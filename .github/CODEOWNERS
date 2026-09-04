@@ -1,0 +1,15 @@
+# 这些路径的改动必须由主开发者 review。
+# 在 GitHub 仓库设置里开启 "Require review from Code Owners" 才会真正生效。
+
+# 认证、权限、数据库 —— 敏感区
+/supabase/                  @redmaker007
+/src/lib/supabase/          @redmaker007
+/src/lib/auth/              @redmaker007
+/src/lib/env.ts             @redmaker007
+/src/proxy.ts               @redmaker007
+/src/types/database.ts      @redmaker007
+
+# 构建与部署配置
+/next.config.ts             @redmaker007
+/package.json               @redmaker007
+/.github/                   @redmaker007
