@@ -5,13 +5,13 @@ import {
   type AuthCodeRequestResult,
   type EmailCodeRequestResult,
 } from "./email-otp-service";
+import { FakeEmailOtpAuth } from "./testing/fake-email-otp-auth";
 
 describe("requestEmailCode", () => {
   it("开放学校的精确邮箱域名可以请求验证码", async () => {
+    const auth = new FakeEmailOtpAuth();
     const service = createEmailOtpService({
-      auth: {
-        requestCode: async () => ({ status: "accepted" }),
-      },
+      auth,
       memberSession: {
         hasValidMemberSession: async () => false,
       },
@@ -24,6 +24,7 @@ describe("requestEmailCode", () => {
     await expect(
       service.requestEmailCode("uw-madison", "student@wisc.edu"),
     ).resolves.toEqual({ status: "code_sent" });
+    expect(auth.requestedEmails).toEqual(["student@wisc.edu"]);
   });
 
   it("只规范化整段空格和域名并保留邮箱本地部分", async () => {
@@ -122,10 +123,10 @@ describe("requestEmailCode", () => {
     ["delivery_failed", "send_failed"],
     ["unavailable", "temporarily_unavailable"],
   ])("将 Auth 的 %s 映射为 %s", async (authStatus, expectedStatus) => {
+    const auth = new FakeEmailOtpAuth();
+    auth.nextResult = { status: authStatus };
     const service = createEmailOtpService({
-      auth: {
-        requestCode: async () => ({ status: authStatus }),
-      },
+      auth,
       memberSession: {
         hasValidMemberSession: async () => false,
       },

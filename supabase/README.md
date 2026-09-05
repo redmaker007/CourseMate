@@ -28,6 +28,12 @@ npx supabase link --project-ref <PROJECT_REF>
 npx supabase db push
 ```
 
+无需云端凭据即可先在嵌入式 PostgreSQL 中执行 migration 并验证 RLS：
+
+```bash
+npm test -- supabase/migrations/email-otp-request.test.ts
+```
+
 ## Auth Hook 配置
 
 应用 migration 后，在 Supabase Dashboard 的 Authentication Hooks 中，把

@@ -51,15 +51,13 @@ export function createSupabaseSchoolDirectory(
 ): SchoolDirectoryPort {
   return {
     async matchesEnabledSchool(schoolId, domain) {
-      const { data, error } = await supabase
-        .from("school_email_domains")
-        .select("school_id")
-        .eq("school_id", schoolId)
-        .eq("domain", domain)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc(
+        "enabled_school_id_for_email_domain",
+        { candidate_domain: domain },
+      );
 
       if (error) throw error;
-      return data?.school_id === schoolId;
+      return data === schoolId;
     },
   };
 }
@@ -80,12 +78,24 @@ export function createSupabaseMemberSession(
 
       const { data, error } = await supabase
         .from("member_accounts")
-        .select("user_id")
+        .select("user_id, school_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (error) throw error;
-      return data?.user_id === user.id;
+      if (data?.user_id !== user.id || !user.email) return false;
+
+      const at = user.email.lastIndexOf("@");
+      if (at <= 0 || at !== user.email.indexOf("@")) return false;
+
+      const domain = user.email.slice(at + 1).toLowerCase();
+      const { data: schoolId, error: domainError } = await supabase.rpc(
+        "enabled_school_id_for_email_domain",
+        { candidate_domain: domain },
+      );
+
+      if (domainError) throw domainError;
+      return schoolId === data.school_id;
     },
   };
 }

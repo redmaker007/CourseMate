@@ -32,6 +32,11 @@ alter table public.schools enable row level security;
 alter table public.school_email_domains enable row level security;
 alter table public.member_accounts enable row level security;
 
+grant select on public.schools, public.school_email_domains
+  to anon, authenticated;
+grant select on public.member_accounts
+  to authenticated;
+
 create policy "enabled schools are publicly readable"
   on public.schools for select to anon, authenticated
   using (enabled);
@@ -60,6 +65,31 @@ values (
 insert into public.school_email_domains (domain, school_id)
 values ('wisc.edu', 'uw-madison');
 
+-- This is the single database definition of an enabled exact email domain.
+-- The application compares the returned school id with the user's selection;
+-- the Auth hook uses the same result to guard direct public Auth requests.
+create or replace function public.enabled_school_id_for_email_domain(candidate_domain text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select domains.school_id
+  from public.school_email_domains domains
+  join public.schools schools on schools.id = domains.school_id
+  where domains.domain = lower(btrim(candidate_domain))
+    and schools.enabled
+  limit 1
+$$;
+
+revoke execute
+  on function public.enabled_school_id_for_email_domain(text)
+  from public;
+grant execute
+  on function public.enabled_school_id_for_email_domain(text)
+  to anon, authenticated, supabase_auth_admin;
+
 -- Configure this function as the Supabase Auth "Before User Created" hook.
 -- Both the application and this guard read the same database allowlist.
 create or replace function public.hook_restrict_user_to_enabled_school(event jsonb)
@@ -87,12 +117,7 @@ begin
 
   candidate_domain := lower(split_part(candidate_email, '@', 2));
 
-  if not exists (
-    select 1
-    from public.school_email_domains domains
-    join public.schools schools on schools.id = domains.school_id
-    where domains.domain = candidate_domain and schools.enabled
-  ) then
+  if public.enabled_school_id_for_email_domain(candidate_domain) is null then
     return jsonb_build_object(
       'error', jsonb_build_object(
         'http_code', 403,
