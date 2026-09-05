@@ -24,6 +24,10 @@ pass = "env(SUPABASE_AUTH_SMTP_PASS)"
 admin_email = "env(SUPABASE_AUTH_SMTP_ADMIN_EMAIL)"
 sender_name = "env(SUPABASE_AUTH_SMTP_SENDER_NAME)"
 
+[auth.email.template.confirmation]
+subject = "CourseMate 登录验证码 / Sign-in code"
+content_path = "./supabase/templates/email-otp.html"
+
 [auth.email.template.magic_link]
 subject = "CourseMate 登录验证码 / Sign-in code"
 content_path = "./supabase/templates/email-otp.html"

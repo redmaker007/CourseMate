@@ -41,9 +41,15 @@ describe("Supabase email OTP configuration", () => {
       "utf8",
     );
 
-    expect(config).toContain(
-      'subject = "CourseMate 登录验证码 / Sign-in code"',
-    );
+    for (const templateKind of ["confirmation", "magic_link"]) {
+      expect(config).toMatch(
+        new RegExp(
+          `\\[auth\\.email\\.template\\.${templateKind}\\]` +
+            `[\\s\\S]*?subject = "CourseMate 登录验证码 / Sign-in code"` +
+            `[\\s\\S]*?content_path = "\\./supabase/templates/email-otp\\.html"`,
+        ),
+      );
+    }
     expect(template).toContain("{{ .Token }}");
     expect(template).toContain("6 位");
     expect(template).toContain("6-digit");
