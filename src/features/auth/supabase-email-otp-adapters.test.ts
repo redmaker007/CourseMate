@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
 import {
-  createSupabaseCurrentDeviceSession,
   createSupabaseEmailOtpAuth,
   createSupabaseMemberSession,
   createSupabaseSchoolDirectory,
@@ -30,25 +29,6 @@ describe("Supabase email OTP adapters", () => {
     await expect(adapter.requestCode("student@wisc.edu")).resolves.toEqual({
       status,
     });
-  });
-
-  it("退出只使用 Supabase 当前设备范围", async () => {
-    let signOutInput: unknown;
-    const adapter = createSupabaseCurrentDeviceSession(
-      asSupabaseClient({
-        auth: {
-          signInWithOtp: async () => ({ data: {}, error: null }),
-          verifyOtp: async () => ({ data: {}, error: null }),
-          signOut: async (input: unknown) => {
-            signOutInput = input;
-            return { error: null };
-          },
-        },
-      }),
-    );
-
-    await expect(adapter.signOut()).resolves.toBeUndefined();
-    expect(signOutInput).toEqual({ scope: "local" });
   });
 
   it.each([

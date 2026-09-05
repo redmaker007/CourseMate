@@ -11,7 +11,7 @@ import {
   createMemberSessionReader,
   type MemberSessionDataPort,
 } from "./member-session";
-import type { CurrentDeviceSessionPort } from "./sign-out-service";
+import { createSupabaseCurrentDeviceSession } from "./supabase-current-device-session";
 
 type CourseMateSupabaseClient = SupabaseClient;
 
@@ -74,17 +74,6 @@ export function createSupabaseEmailOtpAuth(
 
     async discardSession() {
       await currentDeviceSession.signOut();
-    },
-  };
-}
-
-export function createSupabaseCurrentDeviceSession(
-  supabase: CourseMateSupabaseClient,
-): CurrentDeviceSessionPort {
-  return {
-    async signOut() {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) throw error;
     },
   };
 }
