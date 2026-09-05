@@ -1,16 +1,29 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
-import { requestEmailCodeAction } from "../actions";
+import { requestEmailCodeAction, verifyEmailCodeAction } from "../actions";
 import type { EnabledSchool } from "../queries";
 import {
   initialRequestEmailCodeState,
   type RequestEmailCodeActionState,
 } from "../request-email-code-state";
+import {
+  initialVerifyEmailCodeState,
+  type VerifyEmailCodeActionState,
+} from "../verify-email-code-state";
 
 function messageTone(status: RequestEmailCodeActionState["status"]) {
   if (status === "code_sent" || status === "already_signed_in") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+function verificationMessageTone(
+  status: VerifyEmailCodeActionState["status"],
+) {
+  if (status === "signed_in" || status === "already_signed_in") {
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
   }
   return "border-rose-200 bg-rose-50 text-rose-800";
@@ -25,9 +38,80 @@ export function RequestEmailCodeForm({
     requestEmailCodeAction,
     initialRequestEmailCodeState,
   );
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [verificationState, verificationAction, verificationPending] =
+    useActionState(verifyEmailCodeAction, initialVerifyEmailCodeState);
+
+  if (state.status === "code_sent" && !editingEmail) {
+    return (
+      <form action={verificationAction} className="space-y-5">
+        <input name="schoolId" type="hidden" value={state.schoolId} />
+        <input name="email" type="hidden" value={state.email} />
+
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+          <p className="text-sm text-indigo-700">验证码已发送至</p>
+          <p className="mt-1 break-all font-medium text-indigo-950">
+            {state.email}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700" htmlFor="code">
+            6 位验证码
+          </label>
+          <input
+            autoComplete="one-time-code"
+            autoFocus
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl tracking-[0.35em] text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+            disabled={verificationPending}
+            id="code"
+            inputMode="numeric"
+            maxLength={6}
+            minLength={6}
+            name="code"
+            pattern="[0-9]{6}"
+            required
+          />
+        </div>
+
+        <button
+          className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          disabled={verificationPending}
+          type="submit"
+        >
+          {verificationPending ? "正在验证…" : "验证并登录"}
+        </button>
+
+        <button
+          className="w-full px-4 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+          disabled={verificationPending}
+          onClick={() => setEditingEmail(true)}
+          type="button"
+        >
+          更换学校或邮箱
+        </button>
+
+        {verificationState.status !== "idle" ? (
+          <p
+            aria-live="polite"
+            className={`rounded-xl border px-4 py-3 text-sm ${verificationMessageTone(verificationState.status)}`}
+            role="status"
+          >
+            {verificationState.message}
+          </p>
+        ) : null}
+      </form>
+    );
+  }
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form
+      action={(formData) => {
+        setEditingEmail(false);
+        formAction(formData);
+      }}
+      className="space-y-5"
+    >
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700" htmlFor="schoolId">
           学校

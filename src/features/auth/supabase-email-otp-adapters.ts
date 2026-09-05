@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type {
   AuthCodeRequestResult,
+  AuthCodeVerificationResult,
   EmailOtpAuthPort,
   MemberSessionPort,
   SchoolDirectoryPort,
@@ -42,6 +43,26 @@ export function createSupabaseEmailOtpAuth(
         return { status: "unavailable" };
       }
       return { status: "delivery_failed" };
+    },
+
+    async verifyCode(email, code): Promise<AuthCodeVerificationResult> {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: "email",
+      });
+
+      if (!error) return { status: "verified" };
+      if (RATE_LIMIT_CODES.has(error.code ?? "") || error.status === 429) {
+        return { status: "rate_limited" };
+      }
+      if (
+        UNAVAILABLE_CODES.has(error.code ?? "") ||
+        (error.status !== undefined && error.status >= 500)
+      ) {
+        return { status: "unavailable" };
+      }
+      return { status: "invalid_or_expired" };
     },
   };
 }

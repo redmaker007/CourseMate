@@ -31,6 +31,36 @@ describe("Supabase email OTP adapters", () => {
     });
   });
 
+  it.each([
+    [null, "verified"],
+    [{ code: "otp_expired", status: 403 }, "invalid_or_expired"],
+    [{ code: "invalid_credentials", status: 400 }, "invalid_or_expired"],
+    [{ code: "over_request_rate_limit", status: 429 }, "rate_limited"],
+    [{ code: "request_timeout", status: 504 }, "unavailable"],
+  ] as const)("将 Supabase 验证结果映射为稳定结果", async (error, status) => {
+    let verificationInput: unknown;
+    const adapter = createSupabaseEmailOtpAuth(
+      asSupabaseClient({
+        auth: {
+          signInWithOtp: async () => ({ data: {}, error: null }),
+          verifyOtp: async (input: unknown) => {
+            verificationInput = input;
+            return { data: {}, error };
+          },
+        },
+      }),
+    );
+
+    await expect(
+      adapter.verifyCode("Student@wisc.edu", "123456"),
+    ).resolves.toEqual({ status });
+    expect(verificationInput).toEqual({
+      email: "Student@wisc.edu",
+      token: "123456",
+      type: "email",
+    });
+  });
+
   it("通过数据库唯一函数核对所选学校和精确域名", async () => {
     const adapter = createSupabaseSchoolDirectory(
       asSupabaseClient({
