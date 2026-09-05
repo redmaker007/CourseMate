@@ -127,6 +127,11 @@ describe("proxy member session", () => {
     expect(response.headers.get("location")).toBe(
       "https://coursemate.example/login?next=%2Fcourses",
     );
+    expect(response.cookies.get("sb-session")?.value).toBe(
+      "refreshed-session",
+    );
+    expect(response.headers.get("set-cookie")).toMatch(/HttpOnly/i);
+    expect(response.headers.get("cache-control")).toContain("no-store");
   });
 
   it("失效 Supabase 会话不能访问受保护路径", async () => {

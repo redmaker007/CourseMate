@@ -3,6 +3,22 @@ import { NextResponse, type NextRequest } from "next/server";
 import { resolveProtectedAccess } from "@/features/auth/protected-access";
 import { updateSession } from "@/lib/supabase/proxy";
 
+const SESSION_RESPONSE_HEADERS = ["cache-control", "expires", "pragma"];
+
+function redirectWithSessionState(url: URL, sessionResponse: NextResponse) {
+  const redirectResponse = NextResponse.redirect(url);
+
+  for (const cookie of sessionResponse.cookies.getAll()) {
+    redirectResponse.cookies.set(cookie);
+  }
+  for (const name of SESSION_RESPONSE_HEADERS) {
+    const value = sessionResponse.headers.get(name);
+    if (value) redirectResponse.headers.set(name, value);
+  }
+
+  return redirectResponse;
+}
+
 /**
  * Next 16 把 middleware 改名为 proxy，导出的函数名也从 middleware 变成 proxy。
  *
@@ -17,7 +33,7 @@ export async function proxy(request: NextRequest) {
   if (access.status === "redirect_to_login") {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", access.nextPath);
-    return NextResponse.redirect(loginUrl);
+    return redirectWithSessionState(loginUrl, response);
   }
 
   return response;
