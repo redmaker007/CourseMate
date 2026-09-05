@@ -15,6 +15,9 @@ describe("Supabase email OTP configuration", () => {
     expect(config).toMatch(
       /\[auth\.email\][\s\S]*max_frequency\s*=\s*"60s"/,
     );
+    expect(config).toMatch(
+      /\[auth\.email\][\s\S]*enable_confirmations\s*=\s*true/,
+    );
   });
 
   it("keeps SMTP identity and credentials in environment variables", async () => {
