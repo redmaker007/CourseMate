@@ -14,7 +14,7 @@ const REQUEST_MESSAGES: Record<
   string
 > = {
   already_signed_in: "你已经登录，无需再次获取验证码。",
-  code_sent: "验证码已发送，请检查收件箱和垃圾邮件。",
+  code_sent: "邮件服务已接受发送请求，请检查收件箱和垃圾邮件。",
   invalid_email: "请输入有效邮箱。",
   rate_limited: "操作过于频繁，请稍后再试。",
   send_failed: "验证码发送失败，请稍后重试。",

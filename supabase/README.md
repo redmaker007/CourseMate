@@ -5,6 +5,8 @@
 ## 目录
 
 - `migrations/` — 按时间戳排序的 SQL migration，只增不改。已经推到 `main` 的 migration 不要编辑，写一个新的去修正。
+- `config.toml` — 可部署的 Supabase Auth 配置，包括 OTP 时效、重发间隔、SMTP 适配层和邮件模板入口。
+- `templates/email-otp.html` — 只包含验证码的中英双语登录邮件，不包含 Magic Link。
 
 ## 铁律
 
@@ -33,6 +35,21 @@ npx supabase db push
 ```bash
 npm test -- supabase/migrations/email-otp-request.test.ts
 ```
+
+## 邮箱 OTP 与 SMTP
+
+`config.toml` 将验证码固定为 6 位、10 分钟有效，并把同一邮箱再次发送的最短间隔设为 60 秒。页面倒计时也使用相同的 60 秒规则。
+
+SMTP 主机、用户、密码、发件邮箱和发件人名称全部通过 `SUPABASE_AUTH_SMTP_*` 环境变量注入；仓库只提交 `.env.example` 中的占位值。切换邮件服务商时修改环境变量（必要时修改 SMTP 端口配置），不需要改验证码请求、验证或成员绑定代码。
+
+本地 `config.toml` 不会仅凭 Git push 自动改变托管的 Supabase 项目。部署负责人需要先在当前终端安全地设置 SMTP 环境变量，再执行：
+
+```bash
+npx supabase link --project-ref <PROJECT_REF>
+npx supabase config push
+```
+
+也可以在 Supabase Dashboard 中配置同样的 Custom SMTP、邮件模板、10 分钟 OTP 有效期和 60 秒发送间隔。真实密钥只放本机或部署平台的 Secret 管理中，不写入 Git、日志或工单。
 
 ## Auth Hook 配置
 
