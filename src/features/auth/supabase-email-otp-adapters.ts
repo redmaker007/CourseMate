@@ -11,6 +11,7 @@ import {
   createMemberSessionReader,
   type MemberSessionDataPort,
 } from "./member-session";
+import type { CurrentDeviceSessionPort } from "./sign-out-service";
 
 type CourseMateSupabaseClient = SupabaseClient;
 
@@ -29,6 +30,8 @@ const UNAVAILABLE_CODES = new Set([
 export function createSupabaseEmailOtpAuth(
   supabase: CourseMateSupabaseClient,
 ): EmailOtpAuthPort {
+  const currentDeviceSession = createSupabaseCurrentDeviceSession(supabase);
+
   return {
     async requestCode(email): Promise<AuthCodeRequestResult> {
       const { error } = await supabase.auth.signInWithOtp({
@@ -70,6 +73,16 @@ export function createSupabaseEmailOtpAuth(
     },
 
     async discardSession() {
+      await currentDeviceSession.signOut();
+    },
+  };
+}
+
+export function createSupabaseCurrentDeviceSession(
+  supabase: CourseMateSupabaseClient,
+): CurrentDeviceSessionPort {
+  return {
+    async signOut() {
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
     },

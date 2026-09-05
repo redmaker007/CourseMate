@@ -4,8 +4,10 @@ import { serverEnv } from "@/lib/server-env";
 
 import { createEmailOtpContextCodec } from "./email-otp-context";
 import { createProductionEmailOtpService } from "./production-email-otp-service";
+import { createProductionSignOutService } from "./production-sign-out-service";
 import type { RequestEmailCodeActionState } from "./request-email-code-state";
 import type { VerifyEmailCodeActionState } from "./verify-email-code-state";
+import type { SignOutResult } from "./sign-out-service";
 
 const REQUEST_MESSAGES: Record<
   Exclude<RequestEmailCodeActionState["status"], "idle">,
@@ -119,4 +121,33 @@ export async function verifyEmailCodeAction(
   );
 
   return { ...result, message: VERIFY_MESSAGES[result.status] };
+}
+
+export type SignOutActionResult = SignOutResult & { message: string };
+
+const SIGN_OUT_MESSAGES: Record<SignOutResult["status"], string> = {
+  signed_out: "已退出当前设备。",
+  temporarily_unavailable: "退出暂时不可用，请稍后重试。",
+};
+
+export async function signOutCurrentDeviceAction(): Promise<SignOutActionResult> {
+  const requestId = crypto.randomUUID();
+
+  let result: SignOutResult;
+  try {
+    const service = await createProductionSignOutService();
+    result = await service.signOutCurrentDevice();
+  } catch {
+    result = { status: "temporarily_unavailable" };
+  }
+
+  console.info(
+    JSON.stringify({
+      operation: "sign_out_current_device",
+      outcome: result.status,
+      requestId,
+    }),
+  );
+
+  return { ...result, message: SIGN_OUT_MESSAGES[result.status] };
 }

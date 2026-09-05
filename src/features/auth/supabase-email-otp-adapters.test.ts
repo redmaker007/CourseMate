@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
 import {
+  createSupabaseCurrentDeviceSession,
   createSupabaseEmailOtpAuth,
   createSupabaseMemberSession,
   createSupabaseSchoolDirectory,
@@ -31,9 +32,9 @@ describe("Supabase email OTP adapters", () => {
     });
   });
 
-  it("只清理当前设备上的不完整 Supabase 会话", async () => {
+  it("退出只使用 Supabase 当前设备范围", async () => {
     let signOutInput: unknown;
-    const adapter = createSupabaseEmailOtpAuth(
+    const adapter = createSupabaseCurrentDeviceSession(
       asSupabaseClient({
         auth: {
           signInWithOtp: async () => ({ data: {}, error: null }),
@@ -46,7 +47,7 @@ describe("Supabase email OTP adapters", () => {
       }),
     );
 
-    await expect(adapter.discardSession()).resolves.toBeUndefined();
+    await expect(adapter.signOut()).resolves.toBeUndefined();
     expect(signOutInput).toEqual({ scope: "local" });
   });
 
