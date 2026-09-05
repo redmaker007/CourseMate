@@ -1,6 +1,6 @@
 "use server";
 
-import { env } from "@/lib/env";
+import { serverEnv } from "@/lib/server-env";
 
 import { createEmailOtpContextCodec } from "./email-otp-context";
 import { createProductionEmailOtpService } from "./production-email-otp-service";
@@ -31,7 +31,7 @@ export async function requestEmailCodeAction(
   let verificationContext = "";
   try {
     const contextCodec = createEmailOtpContextCodec(
-      env.emailOtpContextSecret,
+      serverEnv.emailOtpContextSecret,
     );
     const service = await createProductionEmailOtpService();
     result = await service.requestEmailCode(schoolId, email);
@@ -91,7 +91,7 @@ export async function verifyEmailCodeAction(
   let schoolId = "unresolved";
   try {
     const contextCodec = createEmailOtpContextCodec(
-      env.emailOtpContextSecret,
+      serverEnv.emailOtpContextSecret,
     );
     const context = contextCodec.read(verificationContext);
     if (!context) {
