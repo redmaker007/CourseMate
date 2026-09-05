@@ -37,6 +37,7 @@ describe("requestEmailCode", () => {
     let requestedEmail = "";
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async (email) => {
           requestedEmail = email;
           return { status: "accepted" };
@@ -83,6 +84,7 @@ describe("requestEmailCode", () => {
     let authWasCalled = false;
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async () => {
           authWasCalled = true;
           return { status: "accepted" };
@@ -108,6 +110,7 @@ describe("requestEmailCode", () => {
     let authWasCalled = false;
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async () => {
           authWasCalled = true;
           return { status: "accepted" };
@@ -162,6 +165,7 @@ describe("requestEmailCode", () => {
       const failure = new Error("包含供应商内部信息的错误");
       const service = createEmailOtpService({
         auth: {
+          discardSession: async () => undefined,
           requestCode: async () => {
             if (failingBoundary === "auth") throw failure;
             return { status: "accepted" };
@@ -194,6 +198,7 @@ describe("verifyEmailCode", () => {
     let sessionCheckCount = 0;
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async () => ({ status: "accepted" }),
         verifyCode: async () => ({ status: "verified" }),
       },
@@ -224,6 +229,7 @@ describe("verifyEmailCode", () => {
       let authWasCalled = false;
       const service = createEmailOtpService({
         auth: {
+          discardSession: async () => undefined,
           requestCode: async () => ({ status: "accepted" }),
           verifyCode: async () => {
             authWasCalled = true;
@@ -250,6 +256,7 @@ describe("verifyEmailCode", () => {
     let sessionCheckCount = 0;
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async () => ({ status: "accepted" }),
         verifyCode: async (_email, code) => {
           verifiedCode = code;
@@ -278,6 +285,7 @@ describe("verifyEmailCode", () => {
     let authWasCalled = false;
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async () => ({ status: "accepted" }),
         verifyCode: async () => {
           authWasCalled = true;
@@ -311,6 +319,7 @@ describe("verifyEmailCode", () => {
     let authWasCalled = false;
     const service = createEmailOtpService({
       auth: {
+        discardSession: async () => undefined,
         requestCode: async () => ({ status: "accepted" }),
         verifyCode: async () => {
           authWasCalled = true;
@@ -382,6 +391,7 @@ describe("verifyEmailCode", () => {
         "123456",
       ),
     ).resolves.toEqual({ status: "temporarily_unavailable" });
+    expect(auth.discardedSessionCount).toBe(1);
   });
 
   it("验证边界抛出内部错误时只返回稳定的暂时不可用结果", async () => {
@@ -407,5 +417,32 @@ describe("verifyEmailCode", () => {
     expect(auth.verificationAttempts).toEqual([
       { email: "student@wisc.edu", code: "123456" },
     ]);
+  });
+
+  it("验证成功后的成员查询失败时也清理不完整会话", async () => {
+    let sessionCheckCount = 0;
+    const auth = new FakeEmailOtpAuth();
+    const service = createEmailOtpService({
+      auth,
+      memberSession: {
+        hasValidMemberSession: async () => {
+          sessionCheckCount += 1;
+          if (sessionCheckCount === 2) throw new Error("database unavailable");
+          return false;
+        },
+      },
+      schools: {
+        matchesEnabledSchool: async () => true,
+      },
+    });
+
+    await expect(
+      service.verifyEmailCode(
+        "uw-madison",
+        "student@wisc.edu",
+        "123456",
+      ),
+    ).resolves.toEqual({ status: "temporarily_unavailable" });
+    expect(auth.discardedSessionCount).toBe(1);
   });
 });

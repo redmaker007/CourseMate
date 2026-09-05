@@ -32,6 +32,7 @@ export interface EmailOtpAuthPort {
     email: string,
     code: string,
   ): Promise<AuthCodeVerificationResult>;
+  discardSession(): Promise<void>;
 }
 
 export interface MemberSessionPort {
@@ -167,10 +168,18 @@ export function createEmailOtpService(dependencies: EmailOtpServiceDependencies)
             return { status: "rate_limited" };
           case "unavailable":
             return { status: "temporarily_unavailable" };
-          case "verified":
-            return (await dependencies.memberSession.hasValidMemberSession())
-              ? { status: "signed_in" }
-              : { status: "temporarily_unavailable" };
+          case "verified": {
+            try {
+              if (await dependencies.memberSession.hasValidMemberSession()) {
+                return { status: "signed_in" };
+              }
+            } catch {
+              // A verified Auth session without a readable matching member
+              // binding is intentionally treated as incomplete and removed.
+            }
+            await dependencies.auth.discardSession();
+            return { status: "temporarily_unavailable" };
+          }
         }
       } catch {
         return { status: "temporarily_unavailable" };

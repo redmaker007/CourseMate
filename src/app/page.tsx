@@ -1,3 +1,7 @@
+import {
+  requestEmailCodeAction,
+  verifyEmailCodeAction,
+} from "@/features/auth/actions";
 import { RequestEmailCodeForm } from "@/features/auth/components/request-email-code-form";
 import { getEnabledSchools, type EnabledSchool } from "@/features/auth/queries";
 
@@ -34,7 +38,11 @@ export default async function Home() {
           </p>
         ) : null}
 
-        <RequestEmailCodeForm schools={schools} />
+        <RequestEmailCodeForm
+          requestAction={requestEmailCodeAction}
+          schools={schools}
+          verifyAction={verifyEmailCodeAction}
+        />
       </section>
     </main>
   );

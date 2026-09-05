@@ -31,6 +31,25 @@ describe("Supabase email OTP adapters", () => {
     });
   });
 
+  it("只清理当前设备上的不完整 Supabase 会话", async () => {
+    let signOutInput: unknown;
+    const adapter = createSupabaseEmailOtpAuth(
+      asSupabaseClient({
+        auth: {
+          signInWithOtp: async () => ({ data: {}, error: null }),
+          verifyOtp: async () => ({ data: {}, error: null }),
+          signOut: async (input: unknown) => {
+            signOutInput = input;
+            return { error: null };
+          },
+        },
+      }),
+    );
+
+    await expect(adapter.discardSession()).resolves.toBeUndefined();
+    expect(signOutInput).toEqual({ scope: "local" });
+  });
+
   it.each([
     [null, "verified"],
     [{ code: "otp_expired", status: 403 }, "invalid_or_expired"],

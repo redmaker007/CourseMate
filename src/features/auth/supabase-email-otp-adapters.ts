@@ -64,6 +64,11 @@ export function createSupabaseEmailOtpAuth(
       }
       return { status: "invalid_or_expired" };
     },
+
+    async discardSession() {
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
+    },
   };
 }
 

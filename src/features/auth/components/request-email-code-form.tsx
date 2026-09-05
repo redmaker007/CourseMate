@@ -2,7 +2,6 @@
 
 import { useActionState, useState } from "react";
 
-import { requestEmailCodeAction, verifyEmailCodeAction } from "../actions";
 import type { EnabledSchool } from "../queries";
 import {
   initialRequestEmailCodeState,
@@ -31,22 +30,35 @@ function verificationMessageTone(
 
 export function RequestEmailCodeForm({
   schools,
+  requestAction,
+  verifyAction,
 }: {
   schools: EnabledSchool[];
+  requestAction: (
+    previousState: RequestEmailCodeActionState,
+    formData: FormData,
+  ) => Promise<RequestEmailCodeActionState>;
+  verifyAction: (
+    previousState: VerifyEmailCodeActionState,
+    formData: FormData,
+  ) => Promise<VerifyEmailCodeActionState>;
 }) {
   const [state, formAction, pending] = useActionState(
-    requestEmailCodeAction,
+    requestAction,
     initialRequestEmailCodeState,
   );
   const [editingEmail, setEditingEmail] = useState(false);
   const [verificationState, verificationAction, verificationPending] =
-    useActionState(verifyEmailCodeAction, initialVerifyEmailCodeState);
+    useActionState(verifyAction, initialVerifyEmailCodeState);
 
   if (state.status === "code_sent" && !editingEmail) {
     return (
       <form action={verificationAction} className="space-y-5">
-        <input name="schoolId" type="hidden" value={state.schoolId} />
-        <input name="email" type="hidden" value={state.email} />
+        <input
+          name="verificationContext"
+          type="hidden"
+          value={state.verificationContext}
+        />
 
         <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
           <p className="text-sm text-indigo-700">验证码已发送至</p>

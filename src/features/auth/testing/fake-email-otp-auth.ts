@@ -7,6 +7,7 @@ import type {
 export class FakeEmailOtpAuth implements EmailOtpAuthPort {
   readonly requestedEmails: string[] = [];
   readonly verificationAttempts: Array<{ email: string; code: string }> = [];
+  discardedSessionCount = 0;
   nextResult: AuthCodeRequestResult = { status: "accepted" };
   nextVerificationResult: AuthCodeVerificationResult = { status: "verified" };
   nextError: Error | null = null;
@@ -26,5 +27,9 @@ export class FakeEmailOtpAuth implements EmailOtpAuthPort {
 
     if (this.nextError) throw this.nextError;
     return this.nextVerificationResult;
+  }
+
+  async discardSession(): Promise<void> {
+    this.discardedSessionCount += 1;
   }
 }

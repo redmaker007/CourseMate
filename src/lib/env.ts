@@ -30,6 +30,12 @@ export const env = {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     );
   },
+  get emailOtpContextSecret() {
+    return required(
+      "EMAIL_OTP_CONTEXT_SECRET",
+      process.env.EMAIL_OTP_CONTEXT_SECRET,
+    );
+  },
   /** 站点公开地址，用于拼邮箱验证的回调链接。本地是 http://localhost:3000 */
   get siteUrl() {
     return (

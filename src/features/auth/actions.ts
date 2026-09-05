@@ -1,5 +1,8 @@
 "use server";
 
+import { env } from "@/lib/env";
+
+import { createEmailOtpContextCodec } from "./email-otp-context";
 import { createProductionEmailOtpService } from "./production-email-otp-service";
 import type { RequestEmailCodeActionState } from "./request-email-code-state";
 import type { VerifyEmailCodeActionState } from "./verify-email-code-state";
@@ -25,9 +28,19 @@ export async function requestEmailCodeAction(
   const requestId = crypto.randomUUID();
 
   let result;
+  let verificationContext = "";
   try {
+    const contextCodec = createEmailOtpContextCodec(
+      env.emailOtpContextSecret,
+    );
     const service = await createProductionEmailOtpService();
     result = await service.requestEmailCode(schoolId, email);
+    if (result.status === "code_sent") {
+      verificationContext = contextCodec.issue({
+        schoolId: result.schoolId,
+        email: result.email,
+      });
+    }
   } catch {
     result = { status: "temporarily_unavailable" } as const;
   }
@@ -40,6 +53,14 @@ export async function requestEmailCodeAction(
       schoolId,
     }),
   );
+
+  if (result.status === "code_sent") {
+    return {
+      ...result,
+      message: REQUEST_MESSAGES.code_sent,
+      verificationContext,
+    };
+  }
 
   return { ...result, message: REQUEST_MESSAGES[result.status] };
 }
@@ -60,15 +81,30 @@ export async function verifyEmailCodeAction(
   _previousState: VerifyEmailCodeActionState,
   formData: FormData,
 ): Promise<VerifyEmailCodeActionState> {
-  const schoolId = String(formData.get("schoolId") ?? "");
-  const email = String(formData.get("email") ?? "");
+  const verificationContext = String(
+    formData.get("verificationContext") ?? "",
+  );
   const code = String(formData.get("code") ?? "");
   const requestId = crypto.randomUUID();
 
   let result;
+  let schoolId = "unresolved";
   try {
-    const service = await createProductionEmailOtpService();
-    result = await service.verifyEmailCode(schoolId, email, code);
+    const contextCodec = createEmailOtpContextCodec(
+      env.emailOtpContextSecret,
+    );
+    const context = contextCodec.read(verificationContext);
+    if (!context) {
+      result = { status: "invalid_email" } as const;
+    } else {
+      schoolId = context.schoolId;
+      const service = await createProductionEmailOtpService();
+      result = await service.verifyEmailCode(
+        context.schoolId,
+        context.email,
+        code,
+      );
+    }
   } catch {
     result = { status: "temporarily_unavailable" } as const;
   }
