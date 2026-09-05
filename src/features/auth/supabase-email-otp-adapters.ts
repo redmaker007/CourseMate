@@ -7,6 +7,10 @@ import type {
   MemberSessionPort,
   SchoolDirectoryPort,
 } from "./email-otp-service";
+import {
+  createMemberSessionReader,
+  type MemberSessionDataPort,
+} from "./member-session";
 
 type CourseMateSupabaseClient = SupabaseClient;
 
@@ -91,37 +95,54 @@ export function createSupabaseSchoolDirectory(
 export function createSupabaseMemberSession(
   supabase: CourseMateSupabaseClient,
 ): MemberSessionPort {
+  const reader = createSupabaseMemberSessionReader(supabase);
+
   return {
     async hasValidMemberSession() {
+      return (await reader.getMemberSession()) !== null;
+    },
+  };
+}
+
+export function createSupabaseMemberSessionReader(
+  supabase: CourseMateSupabaseClient,
+) {
+  const data: MemberSessionDataPort = {
+    async getVerifiedUser() {
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError?.name === "AuthSessionMissingError") return false;
+      if (userError?.name === "AuthSessionMissingError") return null;
       if (userError) throw userError;
-      if (!user) return false;
+      if (!user?.email) return null;
 
+      return { id: user.id, email: user.email };
+    },
+
+    async getMemberBinding(userId) {
       const { data, error } = await supabase
         .from("member_accounts")
         .select("user_id, school_id")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (error) throw error;
-      if (data?.user_id !== user.id || !user.email) return false;
+      if (!data) return null;
+      return { userId: data.user_id, schoolId: data.school_id };
+    },
 
-      const at = user.email.lastIndexOf("@");
-      if (at <= 0 || at !== user.email.indexOf("@")) return false;
-
-      const domain = user.email.slice(at + 1).toLowerCase();
+    async getEnabledSchoolIdForDomain(domain) {
       const { data: schoolId, error: domainError } = await supabase.rpc(
         "enabled_school_id_for_email_domain",
         { candidate_domain: domain },
       );
 
       if (domainError) throw domainError;
-      return schoolId === data.school_id;
+      return schoolId;
     },
   };
+
+  return createMemberSessionReader(data);
 }
