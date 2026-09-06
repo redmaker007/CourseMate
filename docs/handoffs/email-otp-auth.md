@@ -1,8 +1,11 @@
 # 学校邮箱 OTP 认证模块交接
 
-> 更新日期：2026-09-07  
-> 工作分支：`feature/email-otp-auth`  
-> 父级需求：[GitHub Issue #1](https://github.com/redmaker007/CourseMate/issues/1)  
+> 更新日期：2026-09-07
+>
+> 工作分支：`feature/email-otp-auth`
+>
+> 父级需求：[GitHub Issue #1](https://github.com/redmaker007/CourseMate/issues/1)
+>
 > 当前验收入口：[GitHub Issue #7](https://github.com/redmaker007/CourseMate/issues/7)
 
 ## 当前结论
