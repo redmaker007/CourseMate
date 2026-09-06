@@ -30,6 +30,7 @@ export async function requestEmailCodeAction(
   const requestId = crypto.randomUUID();
 
   let result;
+  let flowId = "";
   let verificationContext = "";
   try {
     const contextCodec = createEmailOtpContextCodec(
@@ -38,6 +39,7 @@ export async function requestEmailCodeAction(
     const service = await createProductionEmailOtpService();
     result = await service.requestEmailCode(schoolId, email);
     if (result.status === "code_sent") {
+      flowId = crypto.randomUUID();
       verificationContext = contextCodec.issue({
         schoolId: result.schoolId,
         email: result.email,
@@ -46,19 +48,22 @@ export async function requestEmailCodeAction(
   } catch {
     result = { status: "temporarily_unavailable" } as const;
   }
+  const loggedSchoolId =
+    result.status === "code_sent" ? result.schoolId : "unresolved";
 
   console.info(
     JSON.stringify({
       operation: "request_email_code",
       outcome: result.status,
       requestId,
-      schoolId,
+      schoolId: loggedSchoolId,
     }),
   );
 
   if (result.status === "code_sent") {
     return {
       ...result,
+      flowId,
       message: REQUEST_MESSAGES.code_sent,
       verificationContext,
     };

@@ -183,13 +183,13 @@ function VerificationStep({
       </div>
 
       <VerifyCodeForm
-        key={activeState.verificationContext}
+        key={`verify-${activeState.flowId}`}
         verificationContext={activeState.verificationContext}
         verifyAction={verifyAction}
       />
 
       <ResendCodeForm
-        key={activeState.verificationContext}
+        key={`resend-${activeState.flowId}`}
         action={resendAction}
         email={activeState.email}
         pending={resendPending}
@@ -237,7 +237,7 @@ export function RequestEmailCodeForm({
     return (
       <VerificationStep
         initialState={state}
-        key={state.verificationContext}
+        key={`verification-${state.flowId}`}
         onEditEmail={() => setEditingEmail(true)}
         requestAction={requestAction}
         verifyAction={verifyAction}
