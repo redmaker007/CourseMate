@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
+import { createSupabaseMemberSessionReader } from "@/features/auth/supabase-email-otp-adapters";
 import { env } from "@/lib/env";
+import { hardenSessionCookieOptions } from "@/lib/supabase/session-cookie-options";
 import type { Database } from "@/types/database";
 
 /**
@@ -20,7 +22,14 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
+            cookieStore.set(
+              name,
+              value,
+              hardenSessionCookieOptions(
+                options,
+                process.env.NODE_ENV === "production",
+              ),
+            );
           }
         } catch {
           // 在 Server Component 里不允许写 cookie。刷新 token 的写入由 src/proxy.ts
@@ -32,15 +41,12 @@ export async function createClient() {
 }
 
 /**
- * 拿当前登录用户。返回 null 表示未登录。
+ * 读取当前 CourseMate 成员会话。返回 null 表示未登录。
  *
- * 用 getUser() 而不是 getSession()：前者会向 Supabase 校验 JWT，后者只读 cookie，
- * 服务端信任未校验的 cookie 会被伪造。
+ * 这里与 OTP 认证和 Proxy 复用同一个成员会话定义：服务端验证过的
+ * Supabase 用户、Member Account 及一致的学校绑定缺一不可。
  */
-export async function getCurrentUser() {
+export async function getMemberSession() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  return createSupabaseMemberSessionReader(supabase).getMemberSession();
 }

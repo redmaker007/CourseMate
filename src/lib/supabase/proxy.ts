@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 import { env } from "@/lib/env";
+import { hardenSessionCookieOptions } from "@/lib/supabase/session-cookie-options";
 import type { Database } from "@/types/database";
+import { createSupabaseMemberSessionReader } from "@/features/auth/supabase-email-otp-adapters";
 
 /**
  * 在 proxy（Next 16 里 middleware 的新名字）中刷新 Supabase session。
@@ -28,7 +30,14 @@ export async function updateSession(request: NextRequest) {
           }
           response = NextResponse.next({ request });
           for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
+            response.cookies.set(
+              name,
+              value,
+              hardenSessionCookieOptions(
+                options,
+                request.nextUrl.protocol === "https:",
+              ),
+            );
           }
           // 这些是 no-cache 相关头。不设的话 CDN/反向代理可能把带着 A 的 auth
           // cookie 的响应缓存下来发给 B。
@@ -40,10 +49,14 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // 必须用 getUser()：它会去校验 JWT。只读 cookie 的 getSession() 在服务端不可信。
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let memberSession = null;
+  try {
+    memberSession = await createSupabaseMemberSessionReader(
+      supabase,
+    ).getMemberSession();
+  } catch {
+    // Fail closed: Auth 或数据库暂时不可用时，不把请求视为成员会话。
+  }
 
-  return { response, user };
+  return { response, memberSession };
 }
