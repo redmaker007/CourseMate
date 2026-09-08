@@ -10,16 +10,15 @@ export type EnabledSchool = {
 
 export async function getEnabledSchools(): Promise<EnabledSchool[]> {
   const supabase = await createClient();
-  const untypedSupabase = supabase as unknown as import("@supabase/supabase-js").SupabaseClient;
-  const { data, error } = await untypedSupabase
+  const { data, error } = await supabase
     .from("schools")
     .select("id, name_en, name_zh")
     .order("name_en");
 
   if (error) throw error;
   return (data ?? []).map((school) => ({
-    id: String(school.id),
-    nameEn: String(school.name_en),
-    nameZh: String(school.name_zh),
+    id: school.id,
+    nameEn: school.name_en,
+    nameZh: school.name_zh,
   }));
 }
