@@ -22,7 +22,7 @@
 | 开发用 Supabase 项目 | 主开发者自有，URL 与 key 在本地 `.env.local`（不入库） |
 | 学校配置 | `uw-madison` / `wisc.edu`、`umich` / `umich.edu`，两所都已开启 |
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
-| Vercel 项目 | `course-mate`，preview 部署带访问保护，仅项目所有者可见 |
+| Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
 | Git 集成 | **未连接**，目前用 `npx vercel deploy` 手动部署 |
 
 `feature/email-otp-auth` 分支已并入 `main`，合并后 98 项测试与生产构建均重新跑过并通过。
@@ -162,7 +162,13 @@ npx vercel env add NEXT_PUBLIC_SUPABASE_URL production --value "<url>" --no-sens
 
 每个 `vercel deploy` 生成一个独立不变的 URL。改完环境变量必须**重新部署**，旧链接不会自动更新。排查时先确认自己打开的是最新那个部署。
 
-当前 preview 部署带访问保护，陌生人访问会 302 跳到 Vercel 登录页。要公开访问需要部署到正式环境（`vercel deploy --prod`），届时要考虑：任何人都能触发发信，消耗 SMTP 额度。
+### 公开的是生产部署，预览部署仍受保护
+
+`vercel deploy` 发的是**预览**部署，受 Vercel Authentication 保护，陌生人会被 302 送去 Vercel 登录页。`vercel deploy --prod` 发的是**生产**部署，在 Hobby 方案下不受该保护，且绑定固定网址 <https://course-mate-three.vercel.app>。
+
+这个分工是刻意保留的，不要去关掉 Deployment Protection 开关：试验性改动先发预览版自己看，确认无误再 `--prod`，公开网址不受影响。
+
+公开后任何人都能触发发信，但实际风险有限——Auth Hook 会拒绝 `wisc.edu` / `umich.edu` 之外的所有域名，只有这两所学校的真实邮箱能走到发信那一步。额度上限是 Brevo 每天 300 封，Supabase 侧每小时限流兜底。
 
 ---
 
@@ -209,13 +215,19 @@ npm test && npm run build && npm run lint && npm run typecheck
 
 **注意**：`feature/db-schema` 的 migration 文件名是 14 位时间戳（`20260903000001`），认证模块是 12 位（`202609050001`）。改造时统一格式。
 
-### 2. `fix/codeowners-auth-paths` 分支未合并
+### 2. GitHub 仓库设置 —— CODEOWNERS 目前是一张不生效的纸
 
-认证代码已随 `main` 落地在 `/src/features/auth/`，但 `main` 上的 CODEOWNERS 仍只锁着已经不存在的 `/src/lib/auth/`。**现状是修改认证逻辑不需要主开发者审批。** 该分支同时把持有签名密钥的 `/src/lib/server-env.ts` 纳入保护。
+`.github/CODEOWNERS` 的路径已经修正（`/src/features/auth/` 与 `/src/lib/server-env.ts` 都已纳入），但**分支保护与 "Require review from Code Owners" 仍未在 GitHub 仓库设置里开启**，所以这份名单当前不拦任何人。
 
-### 3. GitHub 仓库设置
+这件事的优先级比字面看起来高：协作者同时拥有 Supabase 后台权限和向 `main` 直接 push 的能力（见下一条）。
 
-分支保护与 "Require review from Code Owners" **仍未开启**。CODEOWNERS 文件本身不会自动生效。
+### 3. 协作者已获得 Supabase 后台权限
+
+2026-09-07 起，协作者被授予 Supabase 组织的 Developer 角色。**Supabase 免费版没有只读或细粒度角色**——任何组织成员都能看到 service_role key、关闭 RLS、读取全部用户邮箱、修改 Auth Hook。
+
+也就是说，代码层的隔离（CODEOWNERS、模块划分）依然成立，但"协作者碰不到权限"在基础设施层已不再成立。主开发者在了解这些代价后仍决定授权，改用口头约定补位：动 Auth Hook 前须打招呼、service_role key 不进代码库、两个账号都开 2FA、日常 UI 开发走本地环境变量而不是开后台。
+
+接手时不要再假设协作者只能改 UI。
 
 ### 4. 产品层面待定
 

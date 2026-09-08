@@ -9,8 +9,8 @@
 /src/proxy.ts               @redmaker007
 /src/types/database.ts      @redmaker007
 
-# 认证代码曾在 /src/lib/auth/，feature/email-otp-auth 起迁到 /src/features/auth/。
-# 两条都留着：合并顺序不确定，少一条就会出现一段无人审批的窗口期。
+# 认证代码现在在 /src/features/auth/，早期版本在 /src/lib/auth/（已删除）。
+# 旧路径留着不删：匹配不到任何文件，没有成本，万一被重建也不会漏审。
 /src/lib/auth/              @redmaker007
 /src/features/auth/         @redmaker007
 
