@@ -232,6 +232,7 @@ export function RequestEmailCodeForm({
     initialRequestEmailCodeState,
   );
   const [editingEmail, setEditingEmail] = useState(false);
+  const [selectedSchoolId, setSelectedSchoolId] = useState("");
 
   if (state.status === "code_sent" && !editingEmail) {
     return (
@@ -244,6 +245,21 @@ export function RequestEmailCodeForm({
       />
     );
   }
+
+  const selectedSchool = schools.find(
+    (school) => school.id === selectedSchoolId,
+  );
+  const acceptedDomains = selectedSchool?.emailDomains ?? [];
+
+  // 选学校之前不能编造一个域名当示例——那会让人以为随便哪所学校都能用。
+  const emailPlaceholder =
+    acceptedDomains.length > 0 ? `name@${acceptedDomains[0]}` : "请先选择学校";
+
+  // 把接受的域名写出来，省得用户拿子域名邮箱反复试。系统是精确匹配的。
+  const emailHint =
+    acceptedDomains.length > 0
+      ? `只接受 ${acceptedDomains.map((domain) => `@${domain}`).join("、")} 结尾的完整邮箱地址。`
+      : "请输入完整邮箱地址，系统不会自动补全后缀。";
 
   return (
     <form
@@ -263,6 +279,7 @@ export function RequestEmailCodeForm({
           disabled={pending || schools.length === 0}
           id="schoolId"
           name="schoolId"
+          onChange={(event) => setSelectedSchoolId(event.target.value)}
           required
         >
           <option disabled value="">
@@ -287,11 +304,11 @@ export function RequestEmailCodeForm({
           id="email"
           inputMode="email"
           name="email"
-          placeholder="name@wisc.edu"
+          placeholder={emailPlaceholder}
           required
           type="email"
         />
-        <p className="text-sm text-slate-500">请输入完整邮箱地址，系统不会自动补全后缀。</p>
+        <p className="text-sm text-slate-500">{emailHint}</p>
       </div>
 
       <button

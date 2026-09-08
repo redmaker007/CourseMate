@@ -45,6 +45,7 @@ describe("RequestEmailCodeForm", () => {
         requestAction={requestAction}
         schools={[
           {
+            emailDomains: ["wisc.edu"],
             id: "uw-madison",
             nameEn: "University of Wisconsin-Madison",
             nameZh: "威斯康星大学麦迪逊分校",
@@ -94,6 +95,7 @@ describe("RequestEmailCodeForm", () => {
         requestAction={requestAction}
         schools={[
           {
+            emailDomains: ["wisc.edu"],
             id: "uw-madison",
             nameEn: "University of Wisconsin-Madison",
             nameZh: "威斯康星大学麦迪逊分校",
@@ -130,5 +132,54 @@ describe("RequestEmailCodeForm", () => {
       }).disabled,
     ).toBe(true);
     expect(requestCount).toBe(2);
+  });
+  it("邮箱提示跟随所选学校变化，不会停留在上一所学校的域名", async () => {
+    const requestAction = async (): Promise<RequestEmailCodeActionState> => ({
+      status: "idle",
+      message: "",
+    });
+    const verifyAction = async (): Promise<VerifyEmailCodeActionState> => ({
+      status: "idle",
+      message: "",
+    });
+
+    render(
+      <RequestEmailCodeForm
+        requestAction={requestAction}
+        schools={[
+          {
+            emailDomains: ["umich.edu"],
+            id: "umich",
+            nameEn: "University of Michigan",
+            nameZh: "密歇根大学",
+          },
+          {
+            emailDomains: ["wisc.edu"],
+            id: "uw-madison",
+            nameEn: "University of Wisconsin-Madison",
+            nameZh: "威斯康星大学麦迪逊分校",
+          },
+        ]}
+        verifyAction={verifyAction}
+      />,
+    );
+
+    const email = screen.getByLabelText("学校邮箱");
+
+    // 还没选学校时不该编造一个域名当示例
+    expect(email.getAttribute("placeholder")).toBe("请先选择学校");
+
+    fireEvent.change(screen.getByLabelText("学校"), {
+      target: { value: "uw-madison" },
+    });
+    expect(email.getAttribute("placeholder")).toBe("name@wisc.edu");
+    expect(screen.getByText("只接受 @wisc.edu 结尾的完整邮箱地址。")).toBeTruthy();
+
+    // 换一所学校后必须跟着变——这里正是原来卡在 wisc.edu 不动的地方
+    fireEvent.change(screen.getByLabelText("学校"), {
+      target: { value: "umich" },
+    });
+    expect(email.getAttribute("placeholder")).toBe("name@umich.edu");
+    expect(screen.getByText("只接受 @umich.edu 结尾的完整邮箱地址。")).toBeTruthy();
   });
 });
