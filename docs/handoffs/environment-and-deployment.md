@@ -198,22 +198,26 @@ npm test && npm run build && npm run lint && npm run typecheck
 
 ## 六、仍然悬而未决
 
-### 1. `feature/db-schema` 与认证模块的 `schools` 表冲突 —— 当前最大阻塞
+### 1. 课程与群聊 migration 尚未应用到线上数据库
 
-两个分支都写了 `create table public.schools`，且都没有 `if not exists`，同库跑第二个必然报错。底层模型也互相矛盾：
+`schools` 表冲突已经解决。原 `feature/db-schema` 分支与认证模块互相矛盾（它自建 `schools`、用数组做后缀匹配、把学校归属放在 `profiles`），已被 `feature/course-and-chat-schema` 取代，新版本建立在认证模块之上：
 
-| | `feature/db-schema` | 已合并的认证模块 |
-|---|---|---|
-| 域名存储 | `schools.domains` 数组 | 独立 `school_email_domains` 表 |
-| 匹配方式 | 后缀匹配，**接受**子域名 | 精确匹配，**拒绝**子域名 |
-| 学校归属 | `profiles.school_id` | `member_accounts.school_id` |
-| 拦截时机 | 创建 profile 时 | 创建 Auth 用户之前 |
+- 不再创建 `schools`，直接引用认证模块的那张表
+- 删掉 `enforce_school_email` 触发器，准入交给 Before User Created Hook
+- `profiles` 不再持有 `school_id`，学校归属的唯一来源是 `member_accounts`
+- 所有指向用户的外键改为引用 `member_accounts(user_id)`——按 ADR-0001，profile 是可选的，没填资料不该导致不能选课
+- 权限改成「先 `revoke all`、再逐项 `grant`」，不再依赖 Supabase default privileges 的隐含行为
+- 文件名统一为 12 位时间戳
 
-**这个分歧事实上已经有答案了**：精确匹配那套已经合并进 `main` 并在真实环境验证生效（`med.umich.edu` 被 403 拒绝）。
+`supabase/migrations/course-and-chat-rls.test.ts` 把**四个 migration 一起**灌进 PGlite 跑了 19 项越权测试（单独跑新的两个证明不了共存），全部通过。
 
-因此 `feature/db-schema` 需要改造：删掉它自己的 `schools`、`profiles.school_id` 绑定和 `enforce_school_email` 触发器，保留 `courses` / `course_members` / `groups` / `group_members` / `messages` 这套业务表，学校归属改从 `member_accounts` 读。基本要重写第一个 migration。
+**剩下的事：这两个 migration 还没有应用到任何真实数据库。** 线上 Supabase 项目目前只有认证模块的表，所以大厅里的课程仍然是占位数据。应用时按 `supabase/migrations/` 的文件名顺序贴进 SQL Editor 即可，不需要 Docker。
 
-**注意**：`feature/db-schema` 的 migration 文件名是 14 位时间戳（`20260903000001`），认证模块是 12 位（`202609050001`）。改造时统一格式。
+应用之后记得重新生成类型——`src/types/database.ts` 至今仍是占位空壳：
+
+```bash
+npx supabase gen types typescript --project-id <REF> > src/types/database.ts
+```
 
 ### 2. GitHub 仓库设置 —— CODEOWNERS 目前是一张不生效的纸
 
