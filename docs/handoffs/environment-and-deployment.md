@@ -1,6 +1,6 @@
 # 环境搭建与部署交接
 
-> 更新日期：2026-09-07
+> 更新日期：2026-09-08
 >
 > 对应 commit：`main` 分支
 >
@@ -23,9 +23,13 @@
 | 学校配置 | `uw-madison` / `wisc.edu`、`umich` / `umich.edu`，两所都已开启 |
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
 | Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
-| Git 集成 | **未连接**，目前用 `npx vercel deploy` 手动部署 |
+| Git 集成 | **未连接** —— `git push` 不会触发部署，见第四节 |
+| 数据库 schema | 四个 migration 均已应用到线上项目，9 张表齐全 |
+| 数据库类型 | 已从线上项目生成，不再是占位空壳 |
+| 课程库 | **空的**。表已就绪，但一门课都还没录 |
+| 前端 | 登录流程可用；大厅是占位页，课程仍是写死的假数据 |
 
-`feature/email-otp-auth` 分支已并入 `main`，合并后 98 项测试与生产构建均重新跑过并通过。
+当前 `main` 上 118 项测试、构建、lint、类型检查均通过。
 
 ---
 
@@ -144,7 +148,7 @@ update public.schools set enabled = true where id = 'umich';
 
 ---
 
-## 四、Vercel 部署的两个坑
+## 四、Vercel 部署
 
 ### `NEXT_PUBLIC_*` 变量绝对不能标成 Sensitive
 
@@ -157,6 +161,18 @@ npx vercel env add NEXT_PUBLIC_SUPABASE_URL production --value "<url>" --no-sens
 ```
 
 `EMAIL_OTP_CONTEXT_SECRET` 是服务端专用、运行时读取，保持 Secret 没问题。它**必须存在**，缺了会让发码 Server Action 直接崩。
+
+### `git push` 不会上线 ← 最容易误解的一点
+
+Vercel **没有连接 GitHub 仓库**。推送只是把代码送到 GitHub，Vercel 对此一无所知。线上版本只有在有人手动执行下面这句时才会更新：
+
+```bash
+npx vercel deploy --prod
+```
+
+所以「合并了修复」和「用户能用上修复」是两件独立的事。改完代码只 push 不部署，线上会一直停在旧版本，而且没有任何报错提示你。
+
+要改成 push 自动部署，需要在 Vercel 后台把项目连上 GitHub 仓库。目前刻意没连——好处是可以先发预览版自己验，坏处就是这条容易忘。
 
 ### 旧部署 URL 会永远停在旧构建
 
@@ -198,26 +214,52 @@ npm test && npm run build && npm run lint && npm run typecheck
 
 ## 六、仍然悬而未决
 
-### 1. 课程与群聊 migration 尚未应用到线上数据库
+### 1. 课程库是空的，前端也还没接上真实数据
 
-`schools` 表冲突已经解决。原 `feature/db-schema` 分支与认证模块互相矛盾（它自建 `schools`、用数组做后缀匹配、把学校归属放在 `profiles`），已被 `feature/course-and-chat-schema` 取代，新版本建立在认证模块之上：
+课程与群聊的四个 migration **已经全部应用到线上 Supabase 项目**，9 张表齐全，类型也已重新生成。数据库这一层不再是阻塞。
 
-- 不再创建 `schools`，直接引用认证模块的那张表
-- 删掉 `enforce_school_email` 触发器，准入交给 Before User Created Hook
-- `profiles` 不再持有 `school_id`，学校归属的唯一来源是 `member_accounts`
-- 所有指向用户的外键改为引用 `member_accounts(user_id)`——按 ADR-0001，profile 是可选的，没填资料不该导致不能选课
-- 权限改成「先 `revoke all`、再逐项 `grant`」，不再依赖 Supabase default privileges 的隐含行为
-- 文件名统一为 12 位时间戳
+`schools` 表冲突已解决：原 `feature/db-schema` 与认证模块互相矛盾（自建 `schools`、用数组做后缀匹配、把学校归属放在 `profiles`），已被重写并合并。新版本不再创建 `schools`、删掉了 `enforce_school_email` 触发器、`profiles` 去掉 `school_id`、用户外键统一引用 `member_accounts(user_id)`、权限改成「先 `revoke all` 再逐项 `grant`」。
 
-`supabase/migrations/course-and-chat-rls.test.ts` 把**四个 migration 一起**灌进 PGlite 跑了 19 项越权测试（单独跑新的两个证明不了共存），全部通过。
+线上匿名探测确认权限符合预期：`schools` 可读（注册页需要），其余六张业务表全部返回 `42501 permission denied`。
 
-**剩下的事：这两个 migration 还没有应用到任何真实数据库。** 线上 Supabase 项目目前只有认证模块的表，所以大厅里的课程仍然是占位数据。应用时按 `supabase/migrations/` 的文件名顺序贴进 SQL Editor 即可，不需要 Docker。
+**剩下两件事：**
 
-应用之后记得重新生成类型——`src/types/database.ts` 至今仍是占位空壳：
+**课程库一门课都没录。** 表是空的，所以就算把前端接上也搜不到任何课。
 
-```bash
-npx supabase gen types typescript --project-id <REF> > src/types/database.ts
+**大厅仍是占位页。** 课程列表来自 `src/features/dashboard/placeholder-data.ts` 里写死的假数据，没有任何页面查过真实的 `courses` 表。
+
+#### 录入课程的注意事项
+
+当前录入方式是团队成员直接在 Supabase 后台操作（后台走 service_role，绕过所有 RLS，不需要网站账号，也不需要任何编辑权限设计）。
+
+批量录入用 SQL Editor 一次性插，不要在 Table Editor 里一行一行点：
+
+```sql
+insert into public.courses (school_id, code, title, term) values
+  ('umich', 'EECS 280', 'Programming and Introductory Data Structures', '2026-fall'),
+  ('umich', 'STATS 250', 'Introduction to Statistics and Data Analysis', '2026-fall');
 ```
+
+三个坑：
+
+- **`code_normalized` 不能出现在插入语句或 CSV 里**，它是数据库自动算出来的生成列，手填直接报错
+- **每插一门课会自动建一个群**，触发器干的，是预期行为
+- **`created_by` 会是 NULL**，因为后台没有登录用户。这对官方课表条目是合理的，但意味着这些课不属于任何学生
+
+数据库会拦住：学期格式不对、`school_id` 不存在、同学期同门课重复。**拦不住**：课名写成乱码、课号张冠李戴——只能靠人核对。
+
+录完验证课程数与群组数应当相等：
+
+```sql
+select (select count(*) from public.courses) as 课程数,
+       (select count(*) from public.groups) as 群组数;
+```
+
+#### 已讨论但决定暂不做的：`school_editors`
+
+曾考虑加一张 `(user_id, school_id)` 的编辑权限表，让课表编辑权按学校隔离。**结论是现在不做**——团队成员用 Supabase 后台录入时 service_role 绕过 RLS，这张表在有管理页之前是死代码。
+
+等到要给第三个人录课、又不想再开数据库权限时再加。届时注意一个坑：查看策略目前是「只能看自己学校的课」，如果只加写权限不改这条，会做出一个**能插入却看不见自己插入内容**的编辑角色。
 
 ### 2. GitHub 仓库设置 —— CODEOWNERS 目前是一张不生效的纸
 
