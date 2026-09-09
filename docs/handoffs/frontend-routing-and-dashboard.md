@@ -1,6 +1,6 @@
 # 前端路由与大厅页交接
 
-> 更新日期：2026-09-07
+> 更新日期：2026-09-08
 >
 > 配套阅读：[`email-otp-auth.md`](./email-otp-auth.md)（认证模块）、[`environment-and-deployment.md`](./environment-and-deployment.md)（环境与部署）
 
@@ -79,7 +79,7 @@
 
 ### 为什么是假数据
 
-`courses` / `course_members` / `groups` / `group_members` / `messages` 这些表**还没进数据库**。`feature/db-schema` 分支上有它们，但和已合并的认证模块存在 `schools` 表冲突，尚未解决——见 [`environment-and-deployment.md`](./environment-and-deployment.md) 第六节第 1 条。
+`courses` / `course_members` / `groups` / `group_members` / `messages` 这些表**已经在线上数据库里了**，`schools` 表冲突也已解决。占位数据还在，是因为两件事：**课程库一门课都没录**，而且**还没有任何页面查过真实的 `courses` 表**。进度见 [`environment-and-deployment.md`](./environment-and-deployment.md)，录入方式见 [录入课程 runbook](../runbooks/seed-courses.md)。
 
 ---
 
@@ -141,7 +141,7 @@ export default async function Page({
 
 ## 七、待办
 
-- **课程与群聊接真实数据**，前置条件是解决 `schools` 表冲突。
+- **课程与群聊接真实数据**。表已在线上，缺的是往 `course_catalog` 灌数据，以及写课程搜索/创建/加入这几个页面。
 - **登录后回到原本想去的页面**：`next` 参数的链路已经通了（proxy 写入、`/login` 读取并校验），但目前只有 `/dashboard` 一个受保护页面，实际还看不出效果。
 - **大厅的移动端适配**没有专门验证过，只用了响应式类。
 - **`/dashboard` 之外还没有任何业务页面**，课程详情、群聊界面都还不存在。
