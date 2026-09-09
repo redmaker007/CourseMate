@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type DashboardHeaderProps = {
   email: string;
   schoolName: string;
@@ -26,14 +28,22 @@ export function DashboardHeader({
           </p>
         </div>
 
-        <form action={signOutAction}>
-          <button
+        <div className="flex items-center gap-2">
+          <Link
             className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-            type="submit"
+            href="/profile"
           >
-            退出登录
-          </button>
-        </form>
+            个人资料
+          </Link>
+          <form action={signOutAction}>
+            <button
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              type="submit"
+            >
+              退出登录
+            </button>
+          </form>
+        </div>
       </div>
     </header>
   );

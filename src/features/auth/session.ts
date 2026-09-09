@@ -8,6 +8,7 @@ export type CurrentMember = {
   userId: string;
   schoolId: string;
   email: string;
+  onboardingComplete: boolean;
 };
 
 /**
@@ -33,7 +34,15 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
     } = await supabase.auth.getUser();
     if (!user?.email) return null;
 
-    return { ...session, email: user.email };
+    const { data: onboardingComplete, error: onboardingError } =
+      await supabase.rpc("has_completed_onboarding");
+    if (onboardingError) return null;
+
+    return {
+      ...session,
+      email: user.email,
+      onboardingComplete: onboardingComplete === true,
+    };
   } catch {
     return null;
   }

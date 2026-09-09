@@ -1,6 +1,6 @@
 import type { MemberSession } from "./member-session";
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth"];
+const PUBLIC_PATHS = ["/", "/login"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(

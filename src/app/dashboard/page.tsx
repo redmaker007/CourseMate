@@ -20,6 +20,7 @@ export default async function DashboardPage({
   // proxy 已经挡过一次，这里再挡一次：不能只信 proxy，页面自己也要重新授权。
   const member = await getCurrentMember();
   if (!member) redirect("/login");
+  if (!member.onboardingComplete) redirect("/onboarding/profile");
 
   const { signout } = await searchParams;
 

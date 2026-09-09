@@ -19,7 +19,14 @@ describe("resolveProtectedAccess", () => {
     ).toEqual({ status: "allow" });
   });
 
-  it.each(["/", "/login", "/auth/callback"])(
+  it("不存在的 signup 路径不属于公开白名单", () => {
+    expect(resolveProtectedAccess("/signup", null)).toEqual({
+      status: "redirect_to_login",
+      nextPath: "/signup",
+    });
+  });
+
+  it.each(["/", "/login"])(
     "没有成员会话也可以访问公开路径 %s",
     (pathname) => {
       expect(resolveProtectedAccess(pathname, null)).toEqual({

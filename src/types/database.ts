@@ -354,6 +354,7 @@ export type Database = {
       }
       is_course_member: { Args: { target_course: string }; Returns: boolean }
       is_group_member: { Args: { target_group: string }; Returns: boolean }
+      has_completed_onboarding: { Args: never; Returns: boolean }
       shares_course_with: { Args: { target_user: string }; Returns: boolean }
     }
     Enums: {

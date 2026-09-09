@@ -7,29 +7,30 @@ import {
 import { RequestEmailCodeForm } from "@/features/auth/components/request-email-code-form";
 import { getEnabledSchools, type EnabledSchool } from "@/features/auth/queries";
 import { getCurrentMember } from "@/features/auth/session";
+import { safeRelativePath } from "@/lib/safe-relative-path";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 只接受站内相对路径，挡掉 //evil.com 和 https://evil.com 这类开放重定向。
  */
-function safeNextPath(value: string | string[] | undefined): string {
-  if (typeof value !== "string") return "/dashboard";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/dashboard";
-  return value;
-}
-
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { next } = await searchParams;
-  const destination = safeNextPath(next);
+  const destination = safeRelativePath(next);
 
   // 验证码校验成功后，Server Action 会让这个页面重新渲染，那时会话已经建立，
   // 于是从这里跳进大厅。落点由页面决定，认证模块只负责返回登录结果。
-  if (await getCurrentMember()) redirect(destination);
+  const member = await getCurrentMember();
+  if (member?.onboardingComplete) redirect(destination);
+  if (member) {
+    redirect(
+      `/onboarding/profile?next=${encodeURIComponent(destination)}`,
+    );
+  }
 
   let schools: EnabledSchool[] = [];
   let schoolsUnavailable = false;

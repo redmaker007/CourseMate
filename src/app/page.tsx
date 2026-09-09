@@ -11,6 +11,8 @@ export const dynamic = "force-dynamic";
  * 会导致同一个界面出现在两个地址上。
  */
 export default async function RootPage() {
-  if (await getCurrentMember()) redirect("/dashboard");
+  const member = await getCurrentMember();
+  if (member?.onboardingComplete) redirect("/dashboard");
+  if (member) redirect("/onboarding/profile");
   redirect("/login");
 }

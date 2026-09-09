@@ -146,4 +146,5 @@ describe("proxy member session", () => {
       "https://coursemate.example/login?next=%2Fcourses",
     );
   });
+
 });
