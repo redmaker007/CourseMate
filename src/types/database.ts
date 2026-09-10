@@ -39,6 +39,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_members: {
+        Row: {
+          cleared_through_message_id: number | null
+          conversation_id: string
+          joined_at: string
+          last_read_message_id: number | null
+          user_id: string
+        }
+        Insert: {
+          cleared_through_message_id?: number | null
+          conversation_id: string
+          joined_at?: string
+          last_read_message_id?: number | null
+          user_id: string
+        }
+        Update: {
+          cleared_through_message_id?: number | null
+          conversation_id?: string
+          joined_at?: string
+          last_read_message_id?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_cleared_message_fkey"
+            columns: ["conversation_id", "cleared_through_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["conversation_id", "id"]
+          },
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_members_last_read_message_fkey"
+            columns: ["conversation_id", "last_read_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["conversation_id", "id"]
+          },
+          {
+            foreignKeyName: "conversation_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          kind: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+        }
+        Relationships: []
+      }
       course_members: {
         Row: {
           course_id: string
@@ -69,6 +143,36 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "member_accounts"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      course_conversations: {
+        Row: {
+          conversation_id: string
+          course_id: string
+        }
+        Insert: {
+          conversation_id: string
+          course_id: string
+        }
+        Update: {
+          conversation_id?: string
+          course_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_conversations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_conversations_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: true
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -120,65 +224,43 @@ export type Database = {
           },
         ]
       }
-      group_members: {
+      direct_conversations: {
         Row: {
-          group_id: string
-          joined_at: string
-          user_id: string
+          conversation_id: string
+          member_high: string | null
+          member_low: string | null
         }
         Insert: {
-          group_id: string
-          joined_at?: string
-          user_id: string
+          conversation_id: string
+          member_high?: string | null
+          member_low?: string | null
         }
         Update: {
-          group_id?: string
-          joined_at?: string
-          user_id?: string
+          conversation_id?: string
+          member_high?: string | null
+          member_low?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "group_members_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
+            foreignKeyName: "direct_conversations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "group_members_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "direct_conversations_member_high_fkey"
+            columns: ["member_high"]
             isOneToOne: false
             referencedRelation: "member_accounts"
             referencedColumns: ["user_id"]
           },
-        ]
-      }
-      groups: {
-        Row: {
-          course_id: string
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          course_id: string
-          created_at?: string
-          id?: string
-          name: string
-        }
-        Update: {
-          course_id?: string
-          created_at?: string
-          id?: string
-          name?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "groups_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: true
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            foreignKeyName: "direct_conversations_member_low_fkey"
+            columns: ["member_low"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -211,34 +293,34 @@ export type Database = {
       messages: {
         Row: {
           body: string
+          conversation_id: string
           created_at: string
           deleted_at: string | null
-          group_id: string
           id: number
           sender_id: string | null
         }
         Insert: {
           body: string
+          conversation_id: string
           created_at?: string
           deleted_at?: string | null
-          group_id: string
           id?: never
           sender_id?: string | null
         }
         Update: {
           body?: string
+          conversation_id?: string
           created_at?: string
           deleted_at?: string | null
-          group_id?: string
           id?: never
           sender_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "messages_group_id_fkey"
-            columns: ["group_id"]
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "groups"
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
           {
@@ -353,7 +435,14 @@ export type Database = {
         Returns: Json
       }
       is_course_member: { Args: { target_course: string }; Returns: boolean }
-      is_group_member: { Args: { target_group: string }; Returns: boolean }
+      can_access_course_conversation: {
+        Args: { target_conversation: string }
+        Returns: boolean
+      }
+      can_send_to_course_conversation: {
+        Args: { target_conversation: string }
+        Returns: boolean
+      }
       has_completed_onboarding: { Args: never; Returns: boolean }
       shares_course_with: { Args: { target_user: string }; Returns: boolean }
     }
