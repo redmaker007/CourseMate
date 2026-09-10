@@ -179,7 +179,8 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 
 ## 作废的东西
 
-- `feature/course-search-and-join` 分支：`/courses` 搜索页、加入退课 Server Action、`schools.current_term`。功能被 #13 覆盖，分支尚未删除。
+- `feature/course-search-and-join` 分支：`/courses` 搜索页、加入退课 Server Action、`schools.current_term`。功能被 #13 覆盖，分支已于 2026-09-10 删除；唯一未合并的提交是 `75dd300`，需要时可按编号找回。
+- 同日一并删除：`feature/db-schema`（未合并提交 `ff5b596`，最早一版 schema，与认证 Spec 冲突，已被 `81313be` 重写取代）、`feature/course-and-chat-schema` 与 `integrate/one-to-one-chat`（均已完整并入 `main`）。组员的 `feature/one-to-one-chat` 保留。
 - 旧的 `supabase/migrations/course-and-chat-rls.test.ts` 仍然保留。它只跑到课程目录那一步，测的是统一会话之前的中间状态（其中还有 `groups` 表），依然有效，但描述的不是最终 schema。
 
 ## 需要协调的事
