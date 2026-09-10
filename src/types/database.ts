@@ -396,6 +396,32 @@ export type Database = {
           },
         ]
       }
+      school_term_settings: {
+        Row: {
+          current_term: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          current_term: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          current_term?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_term_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           created_at: string

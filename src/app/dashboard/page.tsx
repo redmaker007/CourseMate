@@ -2,13 +2,16 @@ import { redirect } from "next/navigation";
 
 import { getEnabledSchools } from "@/features/auth/queries";
 import { getCurrentMember } from "@/features/auth/session";
+import { CourseSearch } from "@/features/courses/components/course-search";
+import {
+  getDashboardCourses,
+  searchAvailableCourses,
+} from "@/features/courses/queries";
 import { signOutAndReturnToLoginAction } from "@/features/dashboard/actions";
 import { CourseCard } from "@/features/dashboard/components/course-card";
 import { DashboardHeader } from "@/features/dashboard/components/dashboard-header";
 import { EmptySlot } from "@/features/dashboard/components/empty-slot";
-import { PlaceholderNotice } from "@/features/dashboard/components/placeholder-notice";
 import { Section } from "@/features/dashboard/components/section";
-import { PLACEHOLDER_COURSES } from "@/features/dashboard/placeholder-data";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +25,8 @@ export default async function DashboardPage({
   if (!member) redirect("/login");
   if (!member.onboardingComplete) redirect("/onboarding/profile");
 
-  const { signout } = await searchParams;
+  const { signout, q, courseAction } = await searchParams;
+  const courseQuery = typeof q === "string" ? q.trim() : "";
 
   let schoolName = member.schoolId;
   try {
@@ -32,6 +36,22 @@ export default async function DashboardPage({
     if (school) schoolName = school.nameZh;
   } catch {
     // 学校名只是展示用，取不到就退回学校 ID，不该拦住整个页面。
+  }
+
+  let courses = { current: [], archived: [] } as Awaited<
+    ReturnType<typeof getDashboardCourses>
+  >;
+  let searchResults = [] as Awaited<ReturnType<typeof searchAvailableCourses>>;
+  let courseDataUnavailable = false;
+  try {
+    [courses, searchResults] = await Promise.all([
+      getDashboardCourses(member),
+      courseQuery
+        ? searchAvailableCourses(member, courseQuery)
+        : Promise.resolve([]),
+    ]);
+  } catch {
+    courseDataUnavailable = true;
   }
 
   return (
@@ -49,29 +69,51 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
-        <PlaceholderNotice />
+        {courseAction === "failed" || courseAction === "invalid" ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900">
+            课程操作失败，请刷新后重试。
+          </div>
+        ) : null}
+
+        {courseDataUnavailable ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+            课程数据暂时不可用，请稍后刷新。
+          </div>
+        ) : null}
+
+        <CourseSearch query={courseQuery} results={searchResults} />
 
         <Section
-          badge="占位数据"
+          badge="当前学期"
           description="加入课程后会自动进入对应的课程群。"
           title="我的课程"
-          action={
-            <button
-              className="cursor-not-allowed rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-400"
-              disabled
-              title="课程功能尚未接入"
-              type="button"
-            >
-              加入课程
-            </button>
-          }
         >
           <ul className="space-y-2.5">
-            {PLACEHOLDER_COURSES.map((course) => (
-              <CourseCard course={course} key={course.id} />
-            ))}
+            {courses.current.length ? (
+              courses.current.map((course) => (
+                <CourseCard course={course} key={course.id} />
+              ))
+            ) : (
+              <li className="rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                还没有加入当前学期的课程，可以从上方搜索。
+              </li>
+            )}
           </ul>
         </Section>
+
+        {courses.archived.length ? (
+          <Section
+            badge="只读"
+            description="已结束学期不再主动显示在当前课程中，但历史消息和成员仍可查看。"
+            title="归档课程"
+          >
+            <ul className="space-y-2.5">
+              {courses.archived.map((course) => (
+                <CourseCard course={course} key={course.id} />
+              ))}
+            </ul>
+          </Section>
+        ) : null}
 
         <Section
           badge="P1"
