@@ -148,6 +148,7 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 | `202609100005_harden_function_execute_grants` | ✅ 线上实测：6 个受限函数对未登录用户全部拒绝，登录必需的函数仍可用 |
 | 从线上重新生成 `src/types/database.ts` | ✅ 1035 行，替换了手工拼接的版本 |
 | `npx vercel deploy --prod` | ✅ 2026-09-10，部署 `38b0636`。部署前核对过环境变量：新代码没有引入新的必需变量 |
+| 热修复：新成员无法保存资料 | ✅ 2026-09-10，部署 `3a43aa2`。见下文「上线后发现的问题」 |
 | 导入并物化课表 | 待执行，见 [录入课程 runbook](../runbooks/seed-courses.md)。在部署之后做没有问题：课程库空着时网站照常运行，只是搜课没有结果 |
 
 **先迁移、后部署代码。** 反过来的话，新代码会去查线上还不存在的 `school_term_settings` 等表，全站报错。而先迁移是安全的：线上当前的代码不读 `groups`、不读课程表。
@@ -160,14 +161,29 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 
 | | |
 |---|---|
-| 全量测试 | **266 项通过**（40 个文件，含两边的全部测试） |
-| 集成测试 | `supabase/migrations/course-catalog-integration.test.ts`，19 项 |
+| 全量测试 | **268 项通过**（40 个文件，含两边的全部测试） |
+| 集成测试 | `supabase/migrations/course-catalog-integration.test.ts`，21 项 |
 | 构建 / lint / 类型检查 | 通过 |
 | 导入脚本预演 | 通过；`--materialize-only` 缺凭据时正确拒绝 |
 | 线上外部探测 | 受限函数对未登录用户全部拒绝；登录必需函数可用；新表齐全；`schools.current_term` 已删；学校邮箱 Hook 仍返回 403 |
 | 部署后冒烟（未登录） | `/login` 200 且列出两所学校；`/`、`/dashboard`、`/courses/*`、`/onboarding`、`/profile` 全部 307 跳转登录并带上 `next`；无 500，部署日志无报错 |
 
 集成测试是**唯一一个按真实顺序跑完全部 migration 的测试**。其余测试各自只跑到自己需要的那一步，足以验证各自功能，但证明不了两条独立开发的线叠在一起还能工作。它覆盖：完整链路、学期单一来源、函数执行权（修复前后对照、枚举检查、内部辅助函数、公开接口仍可间接使用、策略依赖函数仍可用、新函数默认不开放）、目录的 onboarding 与跨校门槛、学生调不动物化、合规建课 / 不合规跳过、幂等、自动配会话、加入后自动成为会话成员、没设学期时拒绝、学期切换后旧会话归档且新学期建出新课。
+
+### 上线后发现的问题：新成员卡在 onboarding
+
+**现象。** 验证码登录成功后进入「先取一个显示名称」，点保存只提示「资料暂时无法保存，请稍后重试」，永远进不了主应用；老成员在 `/profile` 也改不了资料。
+
+**根因。** 两处组员的代码各自正确、叠在一起出错：
+
+- `production-profile-service.ts` 用 `upsert` 保存资料，也就是 `INSERT … ON CONFLICT DO UPDATE`
+- `202609100003_friendship_backend` 把 `profiles` 的读取权限收窄成 `id` / `display_name` / `avatar_url` 三列，`major` / `grad_year` 只能经 `get_own_profile()` 读到
+
+Postgres 要求 `ON CONFLICT DO UPDATE` 对被更新的列有读取权限，于是整句 `permission denied for table profiles`。单独的 `insert` 和 `update` 不受影响。onboarding 的测试只跑到它自己那一步 migration，没有叠上好友后端，所以测试全绿。
+
+**修复（`3a43aa2`）。** 改为先 `insert`，遇到唯一约束冲突（`23505`）再 `update`。没有放宽列级权限——同课同学本来就不该直接读到别人的专业和毕业年份。集成测试补了两项：完整链路下按网站写法保存成功，以及 upsert 确实会被拒（防止有人改回去）。
+
+**教训。** 收窄表或列权限的 migration，要搜一遍应用代码里对这张表的所有写法（尤其 `upsert`、`.select()` 链在写入后面）。验证只能靠跑完全部 migration 的测试。
 
 ### 没验证的
 
@@ -187,4 +203,5 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 
 - **`main` 已经更新。** 在 `feature/one-to-one-chat` 上继续开发之前，要先把 `main` 合进去——他的 `profile_onboarding` migration 已经改名，新写的测试若再按旧文件名串联会找不到文件。
 - **函数执行权的写法要改。** 以后写函数要写全 `revoke … from public, anon, authenticated`，只被内部调用的辅助函数不要授予任何客户端角色。
+- **资料保存已改过。** 他的 `production-profile-service.ts` 不再用 `upsert`，原因见上文「上线后发现的问题」。以后收窄表权限时，要连带检查所有写这张表的代码；新写的数据库测试要跑完全部 migration，至少叠上会影响同一张表的那几个。
 - ADR 编号目前是 0001、0002、0004，**缺 0003**。不确定是跳号还是有一篇尚未提交。
