@@ -13,19 +13,16 @@ export async function getOwnProfile(
   userId: string,
 ): Promise<CurrentProfile | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, display_name, major, grad_year, avatar_url")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_own_profile");
 
   if (error) throw error;
-  if (!data || data.id !== userId) return null;
+  const profile = data?.[0];
+  if (!profile || profile.id !== userId) return null;
 
   return {
-    displayName: data.display_name,
-    major: data.major,
-    gradYear: data.grad_year,
-    avatarUrl: data.avatar_url,
+    displayName: profile.display_name,
+    major: profile.major,
+    gradYear: profile.grad_year,
+    avatarUrl: profile.avatar_url,
   };
 }

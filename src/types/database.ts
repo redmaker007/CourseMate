@@ -290,6 +290,174 @@ export type Database = {
           },
         ]
       }
+      friend_preferences: {
+        Row: {
+          hidden: boolean
+          note: string | null
+          owner_id: string
+          pair_high: string
+          pair_low: string
+        }
+        Insert: {
+          hidden?: boolean
+          note?: string | null
+          owner_id: string
+          pair_high: string
+          pair_low: string
+        }
+        Update: {
+          hidden?: boolean
+          note?: string | null
+          owner_id?: string
+          pair_high?: string
+          pair_low?: string
+        }
+        Relationships: []
+      }
+      friend_rate_limit_buckets: {
+        Row: {
+          action_kind: string
+          actor_id: string
+          request_count: number
+          window_seconds: number
+          window_start: number
+        }
+        Insert: {
+          action_kind: string
+          actor_id: string
+          request_count: number
+          window_seconds: number
+          window_start: number
+        }
+        Update: {
+          action_kind?: string
+          actor_id?: string
+          request_count?: number
+          window_seconds?: number
+          window_start?: number
+        }
+        Relationships: []
+      }
+      friend_rate_limit_config: {
+        Row: {
+          action_kind: string
+          hour_limit: number
+          minute_limit: number
+        }
+        Insert: {
+          action_kind: string
+          hour_limit: number
+          minute_limit: number
+        }
+        Update: {
+          action_kind?: string
+          hour_limit?: number
+          minute_limit?: number
+        }
+        Relationships: []
+      }
+      friend_request_active_pairs: {
+        Row: {
+          pair_high: string
+          pair_low: string
+          request_id: string
+        }
+        Insert: {
+          pair_high: string
+          pair_low: string
+          request_id: string
+        }
+        Update: {
+          pair_high?: string
+          pair_low?: string
+          request_id?: string
+        }
+        Relationships: []
+      }
+      friend_requests: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          message: string
+          pair_high: string
+          pair_low: string
+          recipient_id: string | null
+          requester_id: string | null
+          resolved_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          message: string
+          pair_high: string
+          pair_low: string
+          recipient_id?: string | null
+          requester_id?: string | null
+          resolved_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message?: string
+          pair_high?: string
+          pair_low?: string
+          recipient_id?: string | null
+          requester_id?: string | null
+          resolved_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      friendships: {
+        Row: {
+          active: boolean
+          created_at: string
+          ended_at: string | null
+          pair_high: string
+          pair_low: string
+          reactivated_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          ended_at?: string | null
+          pair_high: string
+          pair_low: string
+          reactivated_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          ended_at?: string | null
+          pair_high?: string
+          pair_low?: string
+          reactivated_at?: string | null
+        }
+        Relationships: []
+      }
+      member_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string
@@ -298,6 +466,7 @@ export type Database = {
           deleted_at: string | null
           id: number
           sender_id: string | null
+          source_friend_request_id: string | null
         }
         Insert: {
           body: string
@@ -306,6 +475,7 @@ export type Database = {
           deleted_at?: string | null
           id?: never
           sender_id?: string | null
+          source_friend_request_id?: string | null
         }
         Update: {
           body?: string
@@ -314,8 +484,16 @@ export type Database = {
           deleted_at?: string | null
           id?: never
           sender_id?: string | null
+          source_friend_request_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_source_friend_request_id_fkey"
+            columns: ["source_friend_request_id"]
+            isOneToOne: true
+            referencedRelation: "friend_requests"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -451,6 +629,95 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_friend_rate_limit: {
+        Args: { target_action: string }
+        Returns: boolean
+      }
+      find_member_by_email: {
+        Args: { candidate_email: string }
+        Returns: {
+          avatar_url: string | null
+          display_name: string | null
+          grad_year: number | null
+          incoming_request_id: string | null
+          major: string | null
+          member_id: string | null
+          relationship_status: string | null
+          result_status: string
+          shared_courses: Json | null
+        }[]
+      }
+      friend_relationship_status: {
+        Args: { target_member_id: string }
+        Returns: string
+      }
+      get_own_profile: {
+        Args: never
+        Returns: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          grad_year: number | null
+          id: string
+          major: string | null
+          updated_at: string
+        }[]
+      }
+      list_friend_requests: {
+        Args: never
+        Returns: {
+          avatar_url: string | null
+          created_at: string
+          direction: string
+          display_name: string | null
+          expires_at: string
+          message: string
+          other_member_id: string | null
+          request_id: string
+          resolved_at: string | null
+          status: string
+        }[]
+      }
+      list_friends: {
+        Args: { include_hidden?: boolean }
+        Returns: {
+          avatar_url: string | null
+          conversation_id: string | null
+          display_name: string
+          effective_name: string
+          grad_year: number | null
+          hidden: boolean
+          major: string | null
+          member_id: string
+          send_status: string
+          shared_courses: Json
+        }[]
+      }
+      members_are_blocked: {
+        Args: { first_member: string; second_member: string }
+        Returns: boolean
+      }
+      remove_friend: { Args: { target_member_id: string }; Returns: string }
+      respond_to_friend_request: {
+        Args: { decision: string; target_request_id: string }
+        Returns: { conversation_id: string | null; result_status: string }[]
+      }
+      send_friend_request: {
+        Args: { request_message: string; target_member_id: string }
+        Returns: { request_id: string | null; result_status: string }[]
+      }
+      set_friend_hidden: {
+        Args: { requested_hidden: boolean; target_member_id: string }
+        Returns: string
+      }
+      set_friend_note: {
+        Args: { requested_note: string | null; target_member_id: string }
+        Returns: string
+      }
+      set_member_blocked: {
+        Args: { requested_blocked: boolean; target_member_id: string }
+        Returns: string
+      }
       current_school_id: { Args: never; Returns: string }
       enabled_school_id_for_email_domain: {
         Args: { candidate_domain: string }
