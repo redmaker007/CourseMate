@@ -17,8 +17,8 @@ const BASE_MIGRATIONS = [
   "202609070001_course_and_chat_schema.sql",
   "202609070002_course_and_chat_rls.sql",
 ] as const;
-const PROFILE_MIGRATION = "202609090001_profile_onboarding.sql";
-const PROFILE_PREFLIGHT = "202609090001_profile_onboarding.sql";
+const PROFILE_MIGRATION = "202609090002_profile_onboarding.sql";
+const PROFILE_PREFLIGHT = "202609090002_profile_onboarding.sql";
 
 type Attempt =
   | { ok: true; rows: Record<string, unknown>[] }

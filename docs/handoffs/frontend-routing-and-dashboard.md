@@ -1,8 +1,10 @@
 # 前端路由与大厅页交接
 
-> 更新日期：2026-09-08
+> 更新日期：2026-09-10
 >
 > 配套阅读：[`email-otp-auth.md`](./email-otp-auth.md)（认证模块）、[`environment-and-deployment.md`](./environment-and-deployment.md)（环境与部署）
+
+> ⚠️ **2026-09-10 现状**：第三节原本描述的是 #13 之前的占位大厅，已按合并后的状态改写。第一、二、五节（路由分流、登录落点、Next.js 版本差异）仍然有效。
 
 ## 背景
 
@@ -62,38 +64,13 @@
 
 ---
 
-## 三、大厅里什么是真的、什么是假的
+## 三、大厅与课程页（已被 #13 取代）
 
-### 真实数据
+这里原先记录的是占位大厅：课程列表写死在 `src/features/dashboard/placeholder-data.ts`，页面顶部挂着"这是占位界面"的黄色提示。课程流程（#13）合并后，占位数据与占位课程卡已删除，大厅改为读取真实的选课与课程会话，并新增了课程会话页 `/courses/[courseId]`。
 
-- **学校名**：按会话里的 `schoolId` 从 `schools` 表查中文名，查不到就退回学校 ID（展示信息不该拦住整个页面）。
-- **邮箱**：来自 `supabase.auth.getUser()`。
+当前实现见 [统一会话核心](./unified-conversation-core.md) 与 [课程目录并入主干](./course-catalog-integration.md)。
 
-这两项顺带起到验证作用——能正确显示，就说明 Member Account 绑定确实生效了。
-
-### 占位数据
-
-课程列表、学习搭子、笔记共享全部是写死的。**全部假数据集中在 `src/features/dashboard/placeholder-data.ts` 一个文件里。**
-
-页面顶部有一条醒目的黄色提示写明"这是占位界面，课程与群聊尚未接入数据库"。**这不是遗漏，是刻意的**——避免后来者把占位数据当成故障去排查。接入真实数据时记得连这条提示一起删掉。
-
-### 为什么是假数据
-
-`courses` / `course_members` / `groups` / `group_members` / `messages` 这些表**已经在线上数据库里了**，`schools` 表冲突也已解决。占位数据还在，是因为两件事：**课程库一门课都没录**，而且**还没有任何页面查过真实的 `courses` 表**。进度见 [`environment-and-deployment.md`](./environment-and-deployment.md)，录入方式见 [录入课程 runbook](../runbooks/seed-courses.md)。
-
----
-
-## 四、接真实数据时怎么改
-
-设计上已经把这一步的成本压到最低：
-
-1. 删掉 `placeholder-data.ts`。
-2. 在 `src/app/dashboard/page.tsx`（Server Component）里查询真实课程。
-3. 把结果按**同样的 props 形状**传给现有组件。
-
-**组件一行都不用改。** 因为 `src/features/dashboard/components/` 下的组件全部是纯展示的——不查数据库、不发请求、不读环境变量，只接收 props。
-
-这也是所有权边界的落地方式：协作者改 UI 时碰不到数据层和权限代码。**新增组件请维持这条约束**，需要数据就往上层要，不要在组件里直接 `createClient()`。
+仍然成立的一条约束：**`src/features/dashboard/components/` 下的组件应保持纯展示**，不查数据库、不发请求，数据由 Server Component 查好后经 props 传入。这是协作者改 UI 时碰不到数据层的前提。
 
 ---
 
@@ -128,7 +105,6 @@ export default async function Page({
 | `src/app/dashboard/page.tsx` | 大厅，取数据并传 props |
 | `src/features/auth/session.ts` | `getCurrentMember()`，页面用的会话读取器。**主开发者职责区** |
 | `src/features/dashboard/actions.ts` | 退出登录并决定落点 |
-| `src/features/dashboard/placeholder-data.ts` | 假数据，接真实数据时删除 |
 | `src/features/dashboard/components/*` | 纯展示组件，**协作者主场** |
 
 `src/features/auth/session.ts` 在 `.github/CODEOWNERS` 的保护范围内（`/src/features/auth/`）。
@@ -141,7 +117,7 @@ export default async function Page({
 
 ## 七、待办
 
-- **课程与群聊接真实数据**。表已在线上，缺的是往 `course_catalog` 灌数据，以及写课程搜索/创建/加入这几个页面。
+- **课程库待导入并物化**，见 [录入课程 runbook](../runbooks/seed-courses.md)。课程搜索、加入与课程会话已由 #13 实现。
 - **登录后回到原本想去的页面**：`next` 参数的链路已经通了（proxy 写入、`/login` 读取并校验），但目前只有 `/dashboard` 一个受保护页面，实际还看不出效果。
 - **大厅的移动端适配**没有专门验证过，只用了响应式类。
 - **`/dashboard` 之外还没有任何业务页面**，课程详情、群聊界面都还不存在。

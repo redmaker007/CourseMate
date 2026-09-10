@@ -13,7 +13,7 @@ const MIGRATIONS = [
   "202609050002_member_account_binding.sql",
   "202609070001_course_and_chat_schema.sql",
   "202609070002_course_and_chat_rls.sql",
-  "202609090001_profile_onboarding.sql",
+  "202609090002_profile_onboarding.sql",
   "202609100001_unified_conversation_core.sql",
 ] as const;
 

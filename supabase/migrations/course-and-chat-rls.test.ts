@@ -81,6 +81,7 @@ beforeAll(async () => {
     "202609050002_member_account_binding.sql",
     "202609070001_course_and_chat_schema.sql",
     "202609070002_course_and_chat_rls.sql",
+    "202609090001_course_catalog.sql",
   ]) {
     const migration = await readFile(
       resolve(process.cwd(), "supabase/migrations", migrationName),
@@ -104,6 +105,14 @@ beforeAll(async () => {
 
     insert into public.profiles (id, display_name) values
       ('${ALICE}', 'Alice'), ('${BOB}', 'Bob'), ('${CAROL}', 'Carol');
+
+    insert into public.course_catalog
+      (school_id, code, subject, number, title, source_course_id)
+    values
+      ('uw-madison', 'ACCT I S 100', 'ACCT I S', '100',
+       'Introductory Financial Accounting', '002983'),
+      ('umich', 'EECS 280', 'EECS', '280',
+       'Programming and Introductory Data Structures', null);
   `);
 
   const created = await asUser(
@@ -342,5 +351,82 @@ describe("退课", () => {
        where group_id = '${groupId}' and user_id = '${ALICE}'`,
     );
     expect(count.rows[0].n).toBe(0);
+  });
+});
+
+describe("课程目录", () => {
+  it("规范化规则与 courses 一致，含空格的学科也能对上", async () => {
+    const row = await database.query<{ code_normalized: string }>(
+      `select code_normalized from public.course_catalog
+       where code = 'ACCT I S 100'`,
+    );
+    expect(row.rows[0].code_normalized).toBe("ACCTIS100");
+  });
+
+  it("学生能读本校目录", async () => {
+    expect(
+      await countAsUser(
+        ALICE,
+        `select count(*)::int as n from public.course_catalog`,
+      ),
+    ).toBe(1);
+  });
+
+  it("读不到外校目录", async () => {
+    const rows = await asUser(
+      ALICE,
+      `select code from public.course_catalog where school_id = 'umich'`,
+    );
+    expect(rows.ok && rows.rows.length).toBe(0);
+  });
+
+  it("学生不能写目录——导入只能走 service_role", async () => {
+    const inserted = await asUser(
+      ALICE,
+      `insert into public.course_catalog
+         (school_id, code, subject, number, title)
+       values ('uw-madison', 'FAKE 101', 'FAKE', '101', 'Injected')`,
+    );
+    expect(inserted.ok).toBe(false);
+
+    const updated = await asUser(
+      ALICE,
+      `update public.course_catalog set title = 'Hacked'
+       where code = 'ACCT I S 100'`,
+    );
+    expect(updated.ok).toBe(false);
+
+    const deleted = await asUser(
+      ALICE,
+      `delete from public.course_catalog where code = 'ACCT I S 100'`,
+    );
+    expect(deleted.ok).toBe(false);
+  });
+
+  it("导入目录不会产生群——那正是它与 courses 分开的原因", async () => {
+    // 断言不变量而不是具体数字：群数恒等于 courses 行数，与目录里有多少条无关。
+    // 如果目录插入也会建群，这个等式立刻不成立。
+    const counts = await database.query<{ courses: number; groups: number }>(
+      `select (select count(*)::int from public.courses) as courses,
+              (select count(*)::int from public.groups)  as groups`,
+    );
+    expect(counts.rows[0].groups).toBe(counts.rows[0].courses);
+
+    const catalogSize = await database.query<{ n: number }>(
+      `select count(*)::int as n from public.course_catalog`,
+    );
+    expect(catalogSize.rows[0].n).toBeGreaterThan(0);
+  });
+
+  it("未登录读不到目录", async () => {
+    await database.exec("set role anon;");
+    let denied = false;
+    try {
+      await database.query("select count(*) from public.course_catalog");
+    } catch {
+      denied = true;
+    }
+    await database.exec("reset role;");
+    expect(denied).toBe(true);
   });
 });

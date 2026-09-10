@@ -12,9 +12,9 @@ Issue #11 实现了强制 Profile onboarding，但本次只提交代码和数据
 
 ## 旧资料与约束验证
 
-应用 migration 前，必须先在目标环境运行只读脚本 `supabase/preflight/202609090001_profile_onboarding.sql`，保存无效资料数量和 ID 清单，确认受影响用户范围。该脚本不会修改数据。
+应用 migration 前，必须先在目标环境运行只读脚本 `supabase/preflight/202609090002_profile_onboarding.sql`，保存无效资料数量和 ID 清单，确认受影响用户范围。该脚本不会修改数据。
 
-Migration `202609090001_profile_onboarding.sql` 新增了 `profiles_display_name_onboarding_check`，并使用 `NOT VALID`：
+Migration `202609090002_profile_onboarding.sql` 新增了 `profiles_display_name_onboarding_check`，并使用 `NOT VALID`：
 
 - 新增或更新的资料立即执行 1–15 字数据库约束。
 - 已有 16–40 字名称不会被截断或删除，但 `has_completed_onboarding()` 会返回 false，成员必须先修正名称。

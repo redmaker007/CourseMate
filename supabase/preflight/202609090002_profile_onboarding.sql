@@ -1,4 +1,4 @@
--- Run this read-only audit before applying 202609090001_profile_onboarding.sql.
+-- Run this read-only audit before applying 202609090002_profile_onboarding.sql.
 -- Existing invalid rows are preserved by the migration but their owners will be
 -- forced through onboarding until they correct the display name.
 select count(*)::int as invalid_profile_count

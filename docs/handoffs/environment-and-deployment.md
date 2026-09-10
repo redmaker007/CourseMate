@@ -1,8 +1,8 @@
 # 环境与部署交接
 
-> 更新日期：2026-09-08
+> 更新日期：2026-09-10
 >
-> 配套阅读：[认证模块交接](./email-otp-auth.md) · [前端路由与大厅](./frontend-routing-and-dashboard.md)
+> 配套阅读：[认证模块交接](./email-otp-auth.md) · [前端路由与大厅](./frontend-routing-and-dashboard.md) · [课程目录并入主干](./course-catalog-integration.md)
 
 ## 这份文档解决什么
 
@@ -22,12 +22,12 @@
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
 | Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
 | Git 集成 | **未连接** —— `git push` 不会触发部署，见第四节 |
-| 数据库 schema | 四个 migration 均已应用到线上项目，9 张表齐全 |
-| 数据库类型 | 已从线上项目生成，不再是占位空壳 |
-| 课程库 | **空的**。表已就绪，但一门课都还没录 |
-| 前端 | 登录流程可用；大厅是占位页，课程仍是写死的假数据 |
+| 数据库 schema | 线上只应用了前五个 migration（至 `202609090001_course_catalog`），外加一列待删除的 `schools.current_term`。**另有五个待上线**，见 [课程目录并入主干](./course-catalog-integration.md) |
+| 数据库类型 | `src/types/database.ts` 目前是**手工拼接**的，线上 migration 应用后必须重新生成 |
+| 课程库 | **空的**。导入脚本已就绪；导入后会自动物化成当前学期课程，学生才搜得到 |
+| 前端 | 统一会话、课程流程、Profile onboarding、好友后端（#11–#14）已在集成分支合并；**线上仍是合并前的版本** |
 
-当前 `main` 上 118 项测试、构建、lint、类型检查均通过。
+集成分支 `integrate/one-to-one-chat` 上 259 项测试、构建、lint、类型检查均通过。
 
 ---
 
@@ -84,21 +84,13 @@
 
 ## 四、仍然悬而未决
 
-### 1. 课程库是空的，前端也还没接上真实数据
+### 1. 五个 migration 待上线，课程库待导入
 
-课程与群聊的四个 migration **已经全部应用到线上 Supabase 项目**，9 张表齐全，类型也已重新生成。数据库这一层不再是阻塞。
+以 `feature/one-to-one-chat` 为主干的合并已在集成分支完成，但**线上 Supabase 还停留在合并前**。
 
-`schools` 表冲突已解决：原 `feature/db-schema` 与认证模块互相矛盾（自建 `schools`、用数组做后缀匹配、把学校归属放在 `profiles`），已被重写并合并。新版本不再创建 `schools`、删掉了 `enforce_school_email` 触发器、`profiles` 去掉 `school_id`、用户外键统一引用 `member_accounts(user_id)`、权限改成「先 `revoke all` 再逐项 `grant`」。
+上线必须严格按顺序：preflight → 依次执行 `202609090002` 至 `202609100004` 五个 migration → 重新生成类型 → 导入并物化课表 → `vercel deploy --prod`。**先迁移、后部署代码**，反过来新代码会去查线上还不存在的表，全站报错。完整步骤与理由见 [课程目录并入主干](./course-catalog-integration.md)。
 
-线上匿名探测确认权限符合预期：`schools` 可读（注册页需要），其余六张业务表全部返回 `42501 permission denied`。
-
-**剩下两件事：**
-
-**课程库一门课都没录。** 表是空的，所以就算把前端接上也搜不到任何课。
-
-**大厅仍是占位页。** 课程列表来自 `src/features/dashboard/placeholder-data.ts` 里写死的假数据，没有任何页面查过真实的 `courses` 表。
-
-录入方式与注意事项见 [录入课程 runbook](../runbooks/seed-courses.md)；数据授权申请见 [申请课程数据授权](../runbooks/request-course-data.md)。
+课程库导入后**必须物化**成当前学期的 `courses`——课程流程禁止学生建课，搜索读的是 `courses` 而不是 `course_catalog`，不物化就搜不到。导入脚本写完目录后会自动物化，见 [录入课程 runbook](../runbooks/seed-courses.md)。数据授权申请见 [申请课程数据授权](../runbooks/request-course-data.md)。
 
 ### 2. GitHub 仓库设置 —— CODEOWNERS 目前是一张不生效的纸
 
