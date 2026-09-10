@@ -147,8 +147,8 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 | `202609100004_integrate_course_catalog` | ✅ |
 | `202609100005_harden_function_execute_grants` | ✅ 线上实测：6 个受限函数对未登录用户全部拒绝，登录必需的函数仍可用 |
 | 从线上重新生成 `src/types/database.ts` | ✅ 1035 行，替换了手工拼接的版本 |
-| 导入并物化课表 | 待执行，见 [录入课程 runbook](../runbooks/seed-courses.md) |
-| `npx vercel deploy --prod` | 待执行——`git push` 不会触发部署 |
+| `npx vercel deploy --prod` | ✅ 2026-09-10，部署 `38b0636`。部署前核对过环境变量：新代码没有引入新的必需变量 |
+| 导入并物化课表 | 待执行，见 [录入课程 runbook](../runbooks/seed-courses.md)。在部署之后做没有问题：课程库空着时网站照常运行，只是搜课没有结果 |
 
 **先迁移、后部署代码。** 反过来的话，新代码会去查线上还不存在的 `school_term_settings` 等表，全站报错。而先迁移是安全的：线上当前的代码不读 `groups`、不读课程表。
 
@@ -165,6 +165,7 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 | 构建 / lint / 类型检查 | 通过 |
 | 导入脚本预演 | 通过；`--materialize-only` 缺凭据时正确拒绝 |
 | 线上外部探测 | 受限函数对未登录用户全部拒绝；登录必需函数可用；新表齐全；`schools.current_term` 已删；学校邮箱 Hook 仍返回 403 |
+| 部署后冒烟（未登录） | `/login` 200 且列出两所学校；`/`、`/dashboard`、`/courses/*`、`/onboarding`、`/profile` 全部 307 跳转登录并带上 `next`；无 500，部署日志无报错 |
 
 集成测试是**唯一一个按真实顺序跑完全部 migration 的测试**。其余测试各自只跑到自己需要的那一步，足以验证各自功能，但证明不了两条独立开发的线叠在一起还能工作。它覆盖：完整链路、学期单一来源、函数执行权（修复前后对照、枚举检查、内部辅助函数、公开接口仍可间接使用、策略依赖函数仍可用、新函数默认不开放）、目录的 onboarding 与跨校门槛、学生调不动物化、合规建课 / 不合规跳过、幂等、自动配会话、加入后自动成为会话成员、没设学期时拒绝、学期切换后旧会话归档且新学期建出新课。
 
