@@ -768,4 +768,20 @@ describe("好友发现与关系状态数据库", () => {
       { requests: 1, friendships: 1, conversations: 1, source_messages: 1 },
     ]);
   });
+
+  it("preserves incoming-request direction in the unique-conflict recovery path", async () => {
+    const migration = await readFile(
+      resolve(
+        process.cwd(),
+        "supabase/migrations/202609100003_friendship_backend.sql",
+      ),
+      "utf8",
+    );
+    const recovery = migration.match(
+      /exception when unique_violation([\s\S]*?)return;\s+end;/,
+    )?.[1];
+
+    expect(recovery).toContain("active_request.recipient_id = actor");
+    expect(recovery).toContain("'incoming_request'");
+  });
 });

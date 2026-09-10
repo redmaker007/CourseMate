@@ -246,10 +246,16 @@ begin
       (pair_low, pair_high, request_id)
     values (low_member, high_member, created_request_id);
   exception when unique_violation then
-    select active.request_id into created_request_id
+    select request.* into active_request
     from public.friend_request_active_pairs active
+    join public.friend_requests request on request.id = active.request_id
     where active.pair_low = low_member and active.pair_high = high_member;
-    return query select 'already_pending'::text, created_request_id;
+    return query select
+      case
+        when active_request.recipient_id = actor then 'incoming_request'
+        else 'already_pending'
+      end,
+      active_request.id;
     return;
   end;
 
