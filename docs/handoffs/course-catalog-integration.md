@@ -2,7 +2,7 @@
 
 > 更新日期：2026-09-10
 >
-> 相关：[统一会话核心](./unified-conversation-core.md) · [Profile onboarding](./profile-onboarding.md) · [好友后端](./friendship-backend.md) · [录入课程 runbook](../runbooks/seed-courses.md)
+> 相关：[统一会话核心](./unified-conversation-core.md) · [Profile onboarding](./profile-onboarding.md) · [好友后端](./friendship-backend.md) · [录入课程 runbook](../runbooks/seed-courses.md) · [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)
 
 ## 背景：两条线撞车了
 
@@ -16,7 +16,7 @@
 
 前者是从 `bad7a76` 分出去的，比课程目录合进 `main` 还早，所以完全不知道目录的存在。
 
-决定：**以 `feature/one-to-one-chat` 为主干合并**，它是一套更完整、自洽的架构；`feature/course-search-and-join` 作废；同时保住课程录入这条链路。集成分支是 `integrate/one-to-one-chat`，没有改动原来的 `feature/one-to-one-chat`。
+决定：**以 `feature/one-to-one-chat` 为主干合并**，它是一套更完整、自洽的架构；`feature/course-search-and-join` 作废；同时保住课程录入这条链路。合并先在 `integrate/one-to-one-chat` 上完成并验证，再快进到 `main`。原来的 `feature/one-to-one-chat` 没有被改动。
 
 ---
 
@@ -75,25 +75,82 @@ SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/import-course-catalog.mts \
 
 ---
 
-## ⚠️ 上线顺序
+## 上线过程中发现的两个问题
 
-线上 Supabase 目前只有前五个 migration（到 `202609090001_course_catalog`），外加那列要删的 `schools.current_term`。**必须严格按下面的顺序：**
+### 1. SQL Editor 不按事务执行 migration
 
-1. 按 [profile-onboarding.md](./profile-onboarding.md) 先跑只读 preflight：`supabase/preflight/202609090002_profile_onboarding.sql`
-2. 在 SQL Editor 依次执行：
-   - `202609090002_profile_onboarding.sql`
-   - `202609100001_unified_conversation_core.sql`
-   - `202609100002_course_flow.sql`
-   - `202609100003_friendship_backend.sql`
-   - `202609100004_integrate_course_catalog.sql`
-3. 从线上重新生成类型，替换手工拼接的版本：
-   ```bash
-   npx supabase gen types typescript --project-id <REF> > src/types/database.ts
-   ```
-4. 导入课表（已导入过则用 `--materialize-only`），见 [录入课程 runbook](../runbooks/seed-courses.md)
-5. `npx vercel deploy --prod`——`git push` 不会触发部署
+在 SQL Editor 里执行 `202609100001_unified_conversation_core.sql` 时报错：
 
-**先迁移、后部署代码。** 反过来的话，新代码会去查线上还不存在的 `conversations`、`school_term_settings`，全站报错。而先迁移是安全的：线上当前的代码不读 `groups`、不读课程表，删掉 `groups` 和改名 `messages.group_id` 不影响它。
+```
+ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
+```
+
+查明的原因：
+
+- SQL Editor 把每条语句**单独提交**，文件里的 `begin; … commit;` 不生效
+- **遇到错误不会停**，报错之后的语句照样执行
+- 该文件第 9 行的临时表是 `on commit drop`，单独提交后立即消失，第 141 行的校验块自然找不到它
+
+证据全部来自线上实测：
+
+| 观察 | 说明 |
+|---|---|
+| `can_access_course_conversation` 等函数存在 | 它们在第 374 行之后才创建，在报错点之后 |
+| `groups`、`group_members` 已不存在 | 删除它们的语句在第 188–189 行，同样在报错点之后 |
+| `messages.group_id` 已改名为 `conversation_id` | 报错点之前的语句 |
+
+所以这个 migration 的结构**很可能已经完整**，唯一没生效的就是那个校验块。那个校验原本用来确认旧群数据完整搬进了新的会话表。线上从未部署过建课界面，这些表里多半没有数据，所以大概率没有真正丢东西——**但这需要诊断查询确认**，不能靠推测。
+
+更值得记住的一点是：这个文件的注释写着「断言失败会回滚，旧表不会删除」。**在 SQL Editor 里这个保证不成立**：校验失败了，删旧表的语句照样执行了。剩下几个文件没有临时表，也没有「先校验、后删除」这种写法，不会踩同一个坑，但同样不是原子执行，任何报错都会留下改到一半的状态。
+
+操作规则已写进 [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)。
+
+### 2. 函数执行权收回得不完整
+
+用未登录身份调用 `can_access_course_conversation`，得到的是 `false`，而不是权限拒绝——这个函数只授予了 `authenticated`。
+
+原因：Supabase 会通过 default privileges 把 public schema 里**新函数的执行权单独授予 `anon` 和 `authenticated`**。此前所有 migration 都只写了 `revoke execute … from public`，只收回了 PUBLIC 这一级，收不回这两份单独的授权。**两位开发者的代码都有这个问题**，课程权限 migration（`202609070002`）也是。
+
+影响分三类：
+
+| 函数 | 影响 |
+|---|---|
+| `members_are_blocked(a, b)` | **真正的泄露点**。本意只在内部使用，但它不校验调用者，任何客户端传入两个成员 ID 就能知道两人之间有没有拉黑 |
+| `consume_friend_rate_limit` | 本意内部使用。按 `auth.uid()` 计数，直接调用只会消耗调用者自己的额度 |
+| 其余按 `auth.uid()` 计算的函数 | 未登录时查的是空用户，只得到 `false` 或空值，无实际泄露 |
+
+本地测试一直没发现，是因为 PGlite 测试桩只复刻了**表**的 default privileges，没复刻**函数**的。
+
+处理：新增 `202609100005_harden_function_execute_grants.sql`：
+
+- 收回 default privileges，以后新建的函数不再自动开放给客户端
+- `anon`：除登录页必需的 `enabled_school_id_for_email_domain` 外全部收回
+- 两个内部辅助函数连 `authenticated` 也收回。它们只被其他 `security definer` 函数在内部调用，以属主身份执行，不需要调用者有执行权；也没有任何 RLS 策略用到它们
+- RLS 策略依赖的函数（`current_school_id`、`has_completed_onboarding` 等）保留 `authenticated` 的执行权，否则策略本身会失效
+
+测试桩已补上函数的 default privileges。集成测试**先断言修复前漏洞确实存在**——证明测试环境真的复现了问题，而不是在空转——再按 `pg_proc` 枚举断言修复后未登录用户只能执行那一个函数。以后新加函数忘了收回，这条会直接失败。
+
+---
+
+## 上线进度
+
+| 步骤 | 状态 |
+|---|---|
+| preflight `202609090002_profile_onboarding.sql` | ✅ 0 个受影响用户 |
+| `202609090002_profile_onboarding` | ✅ |
+| `202609100001_unified_conversation_core` | ⚠️ 非原子执行，校验块失败，结构待诊断确认 |
+| 诊断查询 | 待执行 |
+| `202609100002_course_flow` | 待执行 |
+| `202609100003_friendship_backend` | 待执行 |
+| `202609100004_integrate_course_catalog` | 待执行 |
+| `202609100005_harden_function_execute_grants` | 待执行 |
+| 从线上重新生成 `src/types/database.ts` | 待执行 |
+| 导入并物化课表 | 待执行，见 [录入课程 runbook](../runbooks/seed-courses.md) |
+| `npx vercel deploy --prod` | 待执行——`git push` 不会触发部署 |
+
+**先迁移、后部署代码。** 反过来的话，新代码会去查线上还不存在的 `school_term_settings` 等表，全站报错。而先迁移是安全的：线上当前的代码不读 `groups`、不读课程表。
+
+**`202609100005` 必须在部署代码之前执行。** 在它之前，好友后端的函数对客户端开放；那时 `member_blocks` 还是空的，没有可泄露的数据，但不要把这个窗口留到上线之后。
 
 ---
 
@@ -101,27 +158,30 @@ SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/import-course-catalog.mts \
 
 | | |
 |---|---|
-| 全量测试 | **259 项通过**（40 个文件，含两边的全部测试） |
-| 集成测试 | `supabase/migrations/course-catalog-integration.test.ts`，12 项 |
+| 全量测试 | **266 项通过**（40 个文件，含两边的全部测试） |
+| 集成测试 | `supabase/migrations/course-catalog-integration.test.ts`，19 项 |
 | 构建 / lint / 类型检查 | 通过 |
 | 导入脚本预演 | 通过；`--materialize-only` 缺凭据时正确拒绝 |
 
-集成测试是**唯一一个按真实顺序跑完全部十个 migration 的测试**。其余测试各自只跑到自己需要的那一步，足以验证各自功能，但证明不了两条独立开发的线叠在一起还能工作。它覆盖：完整链路可跑通、学期只有一个来源、目录的 onboarding 与跨校门槛、学生调不动物化、合规建课 / 不合规跳过、幂等、自动配会话、加入后自动成为会话成员、没设学期时拒绝、学期切换后旧会话归档且新学期建出新课。
+集成测试是**唯一一个按真实顺序跑完全部 migration 的测试**。其余测试各自只跑到自己需要的那一步，足以验证各自功能，但证明不了两条独立开发的线叠在一起还能工作。它覆盖：完整链路、学期单一来源、函数执行权（修复前后对照、枚举检查、内部辅助函数、公开接口仍可间接使用、策略依赖函数仍可用、新函数默认不开放）、目录的 onboarding 与跨校门槛、学生调不动物化、合规建课 / 不合规跳过、幂等、自动配会话、加入后自动成为会话成员、没设学期时拒绝、学期切换后旧会话归档且新学期建出新课。
 
 ### 没验证的
 
-- **这五个 migration 都没在真实 Supabase 上跑过**，只在 PGlite 里验证过。线上第一次执行时仍可能遇到平台差异。
-- 物化函数由真实 PostgREST `rpc()` 调用、以及真实课表规模下的耗时，都没测过。
-- `database.ts` 是手工拼接的，与线上真实 schema 可能有细微出入，所以上线顺序第 3 步不能跳过。
+- 剩下四个 migration 都没在真实 Supabase 上执行过，只在 PGlite 里验证过
+- `202609100001` 在线上的最终状态还没有经过诊断确认
+- PGlite 里的 default privileges 是按观察到的 Supabase 行为手工复刻的。真实默认授权挂在 schema 级还是全局级没有直接查过，所以 `202609100005` 两种都写了
+- 物化函数由真实 PostgREST `rpc()` 调用、以及真实课表规模下的耗时，都没测过
+- `database.ts` 是手工拼接的，与线上真实 schema 可能有细微出入
 
 ---
 
 ## 作废的东西
 
 - `feature/course-search-and-join` 分支：`/courses` 搜索页、加入退课 Server Action、`schools.current_term`。功能被 #13 覆盖，分支尚未删除。
-- 旧的 `supabase/migrations/course-and-chat-rls.test.ts` 仍然保留，它只跑到课程目录那一步，测的是统一会话之前的中间状态（其中还有 `groups` 表）。它依然有效，但描述的不是最终 schema。
+- 旧的 `supabase/migrations/course-and-chat-rls.test.ts` 仍然保留。它只跑到课程目录那一步，测的是统一会话之前的中间状态（其中还有 `groups` 表），依然有效，但描述的不是最终 schema。
 
 ## 需要协调的事
 
-- **`feature/one-to-one-chat` 上如果还在继续开发，需要先合并这次的结果**——他的 `profile_onboarding` migration 已经改名，新写的测试若再按旧文件名串联会找不到文件。
+- **`main` 已经更新。** 在 `feature/one-to-one-chat` 上继续开发之前，要先把 `main` 合进去——他的 `profile_onboarding` migration 已经改名，新写的测试若再按旧文件名串联会找不到文件。
+- **函数执行权的写法要改。** 以后写函数要写全 `revoke … from public, anon, authenticated`，只被内部调用的辅助函数不要授予任何客户端角色。
 - ADR 编号目前是 0001、0002、0004，**缺 0003**。不确定是跳号还是有一篇尚未提交。

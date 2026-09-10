@@ -22,12 +22,12 @@
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
 | Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
 | Git 集成 | **未连接** —— `git push` 不会触发部署，见第四节 |
-| 数据库 schema | 线上只应用了前五个 migration（至 `202609090001_course_catalog`），外加一列待删除的 `schools.current_term`。**另有五个待上线**，见 [课程目录并入主干](./course-catalog-integration.md) |
+| 数据库 schema | 上线进行中：`202609090002` 已应用；`202609100001` 在 SQL Editor 里**没有按事务执行**，校验块失败，结构待诊断确认；另有四个待执行（含新增的 `202609100005` 函数权限修复）。见 [课程目录并入主干](./course-catalog-integration.md) |
 | 数据库类型 | `src/types/database.ts` 目前是**手工拼接**的，线上 migration 应用后必须重新生成 |
 | 课程库 | **空的**。导入脚本已就绪；导入后会自动物化成当前学期课程，学生才搜得到 |
 | 前端 | 统一会话、课程流程、Profile onboarding、好友后端（#11–#14）已在集成分支合并；**线上仍是合并前的版本** |
 
-集成分支 `integrate/one-to-one-chat` 上 259 项测试、构建、lint、类型检查均通过。
+`main` 上 266 项测试、构建、lint、类型检查均通过。
 
 ---
 
@@ -84,11 +84,11 @@
 
 ## 四、仍然悬而未决
 
-### 1. 五个 migration 待上线，课程库待导入
+### 1. 上线进行到一半，课程库待导入
 
-以 `feature/one-to-one-chat` 为主干的合并已在集成分支完成，但**线上 Supabase 还停留在合并前**。
+以 `feature/one-to-one-chat` 为主干的合并已并入 `main`，线上迁移执行到一半。`202609100001` 在 SQL Editor 里没有按事务执行——每条语句单独提交、遇错不停——结构待诊断确认。SQL Editor 的这个行为已写进 [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)。
 
-上线必须严格按顺序：preflight → 依次执行 `202609090002` 至 `202609100004` 五个 migration → 重新生成类型 → 导入并物化课表 → `vercel deploy --prod`。**先迁移、后部署代码**，反过来新代码会去查线上还不存在的表，全站报错。完整步骤与理由见 [课程目录并入主干](./course-catalog-integration.md)。
+剩余步骤：诊断查询 → 依次执行 `202609100002` 至 `202609100005` 四个 migration → 重新生成类型 → 导入并物化课表 → `vercel deploy --prod`。**先迁移、后部署代码**，反过来新代码会去查线上还不存在的表，全站报错。完整步骤与理由见 [课程目录并入主干](./course-catalog-integration.md)。
 
 课程库导入后**必须物化**成当前学期的 `courses`——课程流程禁止学生建课，搜索读的是 `courses` 而不是 `course_catalog`，不物化就搜不到。导入脚本写完目录后会自动物化，见 [录入课程 runbook](../runbooks/seed-courses.md)。数据授权申请见 [申请课程数据授权](../runbooks/request-course-data.md)。
 

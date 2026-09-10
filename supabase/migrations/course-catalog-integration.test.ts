@@ -5,12 +5,16 @@ import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
- * 课程目录与课程流程的集成测试。
+ * 全链路集成测试。
  *
  * 这是唯一一个按**真实顺序**跑完全部 migration 的测试。其余测试各自只跑到自己
  * 需要的那一步——足以验证各自的功能，但证明不了两条独立开发的线（课程目录与
  * 统一会话 / 课程流程）叠在一起还能工作。合并时出过迁移时间戳撞号、当前学期存了
  * 两份这类问题，所以这里专门守着完整链路。
+ *
+ * 测试桩复刻了 Supabase 的两类 default privileges：新表与**新函数**都会被单独授予
+ * anon / authenticated。后者此前漏掉了，导致「revoke from public 收不回单独授权」
+ * 这个问题在本地从未暴露。
  */
 
 const MIGRATIONS = [
@@ -26,7 +30,13 @@ const MIGRATIONS = [
   "202609100004_integrate_course_catalog.sql",
 ] as const;
 
+const HARDENING = "202609100005_harden_function_execute_grants.sql";
+
+/** 唯一允许未登录用户执行的函数：登录页在登录前就要用它判断邮箱属于哪所学校。 */
+const ANON_ALLOWED_FUNCTIONS = ["enabled_school_id_for_email_domain"];
+
 const ALICE = "11111111-1111-4111-8111-111111111111"; // wisc，已完成 onboarding
+const BOB = "22222222-2222-4222-8222-222222222222"; // wisc，已完成 onboarding
 const CAROL = "33333333-3333-4333-8333-333333333333"; // umich，已完成 onboarding
 const INCOMPLETE = "55555555-5555-4555-8555-555555555555"; // wisc，没有 Profile
 
@@ -46,6 +56,9 @@ type Materialized = {
 };
 
 let database: PGlite;
+
+/** 修复 migration 之前，未登录用户能否执行内部辅助函数。用来证明测试确实复现了漏洞。 */
+let membersAreBlockedExposedBeforeHardening: boolean;
 
 async function applyMigration(name: string) {
   const sql = await readFile(
@@ -70,6 +83,14 @@ async function asUser(userId: string, sql: string): Promise<Attempt> {
   await database.exec(
     `set role authenticated;
      select set_config('request.jwt.claim.sub', '${userId}', false);`,
+  );
+  return run(sql);
+}
+
+async function asAnon(sql: string): Promise<Attempt> {
+  await database.exec(
+    `select set_config('request.jwt.claim.sub', '', false);
+     set role anon;`,
   );
   return run(sql);
 }
@@ -115,6 +136,13 @@ async function conversationArchivedAt(course: string) {
   return rows.rows[0];
 }
 
+async function anonCanExecute(signature: string): Promise<boolean> {
+  const rows = await database.query<{ allowed: boolean }>(
+    `select has_function_privilege('anon', '${signature}', 'execute') as allowed`,
+  );
+  return rows.rows[0].allowed;
+}
+
 beforeAll(async () => {
   database = new PGlite();
   await database.exec(`
@@ -135,17 +163,27 @@ beforeAll(async () => {
     grant usage on schema public to anon, authenticated;
     alter default privileges in schema public
       grant all on tables to anon, authenticated, service_role;
+    alter default privileges in schema public
+      grant execute on functions to anon, authenticated, service_role;
   `);
 
   for (const migration of MIGRATIONS) await applyMigration(migration);
 
+  membersAreBlockedExposedBeforeHardening = await anonCanExecute(
+    "public.members_are_blocked(uuid, uuid)",
+  );
+
+  await applyMigration(HARDENING);
+
   await database.exec(`
     insert into auth.users (id, email, email_confirmed_at) values
       ('${ALICE}', 'alice@wisc.edu', now()),
+      ('${BOB}', 'bob@wisc.edu', now()),
       ('${CAROL}', 'carol@umich.edu', now()),
       ('${INCOMPLETE}', 'incomplete@wisc.edu', now());
     insert into public.profiles (id, display_name) values
       ('${ALICE}', 'Alice'),
+      ('${BOB}', 'Bob'),
       ('${CAROL}', 'Carol');
 
     insert into public.course_catalog (school_id, code, subject, number, title) values
@@ -161,7 +199,7 @@ afterAll(async () => {
 });
 
 describe("完整迁移链", () => {
-  it("十个 migration 按真实顺序跑通，两条线的表都在", async () => {
+  it("全部 migration 按真实顺序跑通，两条线的表都在", async () => {
     const tables = await database.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public'
@@ -183,6 +221,85 @@ describe("完整迁移链", () => {
          and column_name = 'current_term'`,
     );
     expect(columns.rows).toEqual([]);
+  });
+});
+
+describe("函数执行权", () => {
+  it("修复前漏洞确实存在——证明测试环境真实复刻了 Supabase 的默认授权", () => {
+    // 如果这条不成立，下面几条「修复后没有漏洞」的断言就可能只是在空转
+    expect(membersAreBlockedExposedBeforeHardening).toBe(true);
+  });
+
+  it("未登录用户只能执行登录必需的那一个函数", async () => {
+    // 按 pg_proc 枚举而不是写死列表：以后新加的函数忘了收回，这条会直接失败
+    const executable = await database.query<{ proname: string }>(
+      `select p.proname
+       from pg_proc p
+       join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.prorettype <> 'trigger'::regtype
+         and has_function_privilege('anon', p.oid, 'execute')
+       order by p.proname`,
+    );
+    expect(executable.rows.map((row) => row.proname)).toEqual(
+      ANON_ALLOWED_FUNCTIONS,
+    );
+  });
+
+  it("未登录用户实际调用受限函数会被拒绝", async () => {
+    const attempt = await asAnon(
+      `select public.can_access_course_conversation('00000000-0000-0000-0000-000000000000')`,
+    );
+    expect(attempt.ok).toBe(false);
+  });
+
+  it("内部辅助函数连已登录用户也调用不了——拉黑关系不再能被任意查询", async () => {
+    const blocked = await asUser(
+      ALICE,
+      `select public.members_are_blocked('${BOB}', '${CAROL}')`,
+    );
+    expect(blocked.ok).toBe(false);
+
+    const rateLimit = await asUser(
+      ALICE,
+      "select public.consume_friend_rate_limit('friend_request')",
+    );
+    expect(rateLimit.ok).toBe(false);
+  });
+
+  it("通过公开接口仍能间接用到内部辅助函数", async () => {
+    // send_friend_request 在内部调用 members_are_blocked 与 consume_friend_rate_limit。
+    // 以函数属主身份执行，所以收回调用者的执行权不应影响它。
+    const sent = await asUser(
+      ALICE,
+      `select * from public.send_friend_request('${BOB}', 'hello')`,
+    );
+    expect(sent.ok).toBe(true);
+  });
+
+  it("已登录用户仍能执行 RLS 策略依赖的函数", async () => {
+    const onboarding = await asUser(
+      ALICE,
+      "select public.has_completed_onboarding() as done",
+    );
+    expect(onboarding.ok && onboarding.rows).toEqual([{ done: true }]);
+  });
+
+  it("以后新建的函数只要 revoke from public 就不再对客户端开放", async () => {
+    await database.exec(`
+      create function public._probe_default_privileges()
+      returns integer language sql as $$ select 1 $$;
+      revoke execute on function public._probe_default_privileges() from public;
+    `);
+    expect(await anonCanExecute("public._probe_default_privileges()")).toBe(
+      false,
+    );
+    const authenticated = await database.query<{ allowed: boolean }>(
+      `select has_function_privilege('authenticated',
+         'public._probe_default_privileges()', 'execute') as allowed`,
+    );
+    expect(authenticated.rows[0].allowed).toBe(false);
+    await database.exec("drop function public._probe_default_privileges();");
   });
 });
 

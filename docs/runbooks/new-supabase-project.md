@@ -8,7 +8,34 @@
 
 ## 1. 应用 migration
 
-把 `supabase/migrations/` 下的 SQL 按文件名顺序贴进后台 SQL Editor 执行。不需要 Docker，也不需要 CLI。
+把 `supabase/migrations/` 下的 SQL 按文件名顺序贴进后台 SQL Editor 执行，**一次一个文件**。不需要 Docker，也不需要 CLI。
+
+⚠️ **SQL Editor 不会把一个文件当作一个事务执行。** 2026-09-10 应用统一会话 migration 时实测：
+
+- 文件里的 `begin; … commit;` 不起作用，每条语句各自提交
+- **遇到错误不会停**，报错之后的语句照样执行，最后只报告一个错误
+- 跨语句使用的临时表（`create temp table … on commit drop`）一建完就消失
+
+所以「中途失败会整体回滚」在 SQL Editor 里不成立，「校验失败就中止」这种防护也拦不住后面的破坏性语句——那次校验块报错了，但它身后删旧表的语句照样执行了。执行后**只要看到任何报错，先别跑下一个文件**，把线上当前状态查清楚再说。
+
+写新 migration 时：
+
+- 不要跨语句使用临时表
+- 不要依赖「前面的校验失败会阻止后面的删除」
+- 需要真正原子执行时，改用直连数据库的方式（`psql --single-transaction`，或 `supabase db push`）。注意线上的迁移记录表目前是空的——之前的 migration 都是手工贴进 SQL Editor 的——直接 `db push` 会从第一个文件重跑，需要先用 `supabase migration repair` 标记已应用的版本
+
+### 收回函数执行权要写全
+
+Supabase 会通过 default privileges 把 public schema 里**新函数的执行权单独授予 `anon` 和 `authenticated`**。只写 `revoke execute on function … from public` 收不回这两份单独授权，本意受限的函数会对未登录用户开放。
+
+`202609100005` 已经收回了这个默认值，但写新函数时仍然要写全，不要依赖那一次修复：
+
+```sql
+revoke execute on function public.xxx(uuid) from public, anon, authenticated;
+grant execute on function public.xxx(uuid) to authenticated;  -- 按需
+```
+
+只在其他 `security definer` 函数内部调用的辅助函数，**不要授予任何客户端角色**。它们以函数属主身份执行，不需要调用者有执行权。
 
 ## 2. 注册 Auth Hook ← 最危险的一步
 
