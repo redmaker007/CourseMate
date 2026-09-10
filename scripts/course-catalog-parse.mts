@@ -2,7 +2,11 @@
  * 课程目录导入的纯解析逻辑。
  *
  * 刻意不碰文件、网络和数据库——导入脚本最容易出错的是数据清洗那一段，
- * 把它单独拆出来才测得动。CLI 在 import-course-catalog.ts。
+ * 把它单独拆出来才测得动。CLI 在 import-course-catalog.mts。
+ *
+ * 管理页（src/features/admin/components/catalog-import.tsx）在**浏览器里**也用
+ * 这个模块解析上传的课表，所以这里不能引入任何 Node 专属的东西，包括 exceljs
+ * 本身——工作簿只按 WorkbookLike 的形状读取。
  */
 
 /** 学校原文里表示"没有值"的写法。人工整理的表格里这些都当空处理。 */
@@ -201,4 +205,167 @@ export function dedupeByCode(
 export function looksLikeHeaderRow(cells: unknown[]): boolean {
   const first = cleanRequired(cells[0]).toLowerCase();
   return first === "course code" || first === "code";
+}
+
+// ---------------------------------------------------------------------------
+// 整本工作簿
+// ---------------------------------------------------------------------------
+
+/** 工作表的最小形状。exceljs 的 Worksheet 天然满足它。 */
+export type WorksheetLike = {
+  name: string;
+  eachRow(
+    callback: (row: { values: unknown }, rowNumber: number) => void,
+  ): void;
+};
+
+/** 工作簿的最小形状。exceljs 的 Workbook 天然满足它。 */
+export type WorkbookLike = {
+  worksheets: WorksheetLike[];
+  getWorksheet(name: string): WorksheetLike | undefined;
+};
+
+/** 索引页声明的课程数与实际解析数对不上。actual 为 null 表示找不到对应分页。 */
+export type CountMismatch = {
+  subject: string;
+  expected: number;
+  actual: number | null;
+};
+
+export type CatalogWorkbookReport = {
+  subjects: SubjectRef[];
+  /** 非空时不能导入：两个学科规范化后同名，课号会挤进同一个唯一键。 */
+  collisions: { normalized: string; shortNames: string[] }[];
+  /** 解析成功的行数（去重前）。 */
+  parsedCount: number;
+  /** 去重后可以写入的课。 */
+  records: CatalogRecord[];
+  issues: RowIssue[];
+  duplicates: RowIssue[];
+  mismatches: CountMismatch[];
+};
+
+/** exceljs 的 row.values 从下标 1 开始，第 0 位恒为空。 */
+function rowCells(row: { values: unknown }): unknown[] {
+  return Array.isArray(row.values) ? row.values.slice(1) : [];
+}
+
+function findIndexSheet(workbook: WorkbookLike, indexName: string) {
+  return (
+    workbook.getWorksheet(indexName) ??
+    workbook.worksheets.find((sheet) => /index|subject/i.test(sheet.name))
+  );
+}
+
+/** 索引页：Subject Code | Short Name | Full Department Name | Course Count | Sheet */
+function readSubjectIndex(sheet: WorksheetLike): SubjectRef[] {
+  const subjects: SubjectRef[] = [];
+  sheet.eachRow((row, rowNumber) => {
+    const cells = rowCells(row);
+    if (rowNumber === 1 || /short name/i.test(cleanRequired(cells[1]))) return;
+
+    const shortName = cleanRequired(cells[1]);
+    if (!shortName) return;
+
+    const count = Number(cleanCell(cells[3]));
+    subjects.push({
+      shortName,
+      fullName: cleanCell(cells[2]) ?? undefined,
+      sourceSubjectCode: cleanCell(cells[0]) ?? undefined,
+      expectedCourseCount: Number.isFinite(count) ? count : undefined,
+    });
+  });
+  return subjects;
+}
+
+/**
+ * 解析整本官方课表：索引页给出学科表，其余每个分页是一个院系的课。
+ *
+ * 只出报告、不做决定——要不要因为对账不符或无法解析的行而停下，由调用方判断。
+ * 找不到索引页时抛错，因为那种情况下后面的一切都无从谈起。
+ */
+export function parseCatalogWorkbook(
+  workbook: WorkbookLike,
+  indexName = "Index",
+): CatalogWorkbookReport {
+  const indexSheet = findIndexSheet(workbook, indexName);
+  if (!indexSheet) {
+    throw new Error(
+      `找不到索引页。工作簿里有：${workbook.worksheets
+        .map((sheet) => sheet.name)
+        .join(", ")}`,
+    );
+  }
+
+  const subjects = readSubjectIndex(indexSheet);
+  const collisions = findSubjectCollisions(subjects);
+
+  const parsed: { sheet: string; row: number; record: CatalogRecord }[] = [];
+  const issues: RowIssue[] = [];
+  const perSheetCounts = new Map<string, number>();
+
+  for (const sheet of workbook.worksheets) {
+    if (sheet.name === indexSheet.name) continue;
+
+    let kept = 0;
+    sheet.eachRow((row, rowNumber) => {
+      const cells = rowCells(row);
+      if (looksLikeHeaderRow(cells)) return;
+      if (cells.every((cell) => cleanCell(cell) === null)) return;
+
+      const result = parseCourseRow(cells, subjects);
+      if (!result.ok) {
+        issues.push({
+          sheet: sheet.name,
+          row: rowNumber,
+          code: cleanRequired(cells[0]),
+          reason: result.reason,
+        });
+        return;
+      }
+      parsed.push({ sheet: sheet.name, row: rowNumber, record: result.record });
+      kept += 1;
+    });
+
+    perSheetCounts.set(sheet.name, kept);
+  }
+
+  const { kept: records, duplicates } = dedupeByCode(parsed);
+
+  // 索引页自带 Course Count，拿它对账——源数据自带校验基准很难得，一定要用。
+  const mismatches: CountMismatch[] = [];
+  for (const subject of subjects) {
+    if (subject.expectedCourseCount === undefined) continue;
+    const actual = perSheetCounts.get(subject.shortName);
+    if (actual === undefined) {
+      mismatches.push({
+        subject: subject.shortName,
+        expected: subject.expectedCourseCount,
+        actual: null,
+      });
+    } else if (actual !== subject.expectedCourseCount) {
+      mismatches.push({
+        subject: subject.shortName,
+        expected: subject.expectedCourseCount,
+        actual,
+      });
+    }
+  }
+
+  return {
+    subjects,
+    collisions,
+    parsedCount: parsed.length,
+    records,
+    issues,
+    duplicates,
+    mismatches,
+  };
+}
+
+/** 对账不符的一行说明。脚本与管理页共用，两边的措辞才一致。 */
+export function describeCountMismatch(mismatch: CountMismatch): string {
+  return mismatch.actual === null
+    ? `${mismatch.subject}：索引页说有 ${mismatch.expected} 门，但找不到对应分页`
+    : `${mismatch.subject}：索引页说 ${mismatch.expected} 门，实际解析出 ${mismatch.actual} 门`;
 }

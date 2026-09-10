@@ -774,6 +774,86 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_add_school_domain: {
+        Args: { new_domain: string; target_school: string }
+        Returns: undefined
+      }
+      admin_grant_admin: { Args: { target_email: string }; Returns: string }
+      admin_import_catalog_batch: {
+        Args: { entries: Json; target_school: string }
+        Returns: number
+      }
+      admin_list_audit_log: {
+        Args: { max_rows?: number }
+        Returns: {
+          action: string
+          actor_email: string | null
+          actor_name: string | null
+          created_at: string
+          details: Json
+          id: number
+          target: string | null
+        }[]
+      }
+      admin_list_schools: {
+        Args: never
+        Returns: {
+          catalog_count: number
+          current_course_count: number
+          current_term: string | null
+          domains: string[]
+          enabled: boolean
+          member_count: number
+          name_en: string
+          name_zh: string
+          school_id: string
+        }[]
+      }
+      admin_list_staff: {
+        Args: never
+        Returns: {
+          display_name: string | null
+          email: string
+          granted_at: string
+          role: string
+          user_id: string
+        }[]
+      }
+      admin_materialize_catalog: {
+        Args: { target_school: string }
+        Returns: {
+          created_count: number
+          existing_count: number
+          invalid_count: number
+          materialized_term: string
+        }[]
+      }
+      admin_remove_school_domain: {
+        Args: { target_domain: string }
+        Returns: undefined
+      }
+      admin_revoke_admin: { Args: { target_user: string }; Returns: undefined }
+      admin_save_catalog_course: {
+        Args: { course_code: string; course_title: string; target_school: string }
+        Returns: string
+      }
+      admin_save_school: {
+        Args: { new_name_en: string; new_name_zh: string; target_school: string }
+        Returns: undefined
+      }
+      admin_set_current_term: {
+        Args: { new_term: string; target_school: string }
+        Returns: {
+          created_count: number
+          existing_count: number
+          invalid_count: number
+          materialized_term: string
+        }[]
+      }
+      admin_set_school_enabled: {
+        Args: { should_enable: boolean; target_school: string }
+        Returns: undefined
+      }
       can_access_course_conversation: {
         Args: { target_conversation: string }
         Returns: boolean
@@ -786,6 +866,7 @@ export type Database = {
         Args: { target_action: string }
         Returns: boolean
       }
+      current_platform_role: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
       enabled_school_id_for_email_domain: {
         Args: { candidate_domain: string }

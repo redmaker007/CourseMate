@@ -2,6 +2,9 @@
  * 把学校官方公开课表（Google Sheet 导出的 .xlsx）导入 course_catalog，
  * 并物化成当前学期学生可加入的 courses。
  *
+ * 日常录课优先用网站的管理页（/admin），不需要 service_role key。这个脚本留给
+ * 管理页用不了的场合，比如新建 Supabase 项目、还没有任何管理员的时候。
+ *
  * 默认只做预演并打印报告，不写库。确认无误后加 --apply 才真正写入。
  *
  *   node scripts/import-course-catalog.mts --file courses.xlsx --school uw-madison
@@ -29,15 +32,9 @@ import ExcelJS from "exceljs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  cleanCell,
-  cleanRequired,
-  dedupeByCode,
-  findSubjectCollisions,
-  looksLikeHeaderRow,
-  parseCourseRow,
-  type CatalogRecord,
-  type RowIssue,
-  type SubjectRef,
+  describeCountMismatch,
+  parseCatalogWorkbook,
+  type CatalogWorkbookReport,
 } from "./course-catalog-parse.mts";
 
 const { values } = parseArgs({
@@ -129,53 +126,28 @@ if (MATERIALIZE_ONLY) {
 }
 
 // ---------------------------------------------------------------------------
-// 读取工作簿
+// 读取并解析工作簿
 // ---------------------------------------------------------------------------
+// 解析逻辑与管理页共用 parseCatalogWorkbook，两边给出的报告才会一致。
 
 const FILE = values.file ?? "";
 const workbook = new ExcelJS.Workbook();
 await workbook.xlsx.readFile(FILE);
 
-/** 索引页：Subject Code | Short Name | Full Department Name | Course Count | Sheet */
-function readSubjectIndex(): SubjectRef[] {
-  const sheet =
-    workbook.getWorksheet(values.index!) ??
-    workbook.worksheets.find((candidate) =>
-      /index|subject/i.test(candidate.name),
-    );
-  if (!sheet) {
-    throw new Error(
-      `找不到索引页。用 --index 指定它的名字。工作簿里有：${workbook.worksheets
-        .map((s) => s.name)
-        .join(", ")}`,
-    );
-  }
-
-  const subjects: SubjectRef[] = [];
-  sheet.eachRow((row, rowNumber) => {
-    const cells = (row.values as unknown[]).slice(1);
-    if (rowNumber === 1 || /short name/i.test(cleanRequired(cells[1]))) return;
-
-    const shortName = cleanRequired(cells[1]);
-    if (!shortName) return;
-
-    const count = Number(cleanCell(cells[3]));
-    subjects.push({
-      shortName,
-      fullName: cleanCell(cells[2]) ?? undefined,
-      sourceSubjectCode: cleanCell(cells[0]) ?? undefined,
-      expectedCourseCount: Number.isFinite(count) ? count : undefined,
-    });
-  });
-
-  return subjects;
+let report: CatalogWorkbookReport;
+try {
+  report = parseCatalogWorkbook(workbook, values.index!);
+} catch (error) {
+  console.error(`${(error as Error).message}\n用 --index 指定索引页的名字。`);
+  process.exit(1);
 }
 
-const subjects = readSubjectIndex();
+const { subjects, collisions, parsedCount, records, issues, duplicates, mismatches } =
+  report;
+
 console.log(`索引页读到 ${subjects.length} 个学科`);
 
 // 撞车必须在写库之前发现：两个学科规范化后同名，课号会挤进同一个唯一键。
-const collisions = findSubjectCollisions(subjects);
 if (collisions.length > 0) {
   console.error("\n学科缩写规范化后发生冲突，必须先处理：");
   for (const collision of collisions) {
@@ -185,66 +157,16 @@ if (collisions.length > 0) {
 }
 
 // ---------------------------------------------------------------------------
-// 解析各院系分页
-// ---------------------------------------------------------------------------
-
-const parsed: { sheet: string; row: number; record: CatalogRecord }[] = [];
-const issues: RowIssue[] = [];
-const perSheetCounts = new Map<string, number>();
-
-const indexSheetName =
-  workbook.getWorksheet(values.index!)?.name ??
-  workbook.worksheets.find((s) => /index|subject/i.test(s.name))?.name;
-
-for (const sheet of workbook.worksheets) {
-  if (sheet.name === indexSheetName) continue;
-
-  let kept = 0;
-  sheet.eachRow((row, rowNumber) => {
-    const cells = (row.values as unknown[]).slice(1);
-    if (looksLikeHeaderRow(cells)) return;
-    if (cells.every((cell) => cleanCell(cell) === null)) return;
-
-    const result = parseCourseRow(cells, subjects);
-    if (!result.ok) {
-      issues.push({
-        sheet: sheet.name,
-        row: rowNumber,
-        code: cleanRequired(cells[0]),
-        reason: result.reason,
-      });
-      return;
-    }
-    parsed.push({ sheet: sheet.name, row: rowNumber, record: result.record });
-    kept += 1;
-  });
-
-  perSheetCounts.set(sheet.name, kept);
-}
-
-const { kept: records, duplicates } = dedupeByCode(parsed);
-
-// ---------------------------------------------------------------------------
 // 报告
 // ---------------------------------------------------------------------------
 
-console.log(`\n解析成功 ${parsed.length} 行，去重后 ${records.length} 门课`);
-
-// 索引页自带 Course Count，拿它对账——源数据自带校验基准很难得，一定要用。
-const mismatches: string[] = [];
-for (const subject of subjects) {
-  if (subject.expectedCourseCount === undefined) continue;
-  const actual = perSheetCounts.get(subject.shortName);
-  if (actual === undefined) {
-    mismatches.push(`  ${subject.shortName}：索引页说有 ${subject.expectedCourseCount} 门，但找不到对应分页`);
-  } else if (actual !== subject.expectedCourseCount) {
-    mismatches.push(`  ${subject.shortName}：索引页说 ${subject.expectedCourseCount} 门，实际解析出 ${actual} 门`);
-  }
-}
+console.log(`\n解析成功 ${parsedCount} 行，去重后 ${records.length} 门课`);
 
 if (mismatches.length > 0) {
   console.log(`\n与索引页 Course Count 对不上的院系（${mismatches.length} 个）：`);
-  console.log(mismatches.slice(0, 20).join("\n"));
+  for (const mismatch of mismatches.slice(0, 20)) {
+    console.log(`  ${describeCountMismatch(mismatch)}`);
+  }
   if (mismatches.length > 20) console.log(`  …还有 ${mismatches.length - 20} 个`);
 } else {
   console.log("每个院系的课程数都与索引页 Course Count 一致");

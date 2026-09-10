@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({ getCurrentMember: vi.fn() }));
+const adminQueries = vi.hoisted(() => ({ getPlatformRole: vi.fn() }));
 const authQueries = vi.hoisted(() => ({ getEnabledSchools: vi.fn() }));
 const courseQueries = vi.hoisted(() => ({
   getDashboardCourses: vi.fn(),
@@ -18,10 +19,13 @@ const navigation = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => navigation);
 vi.mock("@/features/auth/session", () => auth);
+vi.mock("@/features/admin/queries", () => adminQueries);
 vi.mock("@/features/auth/queries", () => authQueries);
 vi.mock("@/features/courses/queries", () => courseQueries);
 vi.mock("@/features/dashboard/components/dashboard-header", () => ({
-  DashboardHeader: () => <div>Dashboard header</div>,
+  DashboardHeader: ({ adminHref }: { adminHref?: string }) => (
+    <div>Dashboard header{adminHref ? ` → ${adminHref}` : ""}</div>
+  ),
 }));
 vi.mock("@/features/dashboard/components/course-card", () => ({
   CourseCard: ({ course }: { course: { title: string } }) => <li>{course.title}</li>,
@@ -45,6 +49,7 @@ describe("DashboardPage course flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.getCurrentMember.mockResolvedValue(MEMBER);
+    adminQueries.getPlatformRole.mockResolvedValue(null);
     authQueries.getEnabledSchools.mockResolvedValue([]);
     courseQueries.getDashboardCourses.mockResolvedValue({
       current: [{ id: "current", title: "Current course" }],
@@ -71,6 +76,16 @@ describe("DashboardPage course flow", () => {
       MEMBER,
       "TEST00",
     );
+  });
+
+  it("只有带平台身份的成员在页头看到管理入口", async () => {
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByText("Dashboard header")).toBeTruthy();
+    cleanup();
+
+    adminQueries.getPlatformRole.mockResolvedValue("admin");
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByText("Dashboard header → /admin")).toBeTruthy();
   });
 
   it("requires profile onboarding before loading course data", async () => {

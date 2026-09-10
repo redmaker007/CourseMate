@@ -22,12 +22,13 @@
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
 | Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
 | Git 集成 | **未连接** —— `git push` 不会触发部署，见第四节 |
-| 数据库 schema | 全部 11 个 migration 已应用到线上，诊断查询与外部探测均确认符合预期。见 [课程目录并入主干](./course-catalog-integration.md) |
+| 数据库 schema | 前 11 个 migration 已应用到线上，诊断查询与外部探测均确认符合预期，见 [课程目录并入主干](./course-catalog-integration.md)。**第 12 个 `202609100006_platform_admin` 待执行**，见 [平台角色与管理页](./platform-admin.md) |
+| 管理页 | 代码已部署；migration 执行、指定所有者之后才可用。执行前线上无害：没有管理入口，`/admin` 显示 404 |
 | 数据库类型 | 已从线上重新生成（2026-09-10） |
 | 课程库 | **空的**。导入脚本已就绪；导入后会自动物化成当前学期课程，学生才搜得到 |
 | 前端 | 统一会话、课程流程、Profile onboarding、好友后端（#11–#14）已合并进 `main`，**已部署上线**（2026-09-10，`38b0636`）。未登录冒烟通过：登录页列出两所学校，受保护页面全部跳转登录，无 500。同日热修复 `3a43aa2`：新成员保存资料被权限拒绝、卡在 onboarding，见 [课程目录并入主干](./course-catalog-integration.md) |
 
-`main` 上 268 项测试、构建、lint、类型检查均通过。
+`main` 上 320 项测试、构建、lint、类型检查均通过。
 
 ---
 
@@ -79,6 +80,7 @@
 | [本地开发](../runbooks/local-development.md) | 新人第一次把项目跑起来 |
 | [录入课程](../runbooks/seed-courses.md) | 往课程库灌数据时 |
 | [申请课程数据授权](../runbooks/request-course-data.md) | 要拿学校的官方课表数据时 |
+| [管理页与平台角色](../runbooks/platform-admin.md) | 第一次启用管理页、任命管理员、日常录课与切换学期 |
 
 决策与理由在 [`docs/adr/`](../adr/)。为什么不逆向学校的课程接口，见 [ADR-0002](../adr/0002-do-not-reverse-engineer-university-course-search.md)。
 
@@ -91,6 +93,8 @@
 数据库迁移已全部完成。过程中发现 SQL Editor 不按事务执行 migration——每条语句单独提交、遇错不停——`202609100001` 因此校验块失败，但诊断确认结构完整、无数据丢失。这个行为已写进 [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)。
 
 代码已部署。剩余步骤只有导入并物化课表——这一步在部署前后做都可以，课程库空着时网站照常运行，只是搜课搜不到结果。完整过程见 [课程目录并入主干](./course-catalog-integration.md)。
+
+**推荐等管理页启用后在网页上导入**（执行 `202609100006`、指定所有者之后），不需要 service_role key，见 [管理页与平台角色](../runbooks/platform-admin.md)。命令行脚本仍然可用。
 
 课程库导入后**必须物化**成当前学期的 `courses`——课程流程禁止学生建课，搜索读的是 `courses` 而不是 `course_catalog`，不物化就搜不到。导入脚本写完目录后会自动物化，见 [录入课程 runbook](../runbooks/seed-courses.md)。数据授权申请见 [申请课程数据授权](../runbooks/request-course-data.md)。
 
