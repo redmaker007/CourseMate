@@ -28,7 +28,7 @@
 | 当前学期存了两份：`schools.current_term` 和 `school_term_settings` | 删除前者。后者还会在学期切换时自动归档旧会话，设计更完整 |
 | 课程流程禁止学生建课，只能加入已存在的 `courses`；而导入写的是 `course_catalog` | 新增 `materialize_catalog_courses()`，把目录物化成当前学期的 `courses` |
 | 课程目录建立时 ADR-0004 还不存在，读取没有 onboarding 门槛 | 补上，与其他课程数据一致 |
-| `src/types/database.ts` 冲突 | 取他的版本，拼入 `course_catalog` 的类型块。**部署后必须从线上重新生成**，见下文 |
+| `src/types/database.ts` 冲突 | 取他的版本，拼入 `course_catalog` 的类型块。迁移上线后已从线上重新生成，替换了拼接版本 |
 
 关于 `schools.current_term`：它是作废分支上的产物，已经被手工应用到了线上项目，但对应的 migration 从未进入 `main`——典型的迁移漂移。`202609100004` 用 `drop column if exists` 删掉它，照 `main` 重建的库没有这一列，那里是空操作。
 
@@ -99,7 +99,7 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 | `groups`、`group_members` 已不存在 | 删除它们的语句在第 188–189 行，同样在报错点之后 |
 | `messages.group_id` 已改名为 `conversation_id` | 报错点之前的语句 |
 
-所以这个 migration 的结构**很可能已经完整**，唯一没生效的就是那个校验块。那个校验原本用来确认旧群数据完整搬进了新的会话表。线上从未部署过建课界面，这些表里多半没有数据，所以大概率没有真正丢东西——**但这需要诊断查询确认**，不能靠推测。
+随后的诊断查询确认：结构完整——旧表已删、`messages` 已改列、4 张新表均已开 RLS、5 条策略与触发器齐全；而课程、选课、消息三张表在迁移前都是空的。所以唯一没生效的校验块本来就无事可验，**没有数据丢失**。
 
 更值得记住的一点是：这个文件的注释写着「断言失败会回滚，旧表不会删除」。**在 SQL Editor 里这个保证不成立**：校验失败了，删旧表的语句照样执行了。剩下几个文件没有临时表，也没有「先校验、后删除」这种写法，不会踩同一个坑，但同样不是原子执行，任何报错都会留下改到一半的状态。
 
@@ -110,6 +110,8 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 用未登录身份调用 `can_access_course_conversation`，得到的是 `false`，而不是权限拒绝——这个函数只授予了 `authenticated`。
 
 原因：Supabase 会通过 default privileges 把 public schema 里**新函数的执行权单独授予 `anon` 和 `authenticated`**。此前所有 migration 都只写了 `revoke execute … from public`，只收回了 PUBLIC 这一级，收不回这两份单独的授权。**两位开发者的代码都有这个问题**，课程权限 migration（`202609070002`）也是。
+
+线上 `pg_default_acl` 确认了这条默认授权的位置：挂在 `postgres` 角色的 `public` schema 级，内容是 `anon=X`、`authenticated=X`。SQL Editor 以 `postgres` 身份执行，所以经它建的每个函数都会被自动授予。`supabase_admin` 另有一条同样的默认授权，那是平台自己用的，我们的 migration 不经过它，也不应去改。
 
 影响分三类：
 
@@ -138,13 +140,13 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 |---|---|
 | preflight `202609090002_profile_onboarding.sql` | ✅ 0 个受影响用户 |
 | `202609090002_profile_onboarding` | ✅ |
-| `202609100001_unified_conversation_core` | ⚠️ 非原子执行，校验块失败，结构待诊断确认 |
-| 诊断查询 | 待执行 |
-| `202609100002_course_flow` | 待执行 |
-| `202609100003_friendship_backend` | 待执行 |
-| `202609100004_integrate_course_catalog` | 待执行 |
-| `202609100005_harden_function_execute_grants` | 待执行 |
-| 从线上重新生成 `src/types/database.ts` | 待执行 |
+| `202609100001_unified_conversation_core` | ✅ 非原子执行、校验块失败，但诊断确认结构完整；相关表原本为空，无数据丢失 |
+| 诊断查询 | ✅ 11 项全部符合预期 |
+| `202609100002_course_flow` | ✅ |
+| `202609100003_friendship_backend` | ✅ |
+| `202609100004_integrate_course_catalog` | ✅ |
+| `202609100005_harden_function_execute_grants` | ✅ 线上实测：6 个受限函数对未登录用户全部拒绝，登录必需的函数仍可用 |
+| 从线上重新生成 `src/types/database.ts` | ✅ 1035 行，替换了手工拼接的版本 |
 | 导入并物化课表 | 待执行，见 [录入课程 runbook](../runbooks/seed-courses.md) |
 | `npx vercel deploy --prod` | 待执行——`git push` 不会触发部署 |
 
@@ -162,16 +164,15 @@ ERROR: 42P01: relation "_legacy_conversation_messages" does not exist
 | 集成测试 | `supabase/migrations/course-catalog-integration.test.ts`，19 项 |
 | 构建 / lint / 类型检查 | 通过 |
 | 导入脚本预演 | 通过；`--materialize-only` 缺凭据时正确拒绝 |
+| 线上外部探测 | 受限函数对未登录用户全部拒绝；登录必需函数可用；新表齐全；`schools.current_term` 已删；学校邮箱 Hook 仍返回 403 |
 
 集成测试是**唯一一个按真实顺序跑完全部 migration 的测试**。其余测试各自只跑到自己需要的那一步，足以验证各自功能，但证明不了两条独立开发的线叠在一起还能工作。它覆盖：完整链路、学期单一来源、函数执行权（修复前后对照、枚举检查、内部辅助函数、公开接口仍可间接使用、策略依赖函数仍可用、新函数默认不开放）、目录的 onboarding 与跨校门槛、学生调不动物化、合规建课 / 不合规跳过、幂等、自动配会话、加入后自动成为会话成员、没设学期时拒绝、学期切换后旧会话归档且新学期建出新课。
 
 ### 没验证的
 
-- 剩下四个 migration 都没在真实 Supabase 上执行过，只在 PGlite 里验证过
-- `202609100001` 在线上的最终状态还没有经过诊断确认
-- PGlite 里的 default privileges 是按观察到的 Supabase 行为手工复刻的。真实默认授权挂在 schema 级还是全局级没有直接查过，所以 `202609100005` 两种都写了
-- 物化函数由真实 PostgREST `rpc()` 调用、以及真实课表规模下的耗时，都没测过
-- `database.ts` 是手工拼接的，与线上真实 schema 可能有细微出入
+- 物化函数由真实 PostgREST `rpc()` 调用、以及真实课表规模下的耗时，都没测过——第一次导入课表时才会跑到
+- 登录之后的完整流程（onboarding、加入课程、课程会话、好友）没有在线上由真人点过——验证码邮件我这边收不到
+- `202609100005` 里全局级的那条 `revoke` 已确认是空操作（线上没有全局默认授权），保留无害
 
 ---
 

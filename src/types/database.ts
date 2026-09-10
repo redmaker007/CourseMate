@@ -113,39 +113,6 @@ export type Database = {
         }
         Relationships: []
       }
-      course_members: {
-        Row: {
-          course_id: string
-          joined_at: string
-          user_id: string
-        }
-        Insert: {
-          course_id: string
-          joined_at?: string
-          user_id?: string
-        }
-        Update: {
-          course_id?: string
-          joined_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "course_members_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "course_members_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "member_accounts"
-            referencedColumns: ["user_id"]
-          },
-        ]
-      }
       course_catalog: {
         Row: {
           code: string
@@ -238,6 +205,39 @@ export type Database = {
           },
         ]
       }
+      course_members: {
+        Row: {
+          course_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          joined_at?: string
+          user_id?: string
+        }
+        Update: {
+          course_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_members_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           code: string
@@ -326,32 +326,6 @@ export type Database = {
           },
         ]
       }
-      member_accounts: {
-        Row: {
-          created_at: string
-          school_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          school_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          school_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "member_accounts_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       friend_preferences: {
         Row: {
           hidden: boolean
@@ -374,7 +348,22 @@ export type Database = {
           pair_high?: string
           pair_low?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "friend_preferences_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "friend_preferences_pair_low_pair_high_fkey"
+            columns: ["pair_low", "pair_high"]
+            isOneToOne: false
+            referencedRelation: "friendships"
+            referencedColumns: ["pair_low", "pair_high"]
+          },
+        ]
       }
       friend_rate_limit_buckets: {
         Row: {
@@ -398,7 +387,22 @@ export type Database = {
           window_seconds?: number
           window_start?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "friend_rate_limit_buckets_action_kind_fkey"
+            columns: ["action_kind"]
+            isOneToOne: false
+            referencedRelation: "friend_rate_limit_config"
+            referencedColumns: ["action_kind"]
+          },
+          {
+            foreignKeyName: "friend_rate_limit_buckets_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       friend_rate_limit_config: {
         Row: {
@@ -434,7 +438,15 @@ export type Database = {
           pair_low?: string
           request_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "friend_request_active_pairs_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "friend_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       friend_requests: {
         Row: {
@@ -473,7 +485,22 @@ export type Database = {
           resolved_at?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "friend_requests_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "friend_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       friendships: {
         Row: {
@@ -500,7 +527,48 @@ export type Database = {
           pair_low?: string
           reactivated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "friendships_pair_high_fkey"
+            columns: ["pair_high"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "friendships_pair_low_fkey"
+            columns: ["pair_low"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      member_accounts: {
+        Row: {
+          created_at: string
+          school_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          school_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          school_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_accounts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       member_blocks: {
         Row: {
@@ -518,7 +586,22 @@ export type Database = {
           blocker_id?: string
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "member_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "member_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       messages: {
         Row: {
@@ -550,13 +633,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "messages_source_friend_request_id_fkey"
-            columns: ["source_friend_request_id"]
-            isOneToOne: true
-            referencedRelation: "friend_requests"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "messages_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
@@ -569,6 +645,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "member_accounts"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "messages_source_friend_request_id_fkey"
+            columns: ["source_friend_request_id"]
+            isOneToOne: false
+            referencedRelation: "friend_requests"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -691,22 +774,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_course_conversation: {
+        Args: { target_conversation: string }
+        Returns: boolean
+      }
+      can_send_to_course_conversation: {
+        Args: { target_conversation: string }
+        Returns: boolean
+      }
       consume_friend_rate_limit: {
         Args: { target_action: string }
         Returns: boolean
       }
+      current_school_id: { Args: never; Returns: string }
+      enabled_school_id_for_email_domain: {
+        Args: { candidate_domain: string }
+        Returns: string
+      }
       find_member_by_email: {
         Args: { candidate_email: string }
         Returns: {
-          avatar_url: string | null
-          display_name: string | null
-          grad_year: number | null
-          incoming_request_id: string | null
-          major: string | null
-          member_id: string | null
-          relationship_status: string | null
+          avatar_url: string
+          display_name: string
+          grad_year: number
+          incoming_request_id: string
+          major: string
+          member_id: string
+          relationship_status: string
           result_status: string
-          shared_courses: Json | null
+          shared_courses: Json
         }[]
       }
       friend_relationship_status: {
@@ -716,43 +812,58 @@ export type Database = {
       get_own_profile: {
         Args: never
         Returns: {
-          avatar_url: string | null
+          avatar_url: string
           created_at: string
           display_name: string
-          grad_year: number | null
+          grad_year: number
           id: string
-          major: string | null
+          major: string
           updated_at: string
         }[]
       }
+      has_completed_onboarding: { Args: never; Returns: boolean }
+      hook_restrict_user_to_enabled_school: {
+        Args: { event: Json }
+        Returns: Json
+      }
+      is_course_member: { Args: { target_course: string }; Returns: boolean }
       list_friend_requests: {
         Args: never
         Returns: {
-          avatar_url: string | null
+          avatar_url: string
           created_at: string
           direction: string
-          display_name: string | null
+          display_name: string
           expires_at: string
           message: string
-          other_member_id: string | null
+          other_member_id: string
           request_id: string
-          resolved_at: string | null
+          resolved_at: string
           status: string
         }[]
       }
       list_friends: {
         Args: { include_hidden?: boolean }
         Returns: {
-          avatar_url: string | null
-          conversation_id: string | null
+          avatar_url: string
+          conversation_id: string
           display_name: string
           effective_name: string
-          grad_year: number | null
+          grad_year: number
           hidden: boolean
-          major: string | null
+          major: string
           member_id: string
           send_status: string
           shared_courses: Json
+        }[]
+      }
+      materialize_catalog_courses: {
+        Args: { target_school: string }
+        Returns: {
+          created_count: number
+          existing_count: number
+          invalid_count: number
+          materialized_term: string
         }[]
       }
       members_are_blocked: {
@@ -762,43 +873,30 @@ export type Database = {
       remove_friend: { Args: { target_member_id: string }; Returns: string }
       respond_to_friend_request: {
         Args: { decision: string; target_request_id: string }
-        Returns: { conversation_id: string | null; result_status: string }[]
+        Returns: {
+          conversation_id: string
+          result_status: string
+        }[]
       }
       send_friend_request: {
         Args: { request_message: string; target_member_id: string }
-        Returns: { request_id: string | null; result_status: string }[]
+        Returns: {
+          request_id: string
+          result_status: string
+        }[]
       }
       set_friend_hidden: {
         Args: { requested_hidden: boolean; target_member_id: string }
         Returns: string
       }
       set_friend_note: {
-        Args: { requested_note: string | null; target_member_id: string }
+        Args: { requested_note: string; target_member_id: string }
         Returns: string
       }
       set_member_blocked: {
         Args: { requested_blocked: boolean; target_member_id: string }
         Returns: string
       }
-      current_school_id: { Args: never; Returns: string }
-      enabled_school_id_for_email_domain: {
-        Args: { candidate_domain: string }
-        Returns: string
-      }
-      hook_restrict_user_to_enabled_school: {
-        Args: { event: Json }
-        Returns: Json
-      }
-      is_course_member: { Args: { target_course: string }; Returns: boolean }
-      can_access_course_conversation: {
-        Args: { target_conversation: string }
-        Returns: boolean
-      }
-      can_send_to_course_conversation: {
-        Args: { target_conversation: string }
-        Returns: boolean
-      }
-      has_completed_onboarding: { Args: never; Returns: boolean }
       shares_course_with: { Args: { target_user: string }; Returns: boolean }
     }
     Enums: {

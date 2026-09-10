@@ -28,6 +28,15 @@
 
 Supabase 会通过 default privileges 把 public schema 里**新函数的执行权单独授予 `anon` 和 `authenticated`**。只写 `revoke execute on function … from public` 收不回这两份单独授权，本意受限的函数会对未登录用户开放。
 
+查当前项目的函数默认授权（`X` 表示执行权）：
+
+```sql
+select defaclrole::regrole, defaclnamespace::regnamespace, defaclacl
+from pg_default_acl where defaclobjtype = 'f';
+```
+
+2026-09-10 在本项目查到 `postgres @ public: {…anon=X…authenticated=X…}`。SQL Editor 以 `postgres` 身份执行，所以经它建的每个函数都会被自动授予。新建项目时跑一下这句，确认 `202609100005` 生效后 `anon` 与 `authenticated` 已从这一条里消失。
+
 `202609100005` 已经收回了这个默认值，但写新函数时仍然要写全，不要依赖那一次修复：
 
 ```sql

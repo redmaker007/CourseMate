@@ -22,8 +22,8 @@
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
 | Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
 | Git 集成 | **未连接** —— `git push` 不会触发部署，见第四节 |
-| 数据库 schema | 上线进行中：`202609090002` 已应用；`202609100001` 在 SQL Editor 里**没有按事务执行**，校验块失败，结构待诊断确认；另有四个待执行（含新增的 `202609100005` 函数权限修复）。见 [课程目录并入主干](./course-catalog-integration.md) |
-| 数据库类型 | `src/types/database.ts` 目前是**手工拼接**的，线上 migration 应用后必须重新生成 |
+| 数据库 schema | 全部 11 个 migration 已应用到线上，诊断查询与外部探测均确认符合预期。见 [课程目录并入主干](./course-catalog-integration.md) |
+| 数据库类型 | 已从线上重新生成（2026-09-10） |
 | 课程库 | **空的**。导入脚本已就绪；导入后会自动物化成当前学期课程，学生才搜得到 |
 | 前端 | 统一会话、课程流程、Profile onboarding、好友后端（#11–#14）已在集成分支合并；**线上仍是合并前的版本** |
 
@@ -84,11 +84,11 @@
 
 ## 四、仍然悬而未决
 
-### 1. 上线进行到一半，课程库待导入
+### 1. 课程库待导入
 
-以 `feature/one-to-one-chat` 为主干的合并已并入 `main`，线上迁移执行到一半。`202609100001` 在 SQL Editor 里没有按事务执行——每条语句单独提交、遇错不停——结构待诊断确认。SQL Editor 的这个行为已写进 [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)。
+数据库迁移已全部完成。过程中发现 SQL Editor 不按事务执行 migration——每条语句单独提交、遇错不停——`202609100001` 因此校验块失败，但诊断确认结构完整、无数据丢失。这个行为已写进 [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)。
 
-剩余步骤：诊断查询 → 依次执行 `202609100002` 至 `202609100005` 四个 migration → 重新生成类型 → 导入并物化课表 → `vercel deploy --prod`。**先迁移、后部署代码**，反过来新代码会去查线上还不存在的表，全站报错。完整步骤与理由见 [课程目录并入主干](./course-catalog-integration.md)。
+剩余步骤：导入并物化课表 → `vercel deploy --prod`。**先迁移、后部署代码**，反过来新代码会去查线上还不存在的表，全站报错。完整步骤与理由见 [课程目录并入主干](./course-catalog-integration.md)。
 
 课程库导入后**必须物化**成当前学期的 `courses`——课程流程禁止学生建课，搜索读的是 `courses` 而不是 `course_catalog`，不物化就搜不到。导入脚本写完目录后会自动物化，见 [录入课程 runbook](../runbooks/seed-courses.md)。数据授权申请见 [申请课程数据授权](../runbooks/request-course-data.md)。
 
