@@ -439,3 +439,68 @@ describe("学期切换", () => {
     expect(history.rows[0].n).toBe(1);
   });
 });
+
+describe("Profile 保存", () => {
+  // 好友后端把 profiles 的读取权限收窄成三列之后，upsert 被拒、新成员卡在
+  // onboarding——上线后才发现，因为 onboarding 的测试只跑到它自己那一步 migration。
+  // 这里按网站实际的写法（production-profile-service.ts）在完整链路上验证。
+  const NEWCOMER = "66666666-6666-4666-8666-666666666666";
+
+  it("新成员插入即完成 onboarding；已有资料时插入撞唯一约束，改走更新", async () => {
+    await database.exec(
+      `insert into auth.users (id, email, email_confirmed_at)
+       values ('${NEWCOMER}', 'newcomer@wisc.edu', now())`,
+    );
+
+    expect(
+      await asUser(
+        NEWCOMER,
+        `insert into public.profiles (id, display_name, major, grad_year)
+         values ('${NEWCOMER}', 'Newcomer', 'Computer Science', 2028)`,
+      ),
+    ).toEqual({ ok: true, rows: [] });
+    expect(
+      await asUser(NEWCOMER, "select public.has_completed_onboarding() as done"),
+    ).toEqual({ ok: true, rows: [{ done: true }] });
+
+    const duplicate = await asUser(
+      NEWCOMER,
+      `insert into public.profiles (id, display_name, major, grad_year)
+       values ('${NEWCOMER}', 'Again', null, null)`,
+    );
+    expect(duplicate.ok).toBe(false);
+    expect(!duplicate.ok && duplicate.error).toMatch(/duplicate key/);
+
+    expect(
+      await asUser(
+        NEWCOMER,
+        `update public.profiles
+         set display_name = 'Renamed', major = null, grad_year = null
+         where id = '${NEWCOMER}'`,
+      ),
+    ).toEqual({ ok: true, rows: [] });
+    expect(
+      await asUser(
+        NEWCOMER,
+        "select display_name, major, grad_year from public.get_own_profile()",
+      ),
+    ).toEqual({
+      ok: true,
+      rows: [{ display_name: "Renamed", major: null, grad_year: null }],
+    });
+  });
+
+  it("upsert 会被列级读取权限拒绝——不要把保存改回 upsert", async () => {
+    expect(
+      await asUser(
+        ALICE,
+        `insert into public.profiles (id, display_name, major, grad_year)
+         values ('${ALICE}', 'Alice', null, null)
+         on conflict (id) do update set
+           display_name = excluded.display_name,
+           major = excluded.major,
+           grad_year = excluded.grad_year`,
+      ),
+    ).toEqual({ ok: false, error: "permission denied for table profiles" });
+  });
+});
