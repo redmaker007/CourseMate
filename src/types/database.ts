@@ -39,6 +39,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      course_catalog: {
+        Row: {
+          code: string
+          code_normalized: string | null
+          credits: string | null
+          department: string | null
+          description: string | null
+          id: string
+          number: string
+          requisites: string | null
+          school_id: string
+          source_course_id: string | null
+          source_term: string | null
+          subject: string
+          title: string
+          typically_offered: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          code_normalized?: string | null
+          credits?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          number: string
+          requisites?: string | null
+          school_id: string
+          source_course_id?: string | null
+          source_term?: string | null
+          subject: string
+          title: string
+          typically_offered?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          code_normalized?: string | null
+          credits?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          number?: string
+          requisites?: string | null
+          school_id?: string
+          source_course_id?: string | null
+          source_term?: string | null
+          subject?: string
+          title?: string
+          typically_offered?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_catalog_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_members: {
         Row: {
           course_id: string
