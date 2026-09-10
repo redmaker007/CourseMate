@@ -114,6 +114,7 @@ beforeAll(async () => {
 
   await applyMigration("202609100002_course_flow.sql");
   await applyMigration("202609100003_friendship_backend.sql");
+  await applyMigration("202609110001_friend_page_queries.sql");
 });
 
 afterAll(async () => {
@@ -533,6 +534,36 @@ describe("好友发现与关系状态数据库", () => {
     expect(blockedAcceptance.ok && blockedAcceptance.rows).toEqual([
       { result_status: "blocked" },
     ]);
+  });
+
+  it("lists only the current member's blocked members without exposing email", async () => {
+    await asUser(
+      ALICE,
+      `select public.set_member_blocked('${BOB}', true)`,
+    );
+
+    const mine = await asUser(
+      ALICE,
+      "select member_id, display_name, avatar_url, active_friendship, conversation_id from public.list_blocked_members()",
+    );
+    const theirs = await asUser(
+      BOB,
+      "select member_id from public.list_blocked_members()",
+    );
+
+    if (!mine.ok) throw new Error(mine.error);
+    if (!theirs.ok) throw new Error(theirs.error);
+    expect(mine.ok && mine.rows).toEqual([
+      {
+        member_id: BOB,
+        display_name: "Bob",
+        avatar_url: null,
+        active_friendship: false,
+        conversation_id: null,
+      },
+    ]);
+    expect(theirs.ok && theirs.rows).toEqual([]);
+    expect(JSON.stringify(mine)).not.toContain("@wisc.edu");
   });
 
   it("删除好友保留历史并在重新添加时恢复同一会话且不恢复备注", async () => {

@@ -63,4 +63,31 @@ describe("Supabase friend backend", () => {
       backend.removeFriend("22222222-2222-4222-8222-222222222222"),
     ).rejects.toEqual({ message: "secret row" });
   });
+
+  it("maps the current member's private blocked-member list", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          member_id: "22222222-2222-4222-8222-222222222222",
+          display_name: "Bob",
+          avatar_url: null,
+          active_friendship: false,
+          conversation_id: null,
+        },
+      ],
+      error: null,
+    });
+    const backend = createSupabaseFriendBackend({ rpc });
+
+    await expect(backend.listBlockedMembers()).resolves.toEqual([
+      {
+        memberId: "22222222-2222-4222-8222-222222222222",
+        displayName: "Bob",
+        avatarUrl: null,
+        activeFriendship: false,
+        conversationId: null,
+      },
+    ]);
+    expect(rpc).toHaveBeenCalledWith("list_blocked_members", {});
+  });
 });
