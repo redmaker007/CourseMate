@@ -7,13 +7,13 @@ import type {
   FriendListItem,
   FriendRequestView,
 } from "../friendship-service";
+import type {
+  FriendMutationAction,
+  FriendSearchAction,
+} from "../friend-action-state";
+import { FriendSearch } from "./friend-discovery";
 import {
   ActionForm,
-  FriendSearch,
-  type FriendMutationAction,
-  type FriendSearchAction,
-} from "./friend-discovery";
-import {
   FriendCard,
   RequestHistory,
 } from "./friend-relationship-management";

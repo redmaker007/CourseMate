@@ -3,23 +3,109 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
-import { initialFriendActionState } from "../friend-action-state";
+import {
+  initialFriendActionState,
+  type FriendActionState,
+  type FriendMutationAction,
+} from "../friend-action-state";
 import type {
   FriendListItem,
   FriendRequestView,
+  MemberBlockStatus,
+  SharedCourseView,
 } from "../friendship-service";
-import {
-  ActionFeedback,
-  ActionForm,
-  blockStatusLabel,
-  canUnblock,
-  CourseChips,
-  type FriendMutationAction,
-} from "./friend-discovery";
 import {
   ReportForm,
   type ReportAction,
 } from "@/features/reporting/components/report-form";
+
+const BLOCK_STATUS_LABEL: Record<
+  Exclude<MemberBlockStatus, "none">,
+  string
+> = {
+  blocked_by_me: "你已拉黑对方",
+  blocked_by_other: "对方已拉黑你",
+  mutual: "双方互相拉黑",
+};
+
+export function blockStatusLabel(status: MemberBlockStatus) {
+  return status === "none" ? null : BLOCK_STATUS_LABEL[status];
+}
+
+export function canUnblock(status: MemberBlockStatus) {
+  return status === "blocked_by_me" || status === "mutual";
+}
+
+export function ActionFeedback({ state }: { state: FriendActionState }) {
+  if (state.status === "idle") return null;
+  const successful = [
+    "sent",
+    "accepted",
+    "rejected",
+    "saved",
+    "cleared",
+    "removed",
+  ].includes(state.status);
+  return (
+    <p
+      aria-live="polite"
+      className={`mt-2 text-xs ${successful ? "text-emerald-700" : "text-amber-700"}`}
+      role="status"
+    >
+      {state.message}
+    </p>
+  );
+}
+
+export function ActionForm({
+  action,
+  className = "",
+  fields,
+  label,
+}: {
+  action: FriendMutationAction;
+  className?: string;
+  fields: Record<string, string>;
+  label: string;
+}) {
+  const [state, formAction, pending] = useActionState(
+    action,
+    initialFriendActionState,
+  );
+  return (
+    <form action={formAction} className={className}>
+      {Object.entries(fields).map(([name, value]) => (
+        <input key={name} name={name} type="hidden" value={value} />
+      ))}
+      <button
+        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        disabled={pending}
+        type="submit"
+      >
+        {pending ? "处理中…" : label}
+      </button>
+      <ActionFeedback state={state} />
+    </form>
+  );
+}
+
+export function CourseChips({ courses }: { courses: SharedCourseView[] }) {
+  if (courses.length === 0) {
+    return <p className="text-xs text-slate-500">当前学期没有共同课程</p>;
+  }
+  return (
+    <ul aria-label="当前共同课程" className="flex flex-wrap gap-2">
+      {courses.map((course) => (
+        <li
+          className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+          key={course.id}
+        >
+          {course.code} · {course.title}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const REQUEST_STATUS: Record<FriendRequestView["status"], string> = {
   pending: "待处理",

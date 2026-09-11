@@ -20,6 +20,16 @@ export type FriendActionState = {
   fieldErrors?: { message?: string; note?: string };
 };
 
+export type FriendMutationAction = (
+  previousState: FriendActionState,
+  formData: FormData,
+) => Promise<FriendActionState>;
+
+export type FriendSearchAction = (
+  previousState: FriendSearchState,
+  formData: FormData,
+) => Promise<FriendSearchState>;
+
 export const initialFriendSearchState: FriendSearchState = {
   status: "idle",
   message: "",
