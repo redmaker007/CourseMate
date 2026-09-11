@@ -11,6 +11,12 @@ export type FriendRelationshipState =
   | "friend"
   | "blocked";
 
+export type MemberBlockStatus =
+  | "none"
+  | "blocked_by_me"
+  | "blocked_me"
+  | "mutual";
+
 export type FriendDiscovery = {
   memberId: string;
   displayName: string;
@@ -19,6 +25,7 @@ export type FriendDiscovery = {
   gradYear: number | null;
   sharedCourses: SharedCourseView[];
   relationship: FriendRelationshipState;
+  blockStatus: MemberBlockStatus;
   incomingRequestId: string | null;
 };
 
@@ -36,6 +43,7 @@ export type FriendListItem = {
   sharedCourses: SharedCourseView[];
   hidden: boolean;
   sendStatus: "allowed" | "blocked";
+  blockStatus: MemberBlockStatus;
   conversationId: string;
 };
 

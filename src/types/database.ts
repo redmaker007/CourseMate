@@ -41,24 +41,24 @@ export type Database = {
     Tables: {
       conversation_members: {
         Row: {
-          cleared_through_message_id: number | null
+          cleared_through_message_id: string | null
           conversation_id: string
           joined_at: string
-          last_read_message_id: number | null
+          last_read_message_id: string | null
           user_id: string
         }
         Insert: {
-          cleared_through_message_id?: number | null
+          cleared_through_message_id?: string | null
           conversation_id: string
           joined_at?: string
-          last_read_message_id?: number | null
+          last_read_message_id?: string | null
           user_id: string
         }
         Update: {
-          cleared_through_message_id?: number | null
+          cleared_through_message_id?: string | null
           conversation_id?: string
           joined_at?: string
-          last_read_message_id?: number | null
+          last_read_message_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -609,7 +609,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           deleted_at: string | null
-          id: number
+          id: string
           sender_id: string | null
           source_friend_request_id: string | null
         }
@@ -795,6 +795,7 @@ export type Database = {
         Args: { candidate_email: string }
         Returns: {
           avatar_url: string
+          block_status: string
           display_name: string
           grad_year: number
           incoming_request_id: string
@@ -842,10 +843,21 @@ export type Database = {
           status: string
         }[]
       }
+      list_blocked_members: {
+        Args: never
+        Returns: {
+          active_friendship: boolean
+          avatar_url: string
+          conversation_id: string
+          display_name: string
+          member_id: string
+        }[]
+      }
       list_friends: {
         Args: { include_hidden?: boolean }
         Returns: {
           avatar_url: string
+          block_status: string
           conversation_id: string
           display_name: string
           effective_name: string
@@ -869,6 +881,10 @@ export type Database = {
       members_are_blocked: {
         Args: { first_member: string; second_member: string }
         Returns: boolean
+      }
+      member_block_status: {
+        Args: { target_member_id: string }
+        Returns: string
       }
       remove_friend: { Args: { target_member_id: string }; Returns: string }
       respond_to_friend_request: {

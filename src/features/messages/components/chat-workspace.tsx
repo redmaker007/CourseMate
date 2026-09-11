@@ -83,6 +83,7 @@ export function ChatWorkspace({
     initialDirectMessageActionState,
   );
   const lastMarkedRef = useRef<string | null>(null);
+  const markingRef = useRef<string | null>(null);
   const latestMessageId = sync.messages.at(-1)?.id;
   const bodyLength = Array.from(body.trim()).length;
   const bodyInvalid = bodyLength < 1 || bodyLength > 4000;
@@ -92,16 +93,28 @@ export function ChatWorkspace({
       if (
         document.visibilityState !== "visible" ||
         !latestMessageId ||
-        lastMarkedRef.current === latestMessageId
+        lastMarkedRef.current === latestMessageId ||
+        markingRef.current === latestMessageId
       ) return;
-      lastMarkedRef.current = latestMessageId;
+      markingRef.current = latestMessageId;
       startTransition(() => {
-        void markReadAction(conversationId, latestMessageId);
+        void markReadAction(conversationId, latestMessageId)
+          .then((status) => {
+            if (status === "updated") lastMarkedRef.current = latestMessageId;
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            if (markingRef.current === latestMessageId) {
+              markingRef.current = null;
+            }
+          });
       });
     };
     markWhenVisible();
+    window.addEventListener("focus", markWhenVisible);
     document.addEventListener("visibilitychange", markWhenVisible);
     return () => {
+      window.removeEventListener("focus", markWhenVisible);
       document.removeEventListener("visibilitychange", markWhenVisible);
     };
   }, [conversationId, latestMessageId, markReadAction]);

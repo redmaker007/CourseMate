@@ -14,7 +14,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => navigation);
 vi.mock("@/features/auth/session", () => auth);
 vi.mock("@/features/friends/actions", () => ({ friendMutationAction: vi.fn() }));
-vi.mock("@/features/friends/components/friend-workspace", () => ({
+vi.mock("@/features/friends/components/friend-discovery", () => ({
   CourseMemberRequestPanel: ({ memberId }: { memberId: string }) => (
     <div data-testid="course-member-request">{memberId}</div>
   ),

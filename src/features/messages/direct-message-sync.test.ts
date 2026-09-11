@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { DirectMessage } from "./direct-message-service";
 import {
-  directMessagePollingDelayMs,
-  mergeDirectMessages,
+  mergeMessages,
+  pollingDelayMs,
   reconnectCursor,
-} from "./direct-message-sync";
+} from "@/lib/message-sync";
+
+import type { DirectMessage } from "./direct-message-service";
 
 const message = (id: string, body = `message-${id}`): DirectMessage => ({
   id,
@@ -18,7 +19,7 @@ const message = (id: string, body = `message-${id}`): DirectMessage => ({
 
 describe("direct message reconnect sync", () => {
   it("deduplicates realtime and cursor-backfill rows in bigint-id order", () => {
-    const merged = mergeDirectMessages(
+    const merged = mergeMessages(
       [message("9007199254740995"), message("9007199254740993")],
       [message("9007199254740994"), message("9007199254740995", "latest")],
     );
@@ -33,7 +34,7 @@ describe("direct message reconnect sync", () => {
   });
 
   it("polls every five seconds before backing off repeated failures", () => {
-    expect([0, 1, 2, 3, 4, 5, 9].map(directMessagePollingDelayMs)).toEqual([
+    expect([0, 1, 2, 3, 4, 5, 9].map(pollingDelayMs)).toEqual([
       5_000,
       5_000,
       5_000,

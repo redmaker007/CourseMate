@@ -29,7 +29,7 @@ import { CourseChat } from "./course-chat";
 
 const INITIAL = [
   {
-    id: 1,
+    id: "1",
     senderId: "member-2",
     senderName: "Bob",
     body: "first",
@@ -62,7 +62,7 @@ describe("CourseChat", () => {
         json: async () => ({
           messages: [
             {
-              id: 2,
+              id: "2",
               senderId: "member-1",
               senderName: "Alice",
               body: "second",
@@ -77,7 +77,7 @@ describe("CourseChat", () => {
       json: async () => ({
         messages: [
           {
-            id: 3,
+            id: "3",
             senderId: "member-1",
             senderName: "Alice",
             body: "third",

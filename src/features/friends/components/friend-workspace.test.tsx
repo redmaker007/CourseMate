@@ -9,10 +9,10 @@ import type {
   FriendRequestView,
 } from "../friendship-service";
 import {
-  FriendNoteForm,
   FilteredFriendList,
   FriendWorkspace,
 } from "./friend-workspace";
+import { FriendNoteForm } from "./friend-relationship-management";
 
 const action = vi.fn(async () => ({ status: "saved", message: "已保存" }));
 const searchAction = vi.fn(async () => ({
@@ -34,6 +34,7 @@ const FRIEND: FriendListItem = {
   sharedCourses: [{ id: "course-1", code: "CS 101", title: "Intro" }],
   hidden: false,
   sendStatus: "allowed",
+  blockStatus: "none",
   conversationId: "33333333-3333-4333-8333-333333333333",
 };
 
@@ -71,6 +72,24 @@ const BLOCKED_MEMBER: BlockedMemberListItem = {
   activeFriendship: false,
   conversationId: null,
 };
+
+const BLOCKED_FRIENDS = [
+  {
+    blockStatus: "blocked_by_me",
+    button: true,
+    message: "你已拉黑对方",
+  },
+  {
+    blockStatus: "blocked_me",
+    button: false,
+    message: "对方已拉黑你",
+  },
+  {
+    blockStatus: "mutual",
+    button: true,
+    message: "双方互相拉黑",
+  },
+] as const;
 
 afterEach(cleanup);
 
@@ -186,4 +205,31 @@ describe("friend workspace", () => {
     expect(screen.getByRole("button", { name: "解除拉黑" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "打开会话" })).toBeNull();
   });
+
+  it.each(BLOCKED_FRIENDS)(
+    "renders $blockStatus with the correct unblock capability",
+    ({ blockStatus, button, message }) => {
+      render(
+        <FriendWorkspace
+          friends={[
+            {
+              ...FRIEND,
+              blockStatus,
+              sendStatus: "blocked",
+            } as FriendListItem & { blockStatus: typeof blockStatus },
+          ]}
+          mutationAction={action}
+          reportAction={reportAction}
+          requests={[]}
+          searchAction={searchAction}
+        />,
+      );
+
+      expect(screen.getByText(message, { exact: false })).toBeTruthy();
+      expect(screen.getByText("双方不能发送消息", { exact: false })).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: "解除我设置的拉黑" }) !== null,
+      ).toBe(button);
+    },
+  );
 });

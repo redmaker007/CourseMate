@@ -100,7 +100,7 @@ export async function createProductionCourseOperations() {
         .eq("id", member.userId)
         .maybeSingle();
       return {
-        id: message.id,
+        id: String(message.id),
         senderId: message.sender_id,
         senderName: profile?.display_name ?? "成员",
         body: message.body,

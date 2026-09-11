@@ -117,6 +117,7 @@ beforeAll(async () => {
   await applyMigration("202609110001_friend_page_queries.sql");
   await applyMigration("202609110002_direct_messaging.sql");
   await applyMigration("202609110003_direct_chat_page.sql");
+  await applyMigration("202609110006_block_direction.sql");
 });
 
 describe("direct messaging database boundary", () => {
@@ -533,6 +534,7 @@ describe("好友发现与关系状态数据库", () => {
           { code: "TEST00", id: expect.any(String), title: "测试00-测试课程" },
         ],
         relationship_status: "none",
+        block_status: "none",
         incoming_request_id: null,
       },
     ]);
@@ -939,6 +941,56 @@ describe("好友发现与关系状态数据库", () => {
     ]);
     expect(theirs.ok && theirs.rows).toEqual([]);
     expect(JSON.stringify(mine)).not.toContain("@wisc.edu");
+  });
+
+  it("returns each block direction and keeps sending blocked until both sides unblock", async () => {
+    await createAcceptedFriendship();
+
+    const status = (userId: string, otherEmail: string) =>
+      asUser(
+        userId,
+        `select block_status, relationship_status from public.find_member_by_email('${otherEmail}')`,
+      );
+    const friendStatus = (userId: string) =>
+      asUser(userId, "select block_status, send_status from public.list_friends()" );
+    const resultRows = async (attempt: Promise<Attempt>) => {
+      const result = await attempt;
+      if (!result.ok) throw new Error(result.error);
+      return result.rows;
+    };
+
+    expect(await resultRows(status(ALICE, "bob@wisc.edu"))).toEqual([
+      { block_status: "none", relationship_status: "friend" },
+    ]);
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', true)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "blocked_by_me", send_status: "blocked" },
+    ]);
+    expect(await resultRows(friendStatus(BOB))).toEqual([
+      { block_status: "blocked_me", send_status: "blocked" },
+    ]);
+    expect(
+      await resultRows(
+        asUser(
+          BOB,
+          `select public.set_member_blocked('${ALICE}', false) as status`,
+        ),
+      ),
+    ).toEqual([{ status: "not_found" }]);
+
+    await asUser(BOB, `select public.set_member_blocked('${ALICE}', true)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "mutual", send_status: "blocked" },
+    ]);
+
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', false)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "blocked_me", send_status: "blocked" },
+    ]);
+    await asUser(BOB, `select public.set_member_blocked('${ALICE}', false)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "none", send_status: "allowed" },
+    ]);
   });
 
   it("删除好友保留历史并在重新添加时恢复同一会话且不恢复备注", async () => {

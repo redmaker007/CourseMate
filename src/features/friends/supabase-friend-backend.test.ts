@@ -15,6 +15,7 @@ describe("Supabase friend backend", () => {
           grad_year: null,
           shared_courses: [{ id: "course-1", code: "CS101", title: "Intro" }],
           relationship_status: "none",
+          block_status: "none",
           incoming_request_id: null,
         },
       ],
@@ -37,6 +38,7 @@ describe("Supabase friend backend", () => {
         gradYear: null,
         sharedCourses: [{ id: "course-1", code: "CS101", title: "Intro" }],
         relationship: "none",
+        blockStatus: "none",
         incomingRequestId: null,
       },
     });
@@ -89,5 +91,35 @@ describe("Supabase friend backend", () => {
       },
     ]);
     expect(rpc).toHaveBeenCalledWith("list_blocked_members", {});
+  });
+
+  it("maps each block direction for the friend list", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: ["blocked_by_me", "blocked_me", "mutual"].map(
+        (block_status, index) => ({
+          member_id: `00000000-0000-4000-8000-00000000000${index}`,
+          display_name: `Member ${index}`,
+          effective_name: `Member ${index}`,
+          avatar_url: null,
+          major: null,
+          grad_year: null,
+          shared_courses: [],
+          hidden: false,
+          send_status: "blocked",
+          block_status,
+          conversation_id: `10000000-0000-4000-8000-00000000000${index}`,
+        }),
+      ),
+      error: null,
+    });
+    const backend = createSupabaseFriendBackend({ rpc });
+
+    const friends = await backend.listFriends(false);
+
+    expect(friends.map((friend) => friend.blockStatus)).toEqual([
+      "blocked_by_me",
+      "blocked_me",
+      "mutual",
+    ]);
   });
 });

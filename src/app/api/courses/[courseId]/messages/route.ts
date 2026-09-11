@@ -20,7 +20,10 @@ export async function GET(
   const searchParams = new URL(request.url).searchParams;
   const rawBefore = searchParams.get("before");
   const rawCursor = rawBefore ?? searchParams.get("after") ?? "0";
-  if (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(Number(rawCursor))) {
+  if (
+    !/^\d+$/.test(rawCursor) ||
+    BigInt(rawCursor) > BigInt("9223372036854775807")
+  ) {
     return NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }
 
@@ -29,8 +32,8 @@ export async function GET(
     return NextResponse.json({ error: "invalid_course" }, { status: 400 });
   }
   const result = rawBefore
-    ? await getCourseMessagesBefore(member, courseId, Number(rawBefore))
-    : await getCourseMessagesAfter(member, courseId, Number(rawCursor));
+    ? await getCourseMessagesBefore(member, courseId, rawBefore)
+    : await getCourseMessagesAfter(member, courseId, rawCursor);
   if (!result) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   return NextResponse.json(result);
 }

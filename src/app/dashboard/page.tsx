@@ -11,7 +11,6 @@ import {
 import { signOutAndReturnToLoginAction } from "@/features/dashboard/actions";
 import { CourseCard } from "@/features/dashboard/components/course-card";
 import { DashboardHeader } from "@/features/dashboard/components/dashboard-header";
-import { EmptySlot } from "@/features/dashboard/components/empty-slot";
 import { Section } from "@/features/dashboard/components/section";
 import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
 
@@ -135,27 +134,6 @@ export default async function DashboardPage({
           </Section>
         ) : null}
 
-        <Section
-          badge="P1"
-          description="按课程和空闲时间匹配同校同学。"
-          title="学习搭子"
-        >
-          <EmptySlot
-            hint="属于 P1 范围，会在 MVP 稳定之后开始做。"
-            title="尚未开始开发"
-          />
-        </Section>
-
-        <Section
-          badge="P1"
-          description="上传并共享课程笔记。"
-          title="笔记共享"
-        >
-          <EmptySlot
-            hint="需要先补齐举报与内容审核机制才能上线。"
-            title="尚未开始开发"
-          />
-        </Section>
       </main>
     </div>
   );

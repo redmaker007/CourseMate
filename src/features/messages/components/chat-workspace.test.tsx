@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DirectMessage } from "../direct-message-service";
@@ -60,6 +60,48 @@ describe("chat workspace", () => {
     expect(screen.queryByText(/已读/)).toBeNull();
   });
 
+  it("retries the same latest message after marking read fails", async () => {
+    const markReadAction = vi
+      .fn()
+      .mockResolvedValueOnce("unavailable")
+      .mockResolvedValueOnce("updated");
+    sync.useDirectMessageSync.mockReturnValue({
+      messages: [MESSAGE],
+      connected: true,
+      hasOlderMessages: false,
+      loadingOlder: false,
+      loadOlder: vi.fn(),
+      backfill: vi.fn(),
+      clearThrough: vi.fn(),
+    });
+
+    render(
+      <ChatWorkspace
+        clearAction={vi.fn()}
+        conversationId={CONVERSATION_ID}
+        currentUserId="alice"
+        initialHasOlderMessages={false}
+        initialMessages={[MESSAGE]}
+        markReadAction={markReadAction}
+        otherDisplayName="Bob"
+        reportAction={vi.fn()}
+        sendAction={vi.fn()}
+        sendStatus="allowed"
+      />,
+    );
+
+    await waitFor(() => expect(markReadAction).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() => expect(markReadAction).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(markReadAction).toHaveBeenCalledTimes(2);
+  });
+
   it("does not offer reporting on the current member's own message", () => {
     sync.useDirectMessageSync.mockReturnValue({
       messages: [{ ...MESSAGE, senderId: "alice" }],
@@ -78,7 +120,7 @@ describe("chat workspace", () => {
         currentUserId="alice"
         initialHasOlderMessages={false}
         initialMessages={[]}
-        markReadAction={vi.fn()}
+        markReadAction={vi.fn().mockResolvedValue("updated")}
         otherDisplayName="Bob"
         reportAction={vi.fn()}
         sendAction={vi.fn()}
@@ -107,7 +149,7 @@ describe("chat workspace", () => {
         currentUserId="alice"
         initialHasOlderMessages={false}
         initialMessages={[MESSAGE]}
-        markReadAction={vi.fn()}
+        markReadAction={vi.fn().mockResolvedValue("updated")}
         otherDisplayName="Bob"
         reportAction={vi.fn()}
         sendAction={vi.fn()}

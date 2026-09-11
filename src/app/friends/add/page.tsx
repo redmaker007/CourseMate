@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentMember } from "@/features/auth/session";
 import { friendMutationAction } from "@/features/friends/actions";
-import { CourseMemberRequestPanel } from "@/features/friends/components/friend-workspace";
+import { CourseMemberRequestPanel } from "@/features/friends/components/friend-discovery";
 
 export const dynamic = "force-dynamic";
 
