@@ -1,5 +1,7 @@
 # 前端路由与大厅页交接
 
+> 历史交接：正文进度、待办、分支与验证结果只代表记录时点；当前进度统一维护在 [STATUS.md](../STATUS.md)。操作步骤见 [操作手册索引](../../README.md#操作手册)，只需定位模块时见 [任务与代码索引](../README.md)。
+
 > 更新日期：2026-09-10
 >
 > 配套阅读：[`email-otp-auth.md`](./email-otp-auth.md)（认证模块）、[`environment-and-deployment.md`](./environment-and-deployment.md)（环境与部署）
