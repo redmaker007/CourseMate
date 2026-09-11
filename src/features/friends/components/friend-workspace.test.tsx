@@ -80,7 +80,7 @@ const BLOCKED_FRIENDS = [
     message: "你已拉黑对方",
   },
   {
-    blockStatus: "blocked_me",
+    blockStatus: "blocked_by_other",
     button: false,
     message: "对方已拉黑你",
   },

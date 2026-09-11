@@ -11,6 +11,8 @@ import type {
 import {
   ActionFeedback,
   ActionForm,
+  blockStatusLabel,
+  canUnblock,
   CourseChips,
   type FriendMutationAction,
 } from "./friend-discovery";
@@ -174,6 +176,7 @@ export function FriendCard({
   reportAction: ReportAction;
   unreadCount?: number;
 }) {
+  const unblockAllowed = canUnblock(friend.blockStatus);
   return (
     <li className="rounded-2xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -186,11 +189,7 @@ export function FriendCard({
           ) : null}
           {friend.sendStatus === "blocked" ? (
             <p className="mt-1 text-xs font-semibold text-rose-700">
-              {friend.blockStatus === "mutual"
-                ? "双方互相拉黑，双方不能发送消息。"
-                : friend.blockStatus === "blocked_by_me"
-                  ? "你已拉黑对方，双方不能发送消息。"
-                  : "对方已拉黑你，双方不能发送消息。"}
+              {blockStatusLabel(friend.blockStatus)}，双方不能发送消息。
             </p>
           ) : null}
           {unreadCount > 0 ? (
@@ -231,23 +230,14 @@ export function FriendCard({
           </p>
         </div>
         <div>
-          {friend.blockStatus === "blocked_me" ? null : (
+          {friend.blockStatus === "blocked_by_other" ? null : (
             <ActionForm
               action={action}
               fields={{
-                intent:
-                  friend.blockStatus === "blocked_by_me" ||
-                  friend.blockStatus === "mutual"
-                    ? "unblock"
-                    : "block",
+                intent: unblockAllowed ? "unblock" : "block",
                 memberId: friend.memberId,
               }}
-              label={
-                friend.blockStatus === "blocked_by_me" ||
-                friend.blockStatus === "mutual"
-                  ? "解除我设置的拉黑"
-                  : "拉黑"
-              }
+              label={unblockAllowed ? "解除我设置的拉黑" : "拉黑"}
             />
           )}
           <p className="mt-1 text-[11px] text-slate-500">

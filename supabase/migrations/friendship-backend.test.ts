@@ -967,7 +967,7 @@ describe("好友发现与关系状态数据库", () => {
       { block_status: "blocked_by_me", send_status: "blocked" },
     ]);
     expect(await resultRows(friendStatus(BOB))).toEqual([
-      { block_status: "blocked_me", send_status: "blocked" },
+      { block_status: "blocked_by_other", send_status: "blocked" },
     ]);
     expect(
       await resultRows(
@@ -985,7 +985,7 @@ describe("好友发现与关系状态数据库", () => {
 
     await asUser(ALICE, `select public.set_member_blocked('${BOB}', false)`);
     expect(await resultRows(friendStatus(ALICE))).toEqual([
-      { block_status: "blocked_me", send_status: "blocked" },
+      { block_status: "blocked_by_other", send_status: "blocked" },
     ]);
     await asUser(BOB, `select public.set_member_blocked('${ALICE}', false)`);
     expect(await resultRows(friendStatus(ALICE))).toEqual([

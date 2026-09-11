@@ -10,6 +10,7 @@ import {
 } from "../friend-action-state";
 import type {
   FriendDiscovery,
+  MemberBlockStatus,
   SharedCourseView,
 } from "../friendship-service";
 import {
@@ -26,6 +27,23 @@ export type FriendSearchAction = (
   previousState: FriendSearchState,
   formData: FormData,
 ) => Promise<FriendSearchState>;
+
+const BLOCK_STATUS_LABEL: Record<
+  Exclude<MemberBlockStatus, "none">,
+  string
+> = {
+  blocked_by_me: "你已拉黑对方",
+  blocked_by_other: "对方已拉黑你",
+  mutual: "双方互相拉黑",
+};
+
+export function blockStatusLabel(status: MemberBlockStatus) {
+  return status === "none" ? null : BLOCK_STATUS_LABEL[status];
+}
+
+export function canUnblock(status: MemberBlockStatus) {
+  return status === "blocked_by_me" || status === "mutual";
+}
 
 export function ActionFeedback({ state }: { state: FriendActionState }) {
   if (state.status === "idle") return null;
@@ -212,14 +230,9 @@ function DiscoveryResult({
       {member.relationship === "blocked" ? (
         <div className="mt-3">
           <p className="mb-2 text-sm text-rose-700">
-            {member.blockStatus === "mutual"
-              ? "双方互相拉黑，无法发送申请或消息。"
-              : member.blockStatus === "blocked_by_me"
-                ? "你已拉黑对方，无法发送申请或消息。"
-                : "对方已拉黑你，无法发送申请或消息。"}
+            {blockStatusLabel(member.blockStatus)}，无法发送申请或消息。
           </p>
-          {member.blockStatus === "blocked_by_me" ||
-          member.blockStatus === "mutual" ? (
+          {canUnblock(member.blockStatus) ? (
             <ActionForm
               action={action}
               fields={{ intent: "unblock", memberId: member.memberId }}

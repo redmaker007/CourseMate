@@ -14,7 +14,7 @@ export type FriendRelationshipState =
 export type MemberBlockStatus =
   | "none"
   | "blocked_by_me"
-  | "blocked_me"
+  | "blocked_by_other"
   | "mutual";
 
 export type FriendDiscovery = {

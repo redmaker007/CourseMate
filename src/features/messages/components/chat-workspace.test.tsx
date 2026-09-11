@@ -19,6 +19,7 @@ const MESSAGE: DirectMessage = {
   body: "hello https://example.com",
   createdAt: "2026-09-11T00:00:00Z",
 };
+const NEXT_MESSAGE: DirectMessage = { ...MESSAGE, id: "43", body: "next" };
 
 afterEach(cleanup);
 
@@ -99,6 +100,55 @@ describe("chat workspace", () => {
     await act(async () => {
       window.dispatchEvent(new Event("focus"));
     });
+    expect(markReadAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an older successful request move the local read cursor backward", async () => {
+    let resolveOlder!: (status: string) => void;
+    let resolveLatest!: (status: string) => void;
+    const markReadAction = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<string>((resolve) => { resolveOlder = resolve; }),
+      )
+      .mockImplementationOnce(
+        () => new Promise<string>((resolve) => { resolveLatest = resolve; }),
+      );
+    const syncResult = {
+      messages: [MESSAGE],
+      connected: true,
+      hasOlderMessages: false,
+      loadingOlder: false,
+      loadOlder: vi.fn(),
+      backfill: vi.fn(),
+      clearThrough: vi.fn(),
+    };
+    sync.useDirectMessageSync.mockReturnValue(syncResult);
+    const props = {
+      clearAction: vi.fn(),
+      conversationId: CONVERSATION_ID,
+      currentUserId: "alice",
+      initialHasOlderMessages: false,
+      initialMessages: [MESSAGE],
+      markReadAction,
+      otherDisplayName: "Bob",
+      reportAction: vi.fn(),
+      sendAction: vi.fn(),
+      sendStatus: "allowed" as const,
+    };
+    const { rerender } = render(<ChatWorkspace {...props} />);
+    await waitFor(() => expect(markReadAction).toHaveBeenCalledTimes(1));
+
+    sync.useDirectMessageSync.mockReturnValue({
+      ...syncResult,
+      messages: [MESSAGE, NEXT_MESSAGE],
+    });
+    rerender(<ChatWorkspace {...props} />);
+    await waitFor(() => expect(markReadAction).toHaveBeenCalledTimes(2));
+    await act(async () => { resolveLatest("updated"); });
+    await act(async () => { resolveOlder("updated"); });
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+
     expect(markReadAction).toHaveBeenCalledTimes(2);
   });
 

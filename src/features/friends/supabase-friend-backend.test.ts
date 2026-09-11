@@ -95,7 +95,7 @@ describe("Supabase friend backend", () => {
 
   it("maps each block direction for the friend list", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: ["blocked_by_me", "blocked_me", "mutual"].map(
+      data: ["blocked_by_me", "blocked_by_other", "mutual"].map(
         (block_status, index) => ({
           member_id: `00000000-0000-4000-8000-00000000000${index}`,
           display_name: `Member ${index}`,
@@ -118,7 +118,7 @@ describe("Supabase friend backend", () => {
 
     expect(friends.map((friend) => friend.blockStatus)).toEqual([
       "blocked_by_me",
-      "blocked_me",
+      "blocked_by_other",
       "mutual",
     ]);
   });

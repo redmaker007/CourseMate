@@ -100,7 +100,13 @@ export function ChatWorkspace({
       startTransition(() => {
         void markReadAction(conversationId, latestMessageId)
           .then((status) => {
-            if (status === "updated") lastMarkedRef.current = latestMessageId;
+            if (
+              status === "updated" &&
+              (lastMarkedRef.current === null ||
+                BigInt(latestMessageId) > BigInt(lastMarkedRef.current))
+            ) {
+              lastMarkedRef.current = latestMessageId;
+            }
           })
           .catch(() => undefined)
           .finally(() => {

@@ -122,7 +122,7 @@ export function FilteredFriendList({
 }) {
   const hidden = friends.filter((friend) => friend.hidden);
   const blockedByOther = friends.filter(
-    (friend) => friend.blockStatus === "blocked_me",
+    (friend) => friend.blockStatus === "blocked_by_other",
   );
   return (
     <div className="grid gap-5 lg:grid-cols-2">

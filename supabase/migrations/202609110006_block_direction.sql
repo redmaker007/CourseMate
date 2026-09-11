@@ -20,7 +20,7 @@ as $$
     when exists (
       select 1 from public.member_blocks
       where blocker_id = target_member_id and blocked_id = auth.uid()
-    ) then 'blocked_me'
+    ) then 'blocked_by_other'
     else 'none'
   end;
 $$;
