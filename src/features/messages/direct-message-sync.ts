@@ -19,3 +19,8 @@ export function reconnectCursor(messages: readonly DirectMessage[]) {
     BigInt(message.id) > BigInt(latest) ? message.id : latest,
   messages[0].id);
 }
+
+export function directMessagePollingDelayMs(consecutiveFailures: number) {
+  if (consecutiveFailures <= 2) return 5_000;
+  return Math.min(5_000 * 2 ** (consecutiveFailures - 2), 60_000);
+}

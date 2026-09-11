@@ -17,6 +17,7 @@ function backend(
     clearConversation: vi.fn().mockResolvedValue({ status: "updated" }),
     getUnreadCounts: vi.fn().mockResolvedValue({ visible: 0, hidden: 0 }),
     listConversationUnread: vi.fn().mockResolvedValue([]),
+    getConversation: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
 }
@@ -101,6 +102,26 @@ describe("direct message service", () => {
 
     await expect(service.getUnreadCounts()).resolves.toEqual({
       status: "temporarily_unavailable",
+    });
+  });
+
+  it("loads an authorized conversation view without trusting route metadata", async () => {
+    const getConversation = vi.fn().mockResolvedValue({
+      conversationId: CONVERSATION_ID,
+      otherMemberId: null,
+      otherDisplayName: "Deleted member",
+      sendStatus: "readonly",
+      hidden: false,
+    });
+    const service = createDirectMessageService(backend({ getConversation }));
+
+    await expect(service.getConversation(CONVERSATION_ID)).resolves.toEqual({
+      status: "loaded",
+      conversation: expect.objectContaining({ sendStatus: "readonly" }),
+    });
+    expect(getConversation).toHaveBeenCalledWith(CONVERSATION_ID);
+    await expect(service.getConversation("tampered")).resolves.toEqual({
+      status: "invalid_conversation",
     });
   });
 });

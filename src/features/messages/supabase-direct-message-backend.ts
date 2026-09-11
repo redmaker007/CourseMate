@@ -32,6 +32,26 @@ export function createSupabaseDirectMessageBackend(
   }
 
   return {
+    async getConversation(conversationId) {
+      const row = firstRow(
+        await call("get_direct_conversation_view", {
+          target_conversation_id: conversationId,
+        }),
+      );
+      if (!row.conversation_id) return null;
+      return {
+        conversationId: String(row.conversation_id),
+        otherMemberId:
+          row.other_member_id === null ? null : String(row.other_member_id),
+        otherDisplayName: String(row.other_display_name),
+        sendStatus: String(row.send_status) as
+          | "allowed"
+          | "blocked"
+          | "readonly",
+        hidden: Boolean(row.hidden),
+      };
+    },
+
     async sendMessage(conversationId, body) {
       const row = firstRow(
         await call("send_direct_message", {

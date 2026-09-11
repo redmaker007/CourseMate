@@ -12,6 +12,7 @@ import type {
   FriendListItem,
   FriendRequestView,
 } from "@/features/friends/friendship-service";
+import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +24,30 @@ export default async function FriendsPage() {
   let unavailable = false;
   let friends: FriendListItem[] = [];
   let requests: FriendRequestView[] = [];
+  let unreadByConversation: Record<string, number> = {};
   try {
     const service = await createProductionFriendshipService();
-    const [friendResult, requestResult] = await Promise.all([
+    const messageService = await createProductionDirectMessageService();
+    const [friendResult, requestResult, unreadResult] = await Promise.all([
       service.listFriends(false),
       service.listFriendRequests(),
+      messageService.listConversationUnread(false),
     ]);
     unavailable =
-      friendResult.status !== "loaded" || requestResult.status !== "loaded";
+      friendResult.status !== "loaded" ||
+      requestResult.status !== "loaded" ||
+      unreadResult.status !== "loaded";
     friends = friendResult.status === "loaded" ? friendResult.friends : [];
     requests = requestResult.status === "loaded" ? requestResult.requests : [];
+    unreadByConversation =
+      unreadResult.status === "loaded"
+        ? Object.fromEntries(
+            unreadResult.conversations.map((conversation) => [
+              conversation.conversationId,
+              conversation.unreadCount,
+            ]),
+          )
+        : {};
   } catch {
     unavailable = true;
   }
@@ -69,6 +84,7 @@ export default async function FriendsPage() {
           mutationAction={friendMutationAction}
           requests={requests}
           searchAction={searchFriendAction}
+          unreadByConversation={unreadByConversation}
         />
       </div>
     </main>

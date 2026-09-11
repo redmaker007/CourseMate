@@ -23,7 +23,16 @@ export type DirectConversationUnread = {
   unreadCount: number;
 };
 
+export type DirectConversationView = {
+  conversationId: string;
+  otherMemberId: string | null;
+  otherDisplayName: string;
+  sendStatus: "allowed" | "blocked" | "readonly";
+  hidden: boolean;
+};
+
 export interface DirectMessageBackend {
+  getConversation(conversationId: string): Promise<DirectConversationView | null>;
   sendMessage(
     conversationId: string,
     body: string,
@@ -60,6 +69,20 @@ function validMessageId(value: string) {
 
 export function createDirectMessageService(backend: DirectMessageBackend) {
   return {
+    async getConversation(conversationId: string) {
+      if (!validConversationId(conversationId)) {
+        return { status: "invalid_conversation" } as const;
+      }
+      try {
+        const conversation = await backend.getConversation(conversationId);
+        return conversation
+          ? ({ status: "loaded", conversation } as const)
+          : ({ status: "not_available" } as const);
+      } catch {
+        return { status: "temporarily_unavailable" } as const;
+      }
+    },
+
     async sendMessage(conversationId: string, rawBody: string) {
       if (!validConversationId(conversationId)) {
         return { status: "invalid_conversation" } as const;

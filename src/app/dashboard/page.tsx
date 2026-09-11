@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getEnabledSchools } from "@/features/auth/queries";
@@ -12,6 +13,7 @@ import { CourseCard } from "@/features/dashboard/components/course-card";
 import { DashboardHeader } from "@/features/dashboard/components/dashboard-header";
 import { EmptySlot } from "@/features/dashboard/components/empty-slot";
 import { Section } from "@/features/dashboard/components/section";
+import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +45,7 @@ export default async function DashboardPage({
   >;
   let searchResults = [] as Awaited<ReturnType<typeof searchAvailableCourses>>;
   let courseDataUnavailable = false;
+  let directUnread = 0;
   try {
     [courses, searchResults] = await Promise.all([
       getDashboardCourses(member),
@@ -54,6 +57,16 @@ export default async function DashboardPage({
     courseDataUnavailable = true;
   }
 
+  try {
+    const messageService = await createProductionDirectMessageService();
+    const unreadResult = await messageService.getUnreadCounts();
+    if (unreadResult.status === "loaded") {
+      directUnread = unreadResult.counts.visible;
+    }
+  } catch {
+    // Unread is a secondary hint; the rest of Dashboard remains usable.
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <DashboardHeader
@@ -63,6 +76,13 @@ export default async function DashboardPage({
       />
 
       <main className="mx-auto max-w-5xl space-y-5 px-5 py-8">
+        <Link
+          className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-sm font-semibold text-indigo-900"
+          href="/friends"
+        >
+          <span>私聊消息</span>
+          <span>{directUnread > 0 ? `${directUnread} 条私聊未读` : "查看好友"}</span>
+        </Link>
         {signout === "failed" ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900">
             退出登录失败，你仍处于登录状态。请稍后重试。

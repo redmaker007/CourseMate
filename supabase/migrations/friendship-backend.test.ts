@@ -116,9 +116,49 @@ beforeAll(async () => {
   await applyMigration("202609100003_friendship_backend.sql");
   await applyMigration("202609110001_friend_page_queries.sql");
   await applyMigration("202609110002_direct_messaging.sql");
+  await applyMigration("202609110003_direct_chat_page.sql");
 });
 
 describe("direct messaging database boundary", () => {
+  it("returns only the current member's authorized chat-page metadata", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    const allowed = await asUser(
+      ALICE,
+      `select * from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(allowed.ok && allowed.rows).toEqual([{
+      conversation_id: conversationId,
+      other_member_id: BOB,
+      other_display_name: "Bob",
+      send_status: "allowed",
+      hidden: false,
+    }]);
+
+    await asUser(ALICE, `select public.set_friend_hidden('${BOB}', true)`);
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', true)`);
+    const blocked = await asUser(
+      ALICE,
+      `select send_status, hidden from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(blocked.ok && blocked.rows).toEqual([
+      { send_status: "blocked", hidden: true },
+    ]);
+
+    const outsider = await asUser(
+      CAROL,
+      `select * from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(outsider.ok && outsider.rows).toEqual([]);
+
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', false)`);
+    await asUser(ALICE, `select public.remove_friend('${BOB}')`);
+    const removed = await asUser(
+      BOB,
+      `select send_status from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(removed.ok && removed.rows).toEqual([{ send_status: "readonly" }]);
+  });
+
   it("allows only an eligible member to send a trimmed 1-4000 character body", async () => {
     const { conversationId } = await createAcceptedFriendship();
     const sent = await asUser(

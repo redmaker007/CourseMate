@@ -9,6 +9,7 @@ import type {
   BlockedMemberListItem,
   FriendListItem,
 } from "@/features/friends/friendship-service";
+import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +21,30 @@ export default async function FilteredFriendsPage() {
   let unavailable = false;
   let friends: FriendListItem[] = [];
   let blockedMembers: BlockedMemberListItem[] = [];
+  let unreadByConversation: Record<string, number> = {};
   try {
     const service = await createProductionFriendshipService();
-    const [friendResult, blockResult] = await Promise.all([
+    const messageService = await createProductionDirectMessageService();
+    const [friendResult, blockResult, unreadResult] = await Promise.all([
       service.listFriends(true),
       service.listBlockedMembers(),
+      messageService.listConversationUnread(true),
     ]);
     unavailable =
-      friendResult.status !== "loaded" || blockResult.status !== "loaded";
+      friendResult.status !== "loaded" ||
+      blockResult.status !== "loaded" ||
+      unreadResult.status !== "loaded";
     friends = friendResult.status === "loaded" ? friendResult.friends : [];
     blockedMembers = blockResult.status === "loaded" ? blockResult.members : [];
+    unreadByConversation =
+      unreadResult.status === "loaded"
+        ? Object.fromEntries(
+            unreadResult.conversations.map((conversation) => [
+              conversation.conversationId,
+              conversation.unreadCount,
+            ]),
+          )
+        : {};
   } catch {
     unavailable = true;
   }
@@ -58,6 +73,7 @@ export default async function FilteredFriendsPage() {
           blockedMembers={blockedMembers}
           friends={friends}
           mutationAction={friendMutationAction}
+          unreadByConversation={unreadByConversation}
         />
       </div>
     </main>

@@ -9,6 +9,8 @@ const courseQueries = vi.hoisted(() => ({
   getDashboardCourses: vi.fn(),
   searchAvailableCourses: vi.fn(),
 }));
+const messageService = vi.hoisted(() => ({ getUnreadCounts: vi.fn() }));
+const messageProduction = vi.hoisted(() => ({ createService: vi.fn() }));
 const navigation = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
@@ -20,6 +22,9 @@ vi.mock("next/navigation", () => navigation);
 vi.mock("@/features/auth/session", () => auth);
 vi.mock("@/features/auth/queries", () => authQueries);
 vi.mock("@/features/courses/queries", () => courseQueries);
+vi.mock("@/features/messages/production-direct-message-service", () => ({
+  createProductionDirectMessageService: messageProduction.createService,
+}));
 vi.mock("@/features/dashboard/components/dashboard-header", () => ({
   DashboardHeader: () => <div>Dashboard header</div>,
 }));
@@ -53,6 +58,11 @@ describe("DashboardPage course flow", () => {
     courseQueries.searchAvailableCourses.mockResolvedValue([
       { id: "search", title: "Search result" },
     ]);
+    messageProduction.createService.mockResolvedValue(messageService);
+    messageService.getUnreadCounts.mockResolvedValue({
+      status: "loaded",
+      counts: { visible: 2, hidden: 7 },
+    });
   });
 
   afterEach(() => cleanup());
@@ -67,6 +77,10 @@ describe("DashboardPage course flow", () => {
     expect(screen.getByText("Current course")).toBeTruthy();
     expect(screen.getByText("Archived course")).toBeTruthy();
     expect(screen.getByText("search:TEST00:Search result")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /2 条私聊未读/ })).toHaveProperty(
+      "href",
+      "http://localhost:3000/friends",
+    );
     expect(courseQueries.searchAvailableCourses).toHaveBeenCalledWith(
       MEMBER,
       "TEST00",

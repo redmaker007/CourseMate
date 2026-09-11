@@ -9,6 +9,8 @@ const service = vi.hoisted(() => ({
   listFriendRequests: vi.fn(),
 }));
 const production = vi.hoisted(() => ({ createService: vi.fn() }));
+const messageService = vi.hoisted(() => ({ listConversationUnread: vi.fn() }));
+const messageProduction = vi.hoisted(() => ({ createService: vi.fn() }));
 const navigation = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
@@ -21,13 +23,16 @@ vi.mock("@/features/auth/session", () => auth);
 vi.mock("@/features/friends/production-friendship-service", () => ({
   createProductionFriendshipService: production.createService,
 }));
+vi.mock("@/features/messages/production-direct-message-service", () => ({
+  createProductionDirectMessageService: messageProduction.createService,
+}));
 vi.mock("@/features/friends/actions", () => ({
   friendMutationAction: vi.fn(),
   searchFriendAction: vi.fn(),
 }));
 vi.mock("@/features/friends/components/friend-workspace", () => ({
-  FriendWorkspace: ({ friends, requests }: { friends: unknown[]; requests: unknown[] }) => (
-    <div data-testid="workspace">{friends.length}:{requests.length}</div>
+  FriendWorkspace: ({ friends, requests, unreadByConversation }: { friends: unknown[]; requests: unknown[]; unreadByConversation: Record<string, number> }) => (
+    <div data-testid="workspace">{friends.length}:{requests.length}:{Object.values(unreadByConversation)[0]}</div>
   ),
 }));
 
@@ -47,8 +52,13 @@ describe("friends page", () => {
     vi.clearAllMocks();
     auth.getCurrentMember.mockResolvedValue(MEMBER);
     production.createService.mockResolvedValue(service);
+    messageProduction.createService.mockResolvedValue(messageService);
     service.listFriends.mockResolvedValue({ status: "loaded", friends: [{}] });
     service.listFriendRequests.mockResolvedValue({ status: "loaded", requests: [{}, {}] });
+    messageService.listConversationUnread.mockResolvedValue({
+      status: "loaded",
+      conversations: [{ conversationId: "conversation-1", unreadCount: 2 }],
+    });
   });
 
   it("protects the page with the current complete member session", async () => {
@@ -65,6 +75,7 @@ describe("friends page", () => {
 
     expect(service.listFriends).toHaveBeenCalledWith(false);
     expect(service.listFriendRequests).toHaveBeenCalledOnce();
-    expect(screen.getByTestId("workspace").textContent).toBe("1:2");
+    expect(messageService.listConversationUnread).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId("workspace").textContent).toBe("1:2:2");
   });
 });

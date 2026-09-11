@@ -105,4 +105,30 @@ describe("Supabase direct message backend", () => {
       include_hidden: true,
     });
   });
+
+  it("maps the authorized conversation view and preserves a missing result", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: [{
+          conversation_id: CONVERSATION_ID,
+          other_member_id: null,
+          other_display_name: "Deleted member",
+          send_status: "readonly",
+          hidden: false,
+        }],
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: [], error: null });
+    const backend = createSupabaseDirectMessageBackend({ rpc });
+
+    await expect(backend.getConversation(CONVERSATION_ID)).resolves.toEqual({
+      conversationId: CONVERSATION_ID,
+      otherMemberId: null,
+      otherDisplayName: "Deleted member",
+      sendStatus: "readonly",
+      hidden: false,
+    });
+    await expect(backend.getConversation(CONVERSATION_ID)).resolves.toBeNull();
+  });
 });

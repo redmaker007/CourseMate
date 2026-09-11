@@ -105,6 +105,20 @@ describe("friend workspace", () => {
       .toBe(`/messages/${FRIEND.conversationId}`);
   });
 
+  it("shows unread only when the containing page supplies that conversation", () => {
+    render(
+      <FriendWorkspace
+        friends={[FRIEND]}
+        mutationAction={action}
+        requests={[]}
+        searchAction={searchAction}
+        unreadByConversation={{ [FRIEND.conversationId]: 3 }}
+      />,
+    );
+
+    expect(screen.getByText("3 条未读")).toBeTruthy();
+  });
+
   it("counts Unicode note characters and blocks the sixteenth character", () => {
     render(<FriendNoteForm action={action} friend={FRIEND} />);
     const input = screen.getByLabelText("给鲍勃设置私有备注") as HTMLInputElement;

@@ -372,7 +372,15 @@ export function FriendNoteForm({
   );
 }
 
-function FriendCard({ action, friend }: { action: FriendMutationAction; friend: FriendListItem }) {
+function FriendCard({
+  action,
+  friend,
+  unreadCount = 0,
+}: {
+  action: FriendMutationAction;
+  friend: FriendListItem;
+  unreadCount?: number;
+}) {
   return (
     <li className="rounded-2xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -383,6 +391,11 @@ function FriendCard({ action, friend }: { action: FriendMutationAction; friend: 
           ) : null}
           {friend.sendStatus === "blocked" ? (
             <p className="mt-1 text-xs font-semibold text-rose-700">当前存在拉黑限制，双方不能发送消息。</p>
+          ) : null}
+          {unreadCount > 0 ? (
+            <p className="mt-1 text-xs font-bold text-indigo-700">
+              {unreadCount} 条未读
+            </p>
           ) : null}
         </div>
         <Link
@@ -424,7 +437,15 @@ function FriendCard({ action, friend }: { action: FriendMutationAction; friend: 
   );
 }
 
-function FriendList({ action, friends }: { action: FriendMutationAction; friends: FriendListItem[] }) {
+function FriendList({
+  action,
+  friends,
+  unreadByConversation,
+}: {
+  action: FriendMutationAction;
+  friends: FriendListItem[];
+  unreadByConversation: Record<string, number>;
+}) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -440,7 +461,14 @@ function FriendList({ action, friends }: { action: FriendMutationAction; friends
         <p className="mt-4 text-sm text-slate-500">暂无普通列表中的好友。</p>
       ) : (
         <ul className="mt-4 space-y-3">
-          {friends.map((friend) => <FriendCard action={action} friend={friend} key={friend.memberId} />)}
+          {friends.map((friend) => (
+            <FriendCard
+              action={action}
+              friend={friend}
+              key={friend.memberId}
+              unreadCount={unreadByConversation[friend.conversationId]}
+            />
+          ))}
         </ul>
       )}
     </section>
@@ -452,11 +480,13 @@ export function FriendWorkspace({
   mutationAction,
   requests,
   searchAction,
+  unreadByConversation = {},
 }: {
   friends: FriendListItem[];
   mutationAction: FriendMutationAction;
   requests: FriendRequestView[];
   searchAction: FriendSearchAction;
+  unreadByConversation?: Record<string, number>;
 }) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -464,7 +494,11 @@ export function FriendWorkspace({
         <FriendSearch mutationAction={mutationAction} searchAction={searchAction} />
         <RequestHistory action={mutationAction} requests={requests} />
       </div>
-      <FriendList action={mutationAction} friends={friends} />
+      <FriendList
+        action={mutationAction}
+        friends={friends}
+        unreadByConversation={unreadByConversation}
+      />
     </div>
   );
 }
@@ -473,10 +507,12 @@ export function FilteredFriendList({
   blockedMembers,
   friends,
   mutationAction,
+  unreadByConversation = {},
 }: {
   blockedMembers: BlockedMemberListItem[];
   friends: FriendListItem[];
   mutationAction: FriendMutationAction;
+  unreadByConversation?: Record<string, number>;
 }) {
   const hidden = friends.filter((friend) => friend.hidden);
   const blockedByMe = new Set(blockedMembers.map((member) => member.memberId));
@@ -490,7 +526,14 @@ export function FilteredFriendList({
         <h2 className="text-lg font-bold text-slate-950">已屏蔽</h2>
         <p className="mt-1 text-sm text-slate-600">只有你能看到这个状态；消息仍会投递。</p>
         <ul className="mt-4 space-y-3">
-          {hidden.map((friend) => <FriendCard action={mutationAction} friend={friend} key={friend.memberId} />)}
+          {hidden.map((friend) => (
+            <FriendCard
+              action={mutationAction}
+              friend={friend}
+              key={friend.memberId}
+              unreadCount={unreadByConversation[friend.conversationId]}
+            />
+          ))}
         </ul>
         {hidden.length === 0 ? <p className="mt-4 text-sm text-slate-500">没有已屏蔽的好友。</p> : null}
       </section>
