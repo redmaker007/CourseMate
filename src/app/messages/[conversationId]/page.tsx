@@ -8,6 +8,7 @@ import {
 } from "@/features/messages/actions";
 import { ChatWorkspace } from "@/features/messages/components/chat-workspace";
 import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
+import { submitBehaviorReportAction } from "@/features/reporting/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function MessagePage({
       initialMessages={messageResult.messages}
       markReadAction={markDirectMessageReadAction}
       otherDisplayName={conversationResult.conversation.otherDisplayName}
+      reportAction={submitBehaviorReportAction}
       sendAction={sendDirectMessageAction}
       sendStatus={conversationResult.conversation.sendStatus}
     />

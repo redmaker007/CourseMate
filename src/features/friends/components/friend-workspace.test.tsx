@@ -19,6 +19,10 @@ const searchAction = vi.fn(async () => ({
   status: "not_found" as const,
   message: "没有找到",
 }));
+const reportAction = vi.fn(async () => ({
+  status: "created",
+  message: "submitted",
+}));
 
 const FRIEND: FriendListItem = {
   memberId: "22222222-2222-4222-8222-222222222222",
@@ -76,6 +80,7 @@ describe("friend workspace", () => {
       <FriendWorkspace
         friends={[FRIEND]}
         mutationAction={action}
+        reportAction={reportAction}
         requests={REQUESTS}
         searchAction={searchAction}
       />,
@@ -92,6 +97,7 @@ describe("friend workspace", () => {
       <FriendWorkspace
         friends={[FRIEND]}
         mutationAction={action}
+        reportAction={reportAction}
         requests={REQUESTS}
         searchAction={searchAction}
       />,
@@ -105,11 +111,27 @@ describe("friend workspace", () => {
       .toBe(`/messages/${FRIEND.conversationId}`);
   });
 
+  it("offers reporting for an incoming request and a visible member profile", () => {
+    render(
+      <FriendWorkspace
+        friends={[FRIEND]}
+        mutationAction={action}
+        reportAction={reportAction}
+        requests={REQUESTS}
+        searchAction={searchAction}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "举报好友申请" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "举报成员资料" })).toBeTruthy();
+  });
+
   it("shows unread only when the containing page supplies that conversation", () => {
     render(
       <FriendWorkspace
         friends={[FRIEND]}
         mutationAction={action}
+        reportAction={reportAction}
         requests={[]}
         searchAction={searchAction}
         unreadByConversation={{ [FRIEND.conversationId]: 3 }}
@@ -140,6 +162,7 @@ describe("friend workspace", () => {
       <FriendWorkspace
         friends={[FRIEND]}
         mutationAction={action}
+        reportAction={reportAction}
         requests={[]}
         searchAction={searchAction}
       />,
@@ -155,6 +178,7 @@ describe("friend workspace", () => {
         blockedMembers={[BLOCKED_MEMBER]}
         friends={[]}
         mutationAction={action}
+        reportAction={reportAction}
       />,
     );
 

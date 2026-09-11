@@ -16,6 +16,10 @@ import {
 } from "../message-action-state";
 import { useDirectMessageSync } from "../use-direct-message-sync";
 import { SafeMessageText } from "./safe-message-text";
+import {
+  ReportForm,
+  type ReportAction,
+} from "@/features/reporting/components/report-form";
 
 type MutationAction = (
   previousState: DirectMessageActionState,
@@ -30,6 +34,7 @@ export function ChatWorkspace({
   initialMessages,
   markReadAction,
   otherDisplayName,
+  reportAction,
   sendAction,
   sendStatus,
 }: {
@@ -43,6 +48,7 @@ export function ChatWorkspace({
     throughMessageId: string,
   ) => Promise<string>;
   otherDisplayName: string;
+  reportAction: ReportAction;
   sendAction: MutationAction;
   sendStatus: "allowed" | "blocked" | "readonly";
 }) {
@@ -171,6 +177,14 @@ export function ChatWorkspace({
                       <time className={`mt-1 block text-[11px] ${own ? "text-indigo-100" : "text-slate-500"}`}>
                         {message.createdAt}
                       </time>
+                      {!own && message.senderId ? (
+                        <ReportForm
+                          action={reportAction}
+                          label="举报消息"
+                          targetId={message.id}
+                          targetType="message"
+                        />
+                      ) : null}
                     </article>
                   </li>
                 );

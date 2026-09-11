@@ -10,6 +10,7 @@ import type {
   FriendListItem,
 } from "@/features/friends/friendship-service";
 import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
+import { submitBehaviorReportAction } from "@/features/reporting/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,7 @@ export default async function FilteredFriendsPage() {
           blockedMembers={blockedMembers}
           friends={friends}
           mutationAction={friendMutationAction}
+          reportAction={submitBehaviorReportAction}
           unreadByConversation={unreadByConversation}
         />
       </div>

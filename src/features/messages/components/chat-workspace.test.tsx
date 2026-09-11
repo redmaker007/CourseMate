@@ -44,18 +44,49 @@ describe("chat workspace", () => {
         initialMessages={[MESSAGE]}
         markReadAction={markReadAction}
         otherDisplayName="Bob"
+        reportAction={vi.fn()}
         sendAction={vi.fn()}
         sendStatus="allowed"
       />,
     );
 
     expect(screen.getByRole("heading", { name: "Bob" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "举报消息" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "https://example.com" }))
       .toHaveProperty("rel", "noopener noreferrer");
     await waitFor(() =>
       expect(markReadAction).toHaveBeenCalledWith(CONVERSATION_ID, "42"),
     );
     expect(screen.queryByText(/已读/)).toBeNull();
+  });
+
+  it("does not offer reporting on the current member's own message", () => {
+    sync.useDirectMessageSync.mockReturnValue({
+      messages: [{ ...MESSAGE, senderId: "alice" }],
+      connected: true,
+      hasOlderMessages: false,
+      loadingOlder: false,
+      loadOlder: vi.fn(),
+      backfill: vi.fn(),
+      clearThrough: vi.fn(),
+    });
+
+    render(
+      <ChatWorkspace
+        clearAction={vi.fn()}
+        conversationId={CONVERSATION_ID}
+        currentUserId="alice"
+        initialHasOlderMessages={false}
+        initialMessages={[]}
+        markReadAction={vi.fn()}
+        otherDisplayName="Bob"
+        reportAction={vi.fn()}
+        sendAction={vi.fn()}
+        sendStatus="allowed"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "举报消息" })).toBeNull();
   });
 
   it("keeps history visible but disables sending for a removed friendship", () => {
@@ -78,6 +109,7 @@ describe("chat workspace", () => {
         initialMessages={[MESSAGE]}
         markReadAction={vi.fn()}
         otherDisplayName="Bob"
+        reportAction={vi.fn()}
         sendAction={vi.fn()}
         sendStatus="readonly"
       />,

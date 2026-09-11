@@ -16,6 +16,10 @@ import type {
   FriendRequestView,
   SharedCourseView,
 } from "../friendship-service";
+import {
+  ReportForm,
+  type ReportAction,
+} from "@/features/reporting/components/report-form";
 
 export type FriendMutationAction = (
   previousState: FriendActionState,
@@ -152,9 +156,11 @@ export function CourseMemberRequestPanel({
 function DiscoveryResult({
   action,
   member,
+  reportAction,
 }: {
   action: FriendMutationAction;
   member: FriendDiscovery;
+  reportAction: ReportAction;
 }) {
   return (
     <article className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -169,6 +175,12 @@ function DiscoveryResult({
       <div className="mt-3">
         <CourseChips courses={member.sharedCourses} />
       </div>
+      <ReportForm
+        action={reportAction}
+        label="举报成员资料"
+        targetId={member.memberId}
+        targetType="profile"
+      />
       {member.relationship === "none" ? (
         <FriendRequestForm action={action} memberId={member.memberId} />
       ) : null}
@@ -204,9 +216,11 @@ function DiscoveryResult({
 
 function FriendSearch({
   mutationAction,
+  reportAction,
   searchAction,
 }: {
   mutationAction: FriendMutationAction;
+  reportAction: ReportAction;
   searchAction: FriendSearchAction;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -252,7 +266,11 @@ function FriendSearch({
         </p>
       ) : null}
       {state.status === "found" ? (
-        <DiscoveryResult action={mutationAction} member={state.member} />
+        <DiscoveryResult
+          action={mutationAction}
+          member={state.member}
+          reportAction={reportAction}
+        />
       ) : null}
     </section>
   );
@@ -267,9 +285,11 @@ const REQUEST_STATUS: Record<FriendRequestView["status"], string> = {
 
 function RequestHistory({
   action,
+  reportAction,
   requests,
 }: {
   action: FriendMutationAction;
+  reportAction: ReportAction;
   requests: FriendRequestView[];
 }) {
   return (
@@ -294,6 +314,14 @@ function RequestHistory({
                 </span>
               </div>
               <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{request.message}</p>
+              {request.direction === "incoming" ? (
+                <ReportForm
+                  action={reportAction}
+                  label="举报好友申请"
+                  targetId={request.requestId}
+                  targetType="friend_request"
+                />
+              ) : null}
               {request.direction === "incoming" && request.status === "pending" ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <ActionForm
@@ -375,10 +403,12 @@ export function FriendNoteForm({
 function FriendCard({
   action,
   friend,
+  reportAction,
   unreadCount = 0,
 }: {
   action: FriendMutationAction;
   friend: FriendListItem;
+  reportAction: ReportAction;
   unreadCount?: number;
 }) {
   return (
@@ -406,6 +436,12 @@ function FriendCard({
         </Link>
       </div>
       <div className="mt-3"><CourseChips courses={friend.sharedCourses} /></div>
+      <ReportForm
+        action={reportAction}
+        label="举报成员资料"
+        targetId={friend.memberId}
+        targetType="profile"
+      />
       <FriendNoteForm action={action} friend={friend} />
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <div>
@@ -440,10 +476,12 @@ function FriendCard({
 function FriendList({
   action,
   friends,
+  reportAction,
   unreadByConversation,
 }: {
   action: FriendMutationAction;
   friends: FriendListItem[];
+  reportAction: ReportAction;
   unreadByConversation: Record<string, number>;
 }) {
   return (
@@ -466,6 +504,7 @@ function FriendList({
               action={action}
               friend={friend}
               key={friend.memberId}
+              reportAction={reportAction}
               unreadCount={unreadByConversation[friend.conversationId]}
             />
           ))}
@@ -478,12 +517,14 @@ function FriendList({
 export function FriendWorkspace({
   friends,
   mutationAction,
+  reportAction,
   requests,
   searchAction,
   unreadByConversation = {},
 }: {
   friends: FriendListItem[];
   mutationAction: FriendMutationAction;
+  reportAction: ReportAction;
   requests: FriendRequestView[];
   searchAction: FriendSearchAction;
   unreadByConversation?: Record<string, number>;
@@ -491,12 +532,21 @@ export function FriendWorkspace({
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-5">
-        <FriendSearch mutationAction={mutationAction} searchAction={searchAction} />
-        <RequestHistory action={mutationAction} requests={requests} />
+        <FriendSearch
+          mutationAction={mutationAction}
+          reportAction={reportAction}
+          searchAction={searchAction}
+        />
+        <RequestHistory
+          action={mutationAction}
+          reportAction={reportAction}
+          requests={requests}
+        />
       </div>
       <FriendList
         action={mutationAction}
         friends={friends}
+        reportAction={reportAction}
         unreadByConversation={unreadByConversation}
       />
     </div>
@@ -507,11 +557,13 @@ export function FilteredFriendList({
   blockedMembers,
   friends,
   mutationAction,
+  reportAction,
   unreadByConversation = {},
 }: {
   blockedMembers: BlockedMemberListItem[];
   friends: FriendListItem[];
   mutationAction: FriendMutationAction;
+  reportAction: ReportAction;
   unreadByConversation?: Record<string, number>;
 }) {
   const hidden = friends.filter((friend) => friend.hidden);
@@ -531,6 +583,7 @@ export function FilteredFriendList({
               action={mutationAction}
               friend={friend}
               key={friend.memberId}
+              reportAction={reportAction}
               unreadCount={unreadByConversation[friend.conversationId]}
             />
           ))}
@@ -557,6 +610,12 @@ export function FilteredFriendList({
                   </Link>
                 ) : null}
               </div>
+              <ReportForm
+                action={reportAction}
+                label="举报成员资料"
+                targetId={member.memberId}
+                targetType="profile"
+              />
               <ActionForm
                 action={mutationAction}
                 className="mt-3"
