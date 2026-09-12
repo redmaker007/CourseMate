@@ -427,6 +427,7 @@ describe("chat workspace", () => {
       (screen.getByRole("textbox", { name: "消息" }) as HTMLTextAreaElement)
         .disabled,
     ).toBe(true);
-    expect(screen.getByText(/已不是好友/)).toBeTruthy();
+    // 只读可能来自好友关系结束，也可能来自双方当前不在同一学校（管理员跨校测试）
+    expect(screen.getByText(/不允许发送新消息/)).toBeTruthy();
   });
 });

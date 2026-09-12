@@ -1,4 +1,6 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import Link from "next/link";
+import { setTestSchoolAction } from "@/features/admin/school-test-actions";
 
 import {
   importCatalogBatchAction,
@@ -45,6 +47,7 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SchoolTestBanner member={member} />
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-4">
           <div className="min-w-0">
@@ -73,6 +76,20 @@ export default async function AdminPage() {
       <main className="mx-auto max-w-5xl space-y-5 px-5 py-8">
         {overview ? (
           <>
+            <Section
+              badge="测试"
+              title="切换测试学校"
+              description="使用自己的账号测试课程、好友和私聊。操作会写入当前环境，已有选课和聊天记录会保留。"
+            >
+              <p className="mb-3 text-sm text-slate-600">
+                当前学校：{member.schoolId} · 邮箱归属：{member.homeSchoolId ?? member.schoolId}
+              </p>
+              <AdminForm action={setTestSchoolAction} submitLabel="进入测试学校" pendingLabel="切换中…">
+                <SchoolSelect schools={schoolOptions.filter((option) =>
+                  overview.schools.some((school) => school.id === option.id && school.enabled)
+                )} />
+              </AdminForm>
+            </Section>
             <Section
               badge="学校"
               description="当前学期决定学生能加入哪些课；邮箱域名决定谁能登录。"

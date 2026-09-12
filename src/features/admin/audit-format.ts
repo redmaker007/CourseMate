@@ -9,6 +9,7 @@ const ACTION_LABELS: Record<string, string> = {
   "school.add_domain": "添加邮箱域名",
   "school.remove_domain": "删除邮箱域名",
   "term.switch": "切换学期",
+  "school.test_switch": "切换测试学校",
   "catalog.import_batch": "导入课表",
   "catalog.materialize": "生成当前学期课程",
   "catalog.save_course": "保存单门课",
@@ -38,6 +39,7 @@ export function summarizeAuditDetails(action: string, details: unknown): string 
     case "school.add_domain":
     case "school.remove_domain":
       return text(detail.domain) ?? "";
+    case "school.test_switch":
     case "term.switch":
       return `${text(detail.from) ?? "未设置"} → ${text(detail.to) ?? "?"}`;
     case "catalog.import_batch":

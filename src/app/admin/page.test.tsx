@@ -62,7 +62,7 @@ const OVERVIEW = {
 };
 
 const OWNER_ONLY_FORMS = ["保存学校", "添加域名", "关闭学校", "删除", "任命为管理员", "撤销管理员"];
-const STAFF_FORMS = ["切换学期", "保存这门课", "重新生成"];
+const STAFF_FORMS = ["切换学期", "保存这门课", "重新生成", "进入测试学校"];
 
 function form(name: string) {
   return screen.queryByRole("form", { name });

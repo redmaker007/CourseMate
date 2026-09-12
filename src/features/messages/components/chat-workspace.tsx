@@ -140,7 +140,7 @@ export function ChatWorkspace({
     sendStatus === "blocked"
       ? "当前存在拉黑限制，历史仍可查看，但双方不能发送新消息。"
       : sendStatus === "readonly"
-        ? "你们已不是好友，历史仍可查看，但不能发送新消息。"
+        ? "当前好友关系或学校权限不允许发送新消息，历史仍可查看。"
         : null;
 
   return (
