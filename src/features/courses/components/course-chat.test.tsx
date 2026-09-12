@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let insertCallback: (() => void) | undefined;
@@ -25,11 +25,17 @@ vi.mock("../actions", () => ({
   sendCourseMessageAction: vi.fn(),
 }));
 
+import { sendCourseMessageAction } from "../actions";
+import type { CourseMessageActionState } from "../course-action-state";
 import { CourseChat } from "./course-chat";
+
+const COURSE_ID = "13000000-0000-4000-8000-000000000001";
+const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CLIENT_MESSAGE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 const INITIAL = [
   {
-    id: 1,
+    id: "1",
     senderId: "member-2",
     senderName: "Bob",
     body: "first",
@@ -43,6 +49,7 @@ describe("CourseChat", () => {
     insertCallback = undefined;
     statusCallback = undefined;
     vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("crypto", { randomUUID: () => CLIENT_MESSAGE_ID });
   });
 
   afterEach(() => {
@@ -62,7 +69,7 @@ describe("CourseChat", () => {
         json: async () => ({
           messages: [
             {
-              id: 2,
+              id: "2",
               senderId: "member-1",
               senderName: "Alice",
               body: "second",
@@ -77,7 +84,7 @@ describe("CourseChat", () => {
       json: async () => ({
         messages: [
           {
-            id: 3,
+            id: "3",
             senderId: "member-1",
             senderName: "Alice",
             body: "third",
@@ -183,6 +190,124 @@ describe("CourseChat", () => {
 
     await act(() => vi.advanceTimersByTimeAsync(20_000));
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("shows a pending message immediately and retries a failure with the same id", async () => {
+    let finish!: (state: {
+      status: "unavailable";
+      message: string;
+      clientMessageId: string;
+      attemptedBody: string;
+    }) => void;
+    vi.mocked(sendCourseMessageAction).mockImplementation(
+      () => new Promise((resolve) => { finish = resolve; }),
+    );
+    render(
+      <CourseChat
+        archived={false}
+        conversationId={CONVERSATION_ID}
+        courseId={COURSE_ID}
+        currentUserId="member-1"
+        hasOlderMessages={false}
+        initialMessages={INITIAL}
+      />,
+    );
+
+    const input = screen.getByLabelText("消息内容");
+    fireEvent.change(input, { target: { value: "hello" } });
+    fireEvent.submit(input.closest("form")!);
+
+    await waitFor(() => {
+      const pending = document.querySelector(
+        "[data-client-message-id]",
+      );
+      expect(pending?.textContent).toContain("hello");
+      expect(pending?.textContent).toContain("发送中");
+    });
+    const firstForm = vi.mocked(sendCourseMessageAction).mock.calls[0][1];
+    const generatedId = String(firstForm.get("clientMessageId"));
+    expect(generatedId).toMatch(/^[0-9a-f-]{36}$/);
+
+    await act(async () => {
+      finish({
+        status: "unavailable",
+        message: "消息暂时无法发送。",
+        clientMessageId: generatedId,
+        attemptedBody: "hello",
+      });
+    });
+    await waitFor(() => expect(screen.getByText(/发送失败/)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    await waitFor(() =>
+      expect(sendCourseMessageAction).toHaveBeenCalledTimes(2),
+    );
+    const retryForm = vi.mocked(sendCourseMessageAction).mock.calls[1][1];
+    expect(retryForm.get("clientMessageId")).toBe(generatedId);
+    expect(retryForm.get("body")).toBe("hello");
+  });
+
+  it("hides the pending copy when Realtime returns the saved message first", async () => {
+    let finish!: (state: CourseMessageActionState) => void;
+    vi.mocked(sendCourseMessageAction).mockImplementation(
+      () => new Promise((resolve) => { finish = resolve; }),
+    );
+    render(
+      <CourseChat
+        archived={false}
+        conversationId={CONVERSATION_ID}
+        courseId={COURSE_ID}
+        currentUserId="member-1"
+        hasOlderMessages={false}
+        initialMessages={INITIAL}
+      />,
+    );
+    const input = screen.getByLabelText("消息内容");
+    fireEvent.change(input, { target: { value: "hello" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() =>
+      expect(document.querySelector(
+        "[data-client-message-id]",
+      )?.textContent).toContain("发送中"),
+    );
+    const sentForm = vi.mocked(sendCourseMessageAction).mock.calls[0][1];
+    const generatedId = String(sentForm.get("clientMessageId"));
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        messages: [{
+          id: "2",
+          clientMessageId: generatedId,
+          senderId: "member-1",
+          senderName: "Alice",
+          body: "hello",
+          createdAt: "2026-09-12T00:00:00Z",
+        }],
+        hasMore: false,
+      }),
+    } as Response);
+
+    await act(async () => insertCallback?.());
+    await waitFor(() => expect(screen.getAllByText("hello")).toHaveLength(1));
+    expect(document.querySelector(
+      "[data-client-message-id]",
+    )).toBeNull();
+    await act(async () => insertCallback?.());
+    expect(screen.getAllByText("hello")).toHaveLength(1);
+    await act(async () => finish({
+      status: "sent",
+      message: "消息已发送。",
+      clientMessageId: generatedId,
+      attemptedBody: "hello",
+      savedMessage: {
+        id: "2",
+        clientMessageId: generatedId,
+        senderId: "member-1",
+        senderName: "Alice",
+        body: "hello",
+        createdAt: "2026-09-12T00:00:00Z",
+      },
+    }));
+    expect(screen.getAllByText("hello")).toHaveLength(1);
   });
 
   it("renders archived history without a send form", () => {

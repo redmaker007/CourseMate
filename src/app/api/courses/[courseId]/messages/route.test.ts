@@ -40,30 +40,52 @@ describe("course message backfill route", () => {
     expect((await request()).status).toBe(403);
   });
 
-  it("rejects unsafe cursors and malformed course ids", async () => {
+  it("rejects malformed cursors and course ids", async () => {
     auth.getCurrentMember.mockResolvedValue(MEMBER);
     expect((await request("-1")).status).toBe(400);
+    expect((await request("9223372036854775808")).status).toBe(400);
     expect((await request("0", "not-a-uuid")).status).toBe(400);
     expect(queries.getCourseMessagesAfter).not.toHaveBeenCalled();
+  });
+
+  it("preserves an arbitrary-size bigint cursor as a string", async () => {
+    auth.getCurrentMember.mockResolvedValue(MEMBER);
+    queries.getCourseMessagesAfter.mockResolvedValue({
+      messages: [{ id: "9007199254740993", body: "new" }],
+      hasMore: false,
+    });
+
+    const response = await request("9007199254740992");
+
+    expect(response.status).toBe(200);
+    expect(queries.getCourseMessagesAfter).toHaveBeenCalledWith(
+      MEMBER,
+      COURSE_ID,
+      "9007199254740992",
+    );
+    expect(await response.json()).toEqual({
+      messages: [{ id: "9007199254740993", body: "new" }],
+      hasMore: false,
+    });
   });
 
   it("returns only messages authorized by the joined-course query", async () => {
     auth.getCurrentMember.mockResolvedValue(MEMBER);
     queries.getCourseMessagesAfter.mockResolvedValue({
-      messages: [{ id: 12, body: "new" }],
+      messages: [{ id: "12", body: "new" }],
       hasMore: false,
     });
 
     const response = await request("11");
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      messages: [{ id: 12, body: "new" }],
+      messages: [{ id: "12", body: "new" }],
       hasMore: false,
     });
     expect(queries.getCourseMessagesAfter).toHaveBeenCalledWith(
       MEMBER,
       COURSE_ID,
-      11,
+      "11",
     );
   });
 
@@ -78,19 +100,21 @@ describe("course message backfill route", () => {
   it("loads older history through an exclusive before cursor", async () => {
     auth.getCurrentMember.mockResolvedValue(MEMBER);
     queries.getCourseMessagesBefore.mockResolvedValue({
-      messages: [{ id: 4, body: "older" }],
+      messages: [{ id: "9007199254740994", body: "older" }],
       hasMore: true,
     });
 
     const response = await GET(
-      new Request(`http://localhost/api/courses/${COURSE_ID}/messages?before=5`),
+      new Request(
+        `http://localhost/api/courses/${COURSE_ID}/messages?before=9007199254740995`,
+      ),
       { params: Promise.resolve({ courseId: COURSE_ID }) },
     );
     expect(response.status).toBe(200);
     expect(queries.getCourseMessagesBefore).toHaveBeenCalledWith(
       MEMBER,
       COURSE_ID,
-      5,
+      "9007199254740995",
     );
   });
 });

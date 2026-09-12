@@ -114,6 +114,383 @@ beforeAll(async () => {
 
   await applyMigration("202609100002_course_flow.sql");
   await applyMigration("202609100003_friendship_backend.sql");
+  await applyMigration("202609110001_friend_page_queries.sql");
+  await applyMigration("202609110002_direct_messaging.sql");
+  await applyMigration("202609110003_direct_chat_page.sql");
+  await applyMigration("202609110006_block_direction.sql");
+});
+
+describe("direct messaging database boundary", () => {
+  it("returns only the current member's authorized chat-page metadata", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    const allowed = await asUser(
+      ALICE,
+      `select * from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(allowed.ok && allowed.rows).toEqual([{
+      conversation_id: conversationId,
+      other_member_id: BOB,
+      other_display_name: "Bob",
+      send_status: "allowed",
+      hidden: false,
+    }]);
+
+    await asUser(ALICE, `select public.set_friend_hidden('${BOB}', true)`);
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', true)`);
+    const blocked = await asUser(
+      ALICE,
+      `select send_status, hidden from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(blocked.ok && blocked.rows).toEqual([
+      { send_status: "blocked", hidden: true },
+    ]);
+
+    const outsider = await asUser(
+      CAROL,
+      `select * from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(outsider.ok && outsider.rows).toEqual([]);
+
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', false)`);
+    await asUser(ALICE, `select public.remove_friend('${BOB}')`);
+    const removed = await asUser(
+      BOB,
+      `select send_status from public.get_direct_conversation_view('${conversationId}')`,
+    );
+    expect(removed.ok && removed.rows).toEqual([{ send_status: "readonly" }]);
+  });
+
+  it("allows only an eligible member to send a trimmed 1-4000 character body", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    const sent = await asUser(
+      ALICE,
+      `select * from public.send_direct_message('${conversationId}', '  ${"界".repeat(4000)}  ')`,
+    );
+    const tooLong = await asUser(
+      ALICE,
+      `select * from public.send_direct_message('${conversationId}', '${"界".repeat(4001)}')`,
+    );
+    const outsider = await asUser(
+      CAROL,
+      `select * from public.send_direct_message('${conversationId}', 'hello')`,
+    );
+    const incomplete = await asUser(
+      INCOMPLETE,
+      `select * from public.send_direct_message('${conversationId}', 'hello')`,
+    );
+
+    expect(sent.ok && sent.rows[0].result_status).toBe("sent");
+    expect(tooLong.ok && tooLong.rows[0].result_status).toBe("invalid_body");
+    expect(outsider.ok && outsider.rows[0].result_status).toBe("not_available");
+    expect(incomplete.ok && incomplete.rows[0].result_status).toBe(
+      "onboarding_required",
+    );
+
+    const stored = await database.query<{ sender_id: string; body_length: number }>(
+      `select sender_id::text, char_length(body)::int as body_length
+       from public.messages
+       where conversation_id = '${conversationId}'
+       order by id desc limit 1`,
+    );
+    expect(stored.rows).toEqual([{ sender_id: ALICE, body_length: 4000 }]);
+
+    const forged = await asUser(
+      ALICE,
+      `insert into public.messages (conversation_id, sender_id, body)
+       values ('${conversationId}', '${BOB}', 'forged')`,
+    );
+    expect(forged.ok).toBe(false);
+  });
+
+  it("keeps delivery independent from hide, but blocks sending in either direction", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    await asUser(
+      ALICE,
+      `select public.set_friend_hidden('${BOB}', true)`,
+    );
+    const delivered = await asUser(
+      BOB,
+      `select * from public.send_direct_message('${conversationId}', 'hidden inbox')`,
+    );
+    const unread = await asUser(
+      ALICE,
+      "select * from public.get_direct_unread_counts()",
+    );
+    const normalList = await asUser(
+      ALICE,
+      "select * from public.list_direct_conversation_unread(false)",
+    );
+    const filteredList = await asUser(
+      ALICE,
+      "select * from public.list_direct_conversation_unread(true)",
+    );
+
+    expect(delivered.ok && delivered.rows[0].result_status).toBe("sent");
+    expect(unread.ok && unread.rows).toEqual([
+      { visible_unread: 0, hidden_unread: 1 },
+    ]);
+    expect(normalList.ok && normalList.rows).toEqual([]);
+    expect(filteredList.ok && filteredList.rows).toEqual([
+      { conversation_id: conversationId, unread_count: 1 },
+    ]);
+
+    await asUser(
+      ALICE,
+      `select public.set_member_blocked('${BOB}', true)`,
+    );
+    const blockedSender = await asUser(
+      ALICE,
+      `select * from public.send_direct_message('${conversationId}', 'nope')`,
+    );
+    const blockedReceiver = await asUser(
+      BOB,
+      `select * from public.send_direct_message('${conversationId}', 'nope')`,
+    );
+    const history = await asUser(
+      BOB,
+      `select message_id, body from public.list_direct_messages('${conversationId}')`,
+    );
+
+    expect(blockedSender.ok && blockedSender.rows[0].result_status).toBe(
+      "not_allowed",
+    );
+    expect(blockedReceiver.ok && blockedReceiver.rows[0].result_status).toBe(
+      "not_allowed",
+    );
+    expect(history.ok && history.rows.some((row) => row.body === "hidden inbox"))
+      .toBe(true);
+  });
+
+  it("retains readable history after removal and reuses the conversation after re-adding", async () => {
+    const first = await createAcceptedFriendship();
+    await asUser(
+      BOB,
+      `select * from public.send_direct_message('${first.conversationId}', 'before removal')`,
+    );
+    await asUser(ALICE, `select public.remove_friend('${BOB}')`);
+
+    const rejected = await asUser(
+      BOB,
+      `select * from public.send_direct_message('${first.conversationId}', 'rejected')`,
+    );
+    const history = await asUser(
+      ALICE,
+      `select body from public.list_direct_messages('${first.conversationId}')`,
+    );
+    expect(rejected.ok && rejected.rows[0].result_status).toBe("not_allowed");
+    expect(history.ok && history.rows.some((row) => row.body === "before removal"))
+      .toBe(true);
+
+    const resent = await asUser(
+      ALICE,
+      `select * from public.send_friend_request('${BOB}', 'again')`,
+    );
+    const requestId = resent.ok ? String(resent.rows[0].request_id) : "";
+    const accepted = await asUser(
+      BOB,
+      `select * from public.respond_to_friend_request('${requestId}', 'accept')`,
+    );
+    expect(accepted.ok && accepted.rows[0].conversation_id).toBe(
+      first.conversationId,
+    );
+  });
+
+  it("paginates only by message id across equal timestamps without gaps or duplicates", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    for (const body of ["one", "two", "three", "four", "five"]) {
+      await asUser(
+        BOB,
+        `select * from public.send_direct_message('${conversationId}', '${body}')`,
+      );
+    }
+    await database.exec(
+      `update public.messages set created_at = '2026-09-11T00:00:00Z'
+       where conversation_id = '${conversationId}'`,
+    );
+    const all = await database.query<{ id: bigint }>(
+      `select id from public.messages
+       where conversation_id = '${conversationId}' order by id`,
+    );
+    const deletedId = all.rows[2].id;
+    await database.exec(
+      `update public.messages set deleted_at = now() where id = ${deletedId}`,
+    );
+
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const page = await asUser(
+        ALICE,
+        `select message_id from public.list_direct_messages(
+          '${conversationId}', 'before', ${cursor ?? "null"}, 2
+        )`,
+      );
+      expect(page.ok).toBe(true);
+      if (!page.ok || page.rows.length === 0) break;
+      const ids = page.rows.map((row) => String(row.message_id));
+      seen.unshift(...ids);
+      cursor = ids[0];
+    }
+
+    const expected = all.rows
+      .map((row) => String(row.id))
+      .filter((id) => id !== String(deletedId));
+    expect(seen).toEqual(expected);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  it("keeps read and personal-clear positions monotonic and private", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    await asUser(
+      BOB,
+      `select * from public.send_direct_message('${conversationId}', 'first')`,
+    );
+    await asUser(
+      BOB,
+      `select * from public.send_direct_message('${conversationId}', 'second')`,
+    );
+    const ids = await database.query<{ id: bigint }>(
+      `select id from public.messages
+       where conversation_id = '${conversationId}' order by id`,
+    );
+    const firstId = String(ids.rows[0].id);
+    const latestId = String(ids.rows.at(-1)!.id);
+
+    await asUser(
+      ALICE,
+      `select public.mark_direct_conversation_read('${conversationId}', ${latestId})`,
+    );
+    await asUser(
+      ALICE,
+      `select public.mark_direct_conversation_read('${conversationId}', ${firstId})`,
+    );
+    const aliceUnread = await asUser(
+      ALICE,
+      "select * from public.get_direct_unread_counts()",
+    );
+    const bobUnread = await asUser(
+      BOB,
+      "select * from public.get_direct_unread_counts()",
+    );
+    const exposedPositions = await asUser(
+      ALICE,
+      `select * from public.conversation_members
+       where conversation_id = '${conversationId}'`,
+    );
+    expect(aliceUnread.ok && aliceUnread.rows[0].visible_unread).toBe(0);
+    expect(bobUnread.ok && bobUnread.rows[0].visible_unread).toBe(1);
+    expect(exposedPositions.ok && exposedPositions.rows).toEqual([]);
+
+    await asUser(
+      ALICE,
+      `select public.clear_direct_conversation('${conversationId}', ${latestId})`,
+    );
+    const firstClear = await database.query<{ cleared_at: string }>(
+      `select cleared_at::text from public.conversation_members
+       where conversation_id = '${conversationId}' and user_id = '${ALICE}'`,
+    );
+    await asUser(
+      ALICE,
+      `select public.clear_direct_conversation('${conversationId}', ${firstId})`,
+    );
+    const positions = await database.query<{
+      user_id: string;
+      last_read_message_id: bigint | null;
+      cleared_through_message_id: bigint | null;
+      cleared_at: string | null;
+    }>(
+      `select user_id::text, last_read_message_id, cleared_through_message_id,
+        cleared_at::text
+       from public.conversation_members
+       where conversation_id = '${conversationId}' order by user_id`,
+    );
+    expect(String(positions.rows[0].last_read_message_id)).toBe(latestId);
+    expect(String(positions.rows[0].cleared_through_message_id)).toBe(latestId);
+    expect(positions.rows[0].cleared_at).toBe(firstClear.rows[0].cleared_at);
+    expect(positions.rows[1].cleared_through_message_id).toBeNull();
+
+    const aliceHistory = await asUser(
+      ALICE,
+      `select body from public.list_direct_messages('${conversationId}')`,
+    );
+    const bobHistory = await asUser(
+      BOB,
+      `select body from public.list_direct_messages('${conversationId}')`,
+    );
+    expect(aliceHistory.ok && aliceHistory.rows).toEqual([]);
+    expect(bobHistory.ok && bobHistory.rows.length).toBe(3);
+
+    await asUser(
+      BOB,
+      `select public.clear_direct_conversation('${conversationId}', ${latestId})`,
+    );
+    const clearCoverage = await database.query<{
+      cleared_through_message_id: bigint;
+      cleared_at: string;
+    }>(
+      `select cleared_through_message_id, cleared_at::text
+       from public.conversation_members
+       where conversation_id = '${conversationId}'
+         and cleared_through_message_id is not null
+         and cleared_at is not null`,
+    );
+    expect(clearCoverage.rows).toHaveLength(2);
+    expect(clearCoverage.rows.every(
+      (row) => String(row.cleared_through_message_id) === latestId,
+    )).toBe(true);
+
+    await asUser(
+      BOB,
+      `select * from public.send_direct_message('${conversationId}', 'after clear')`,
+    );
+    const reappeared = await asUser(
+      ALICE,
+      `select body from public.list_direct_messages('${conversationId}')`,
+    );
+    expect(reappeared.ok && reappeared.rows).toEqual([{ body: "after clear" }]);
+  });
+
+  it("lets only members read realtime rows and preserves anonymized history on deletion", async () => {
+    const { conversationId } = await createAcceptedFriendship();
+    await asUser(
+      BOB,
+      `select * from public.send_direct_message('${conversationId}', 'remember me')`,
+    );
+    const outsider = await asUser(
+      CAROL,
+      `select * from public.messages where conversation_id = '${conversationId}'`,
+    );
+    expect(outsider.ok && outsider.rows).toEqual([]);
+
+    await database.exec(
+      `delete from public.member_accounts where user_id = '${BOB}'`,
+    );
+    const history = await asUser(
+      ALICE,
+      `select sender_id, sender_display_name, body
+       from public.list_direct_messages('${conversationId}')`,
+    );
+    const publication = await database.query<{ count: number }>(
+      `select count(*)::int
+       from pg_publication_tables
+       where pubname = 'supabase_realtime' and tablename = 'messages'`,
+    );
+    // Restore the shared fixture member for the older friendship tests below.
+    await database.exec(`
+      insert into public.member_accounts (user_id, school_id)
+      values ('${BOB}', 'uw-madison');
+      insert into public.profiles (id, display_name, major, grad_year)
+      values ('${BOB}', 'Bob', 'Mathematics', 2028);
+      insert into public.course_members (course_id, user_id)
+      select id, '${BOB}' from public.courses where school_id = 'uw-madison';
+    `);
+    expect(history.ok && history.rows).toContainEqual({
+      sender_id: null,
+      sender_display_name: "Deleted member",
+      body: "remember me",
+    });
+    expect(publication.rows).toEqual([{ count: 1 }]);
+  });
 });
 
 afterAll(async () => {
@@ -157,6 +534,7 @@ describe("好友发现与关系状态数据库", () => {
           { code: "TEST00", id: expect.any(String), title: "测试00-测试课程" },
         ],
         relationship_status: "none",
+        block_status: "none",
         incoming_request_id: null,
       },
     ]);
@@ -532,6 +910,86 @@ describe("好友发现与关系状态数据库", () => {
     );
     expect(blockedAcceptance.ok && blockedAcceptance.rows).toEqual([
       { result_status: "blocked" },
+    ]);
+  });
+
+  it("lists only the current member's blocked members without exposing email", async () => {
+    await asUser(
+      ALICE,
+      `select public.set_member_blocked('${BOB}', true)`,
+    );
+
+    const mine = await asUser(
+      ALICE,
+      "select member_id, display_name, avatar_url, active_friendship, conversation_id from public.list_blocked_members()",
+    );
+    const theirs = await asUser(
+      BOB,
+      "select member_id from public.list_blocked_members()",
+    );
+
+    if (!mine.ok) throw new Error(mine.error);
+    if (!theirs.ok) throw new Error(theirs.error);
+    expect(mine.ok && mine.rows).toEqual([
+      {
+        member_id: BOB,
+        display_name: "Bob",
+        avatar_url: null,
+        active_friendship: false,
+        conversation_id: null,
+      },
+    ]);
+    expect(theirs.ok && theirs.rows).toEqual([]);
+    expect(JSON.stringify(mine)).not.toContain("@wisc.edu");
+  });
+
+  it("returns each block direction and keeps sending blocked until both sides unblock", async () => {
+    await createAcceptedFriendship();
+
+    const status = (userId: string, otherEmail: string) =>
+      asUser(
+        userId,
+        `select block_status, relationship_status from public.find_member_by_email('${otherEmail}')`,
+      );
+    const friendStatus = (userId: string) =>
+      asUser(userId, "select block_status, send_status from public.list_friends()" );
+    const resultRows = async (attempt: Promise<Attempt>) => {
+      const result = await attempt;
+      if (!result.ok) throw new Error(result.error);
+      return result.rows;
+    };
+
+    expect(await resultRows(status(ALICE, "bob@wisc.edu"))).toEqual([
+      { block_status: "none", relationship_status: "friend" },
+    ]);
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', true)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "blocked_by_me", send_status: "blocked" },
+    ]);
+    expect(await resultRows(friendStatus(BOB))).toEqual([
+      { block_status: "blocked_by_other", send_status: "blocked" },
+    ]);
+    expect(
+      await resultRows(
+        asUser(
+          BOB,
+          `select public.set_member_blocked('${ALICE}', false) as status`,
+        ),
+      ),
+    ).toEqual([{ status: "not_found" }]);
+
+    await asUser(BOB, `select public.set_member_blocked('${ALICE}', true)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "mutual", send_status: "blocked" },
+    ]);
+
+    await asUser(ALICE, `select public.set_member_blocked('${BOB}', false)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "blocked_by_other", send_status: "blocked" },
+    ]);
+    await asUser(BOB, `select public.set_member_blocked('${ALICE}', false)`);
+    expect(await resultRows(friendStatus(ALICE))).toEqual([
+      { block_status: "none", send_status: "allowed" },
     ]);
   });
 

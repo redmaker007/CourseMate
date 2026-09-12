@@ -28,6 +28,8 @@ import {
 import { initialCourseMessageActionState } from "./course-action-state";
 
 const COURSE_ID = "13000000-0000-4000-8000-000000000001";
+const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CLIENT_MESSAGE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 describe("course Server Actions", () => {
   beforeEach(() => {
@@ -61,7 +63,7 @@ describe("course Server Actions", () => {
 
   it("returns the persisted message so the client can merge immediately", async () => {
     const savedMessage = {
-      id: 7,
+      id: "7",
       senderId: "member-1",
       senderName: "Alice",
       body: "hello",
@@ -73,6 +75,8 @@ describe("course Server Actions", () => {
     });
     const formData = new FormData();
     formData.set("courseId", COURSE_ID);
+    formData.set("conversationId", CONVERSATION_ID);
+    formData.set("clientMessageId", CLIENT_MESSAGE_ID);
     formData.set("body", "hello");
 
     await expect(
@@ -80,8 +84,15 @@ describe("course Server Actions", () => {
     ).resolves.toEqual({
       status: "sent",
       message: "消息已发送。",
+      clientMessageId: CLIENT_MESSAGE_ID,
+      attemptedBody: "hello",
       savedMessage,
     });
+    expect(operations.sendCourseMessage).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      CLIENT_MESSAGE_ID,
+      "hello",
+    );
     expect(cache.revalidatePath).toHaveBeenCalledWith(`/courses/${COURSE_ID}`);
   });
 
@@ -89,6 +100,8 @@ describe("course Server Actions", () => {
     boundary.create.mockRejectedValue(new Error("private database detail"));
     const formData = new FormData();
     formData.set("courseId", COURSE_ID);
+    formData.set("conversationId", CONVERSATION_ID);
+    formData.set("clientMessageId", CLIENT_MESSAGE_ID);
     formData.set("body", "hello");
 
     await expect(
@@ -96,6 +109,8 @@ describe("course Server Actions", () => {
     ).resolves.toEqual({
       status: "unavailable",
       message: "消息暂时无法发送。",
+      clientMessageId: CLIENT_MESSAGE_ID,
+      attemptedBody: "hello",
     });
   });
 });

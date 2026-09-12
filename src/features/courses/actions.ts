@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { CourseMessageActionState } from "./course-action-state";
-import { isCourseId } from "./course-identifiers";
+import { isUuid } from "./course-identifiers";
 import { createProductionCourseOperations } from "./production-course-operations";
 
 export async function joinCourseAction(courseId: string) {
-  if (!isCourseId(courseId)) redirect("/dashboard?courseAction=invalid");
+  if (!isUuid(courseId)) redirect("/dashboard?courseAction=invalid");
   let result: Awaited<ReturnType<Awaited<ReturnType<typeof createProductionCourseOperations>>["joinCourse"]>>;
   try {
     const operations = await createProductionCourseOperations();
@@ -24,7 +24,7 @@ export async function joinCourseAction(courseId: string) {
 }
 
 export async function leaveCourseAction(courseId: string) {
-  if (!isCourseId(courseId)) redirect("/dashboard?courseAction=invalid");
+  if (!isUuid(courseId)) redirect("/dashboard?courseAction=invalid");
   let result: Awaited<ReturnType<Awaited<ReturnType<typeof createProductionCourseOperations>>["leaveCourse"]>>;
   try {
     const operations = await createProductionCourseOperations();
@@ -44,19 +44,39 @@ export async function sendCourseMessageAction(
   formData: FormData,
 ): Promise<CourseMessageActionState> {
   const courseId = formData.get("courseId");
-  if (!isCourseId(courseId)) {
-    return { status: "invalid", message: "课程信息无效，请刷新页面。" };
+  const conversationId = formData.get("conversationId");
+  const clientMessageId = formData.get("clientMessageId");
+  const attemptedBody = String(formData.get("body") ?? "");
+  const attempt = {
+    clientMessageId: String(clientMessageId ?? ""),
+    attemptedBody,
+  };
+  if (
+    !isUuid(courseId) ||
+    !isUuid(conversationId) ||
+    !isUuid(clientMessageId)
+  ) {
+    return {
+      status: "invalid",
+      message: "课程信息无效，请刷新页面。",
+      ...attempt,
+    };
   }
 
   let result: Awaited<ReturnType<Awaited<ReturnType<typeof createProductionCourseOperations>>["sendCourseMessage"]>>;
   try {
     const operations = await createProductionCourseOperations();
     result = await operations.sendCourseMessage(
-      courseId,
-      String(formData.get("body") ?? ""),
+      conversationId,
+      clientMessageId,
+      attemptedBody,
     );
   } catch {
-    return { status: "unavailable", message: "消息暂时无法发送。" };
+    return {
+      status: "unavailable",
+      message: "消息暂时无法发送。",
+      ...attempt,
+    };
   }
   switch (result.status) {
     case "sent":
@@ -64,13 +84,22 @@ export async function sendCourseMessageAction(
       return {
         status: "sent",
         message: "消息已发送。",
+        ...attempt,
         savedMessage: result.message,
       };
     case "invalid":
-      return { status: "invalid", message: "请输入 1–4000 个字符。" };
+      return {
+        status: "invalid",
+        message: "请输入 1–4000 个字符。",
+        ...attempt,
+      };
     case "unauthenticated":
     case "not_available":
     case "temporarily_unavailable":
-      return { status: "unavailable", message: "消息暂时无法发送。" };
+      return {
+        status: "unavailable",
+        message: "消息暂时无法发送。",
+        ...attempt,
+      };
   }
 }

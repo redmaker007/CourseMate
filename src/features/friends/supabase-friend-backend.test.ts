@@ -15,6 +15,7 @@ describe("Supabase friend backend", () => {
           grad_year: null,
           shared_courses: [{ id: "course-1", code: "CS101", title: "Intro" }],
           relationship_status: "none",
+          block_status: "none",
           incoming_request_id: null,
         },
       ],
@@ -37,6 +38,7 @@ describe("Supabase friend backend", () => {
         gradYear: null,
         sharedCourses: [{ id: "course-1", code: "CS101", title: "Intro" }],
         relationship: "none",
+        blockStatus: "none",
         incomingRequestId: null,
       },
     });
@@ -62,5 +64,62 @@ describe("Supabase friend backend", () => {
     await expect(
       backend.removeFriend("22222222-2222-4222-8222-222222222222"),
     ).rejects.toEqual({ message: "secret row" });
+  });
+
+  it("maps the current member's private blocked-member list", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          member_id: "22222222-2222-4222-8222-222222222222",
+          display_name: "Bob",
+          avatar_url: null,
+          active_friendship: false,
+          conversation_id: null,
+        },
+      ],
+      error: null,
+    });
+    const backend = createSupabaseFriendBackend({ rpc });
+
+    await expect(backend.listBlockedMembers()).resolves.toEqual([
+      {
+        memberId: "22222222-2222-4222-8222-222222222222",
+        displayName: "Bob",
+        avatarUrl: null,
+        activeFriendship: false,
+        conversationId: null,
+      },
+    ]);
+    expect(rpc).toHaveBeenCalledWith("list_blocked_members", {});
+  });
+
+  it("maps each block direction for the friend list", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: ["blocked_by_me", "blocked_by_other", "mutual"].map(
+        (block_status, index) => ({
+          member_id: `00000000-0000-4000-8000-00000000000${index}`,
+          display_name: `Member ${index}`,
+          effective_name: `Member ${index}`,
+          avatar_url: null,
+          major: null,
+          grad_year: null,
+          shared_courses: [],
+          hidden: false,
+          send_status: "blocked",
+          block_status,
+          conversation_id: `10000000-0000-4000-8000-00000000000${index}`,
+        }),
+      ),
+      error: null,
+    });
+    const backend = createSupabaseFriendBackend({ rpc });
+
+    const friends = await backend.listFriends(false);
+
+    expect(friends.map((friend) => friend.blockStatus)).toEqual([
+      "blocked_by_me",
+      "blocked_by_other",
+      "mutual",
+    ]);
   });
 });

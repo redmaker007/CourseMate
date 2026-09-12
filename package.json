@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cleanup:direct-messages": "node scripts/direct-message-cleanup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

@@ -2,7 +2,7 @@
 
 > 历史交接：正文进度、待办、分支与验证结果只代表记录时点；当前进度统一维护在 [STATUS.md](../STATUS.md)。操作步骤见 [操作手册索引](../../README.md#操作手册)，只需定位模块时见 [任务与代码索引](../README.md)。
 
-> 更新日期：2026-09-10
+> 更新日期：2026-09-11；2026-09-12 合并时保留双方交接内容，最新环境核对见 STATUS。
 >
 > 配套阅读：[认证模块交接](./email-otp-auth.md) · [前端路由与大厅](./frontend-routing-and-dashboard.md) · [课程目录并入主干](./course-catalog-integration.md)
 
@@ -24,11 +24,13 @@
 | 邮件发送 | Brevo 自定义 SMTP，免费额度每天 300 封 |
 | Vercel 项目 | `course-mate`。**生产环境已公开**：<https://course-mate-three.vercel.app>（固定网址，每次部署不变）。预览部署仍带访问保护，只有项目所有者能开 |
 | Git 集成 | **未连接** —— `git push` 不会触发部署，见第四节 |
-| 数据库 schema | 前 11 个 migration 已应用到线上，诊断查询与外部探测均确认符合预期，见 [课程目录并入主干](./course-catalog-integration.md)。**第 12 个 `202609100006_platform_admin` 待执行**，见 [平台角色与管理页](./platform-admin.md) |
+| 数据库 schema | 2026-09-10 曾通过 SQL Editor 手工应用并诊断到 `202609100005`；2026-09-11 只读查询发现远端 migration 历史表只登记 `202609050001`、`202609050002`。这表示历史记录不完整，不能据此判断真实 schema。管理迁移 `202609100006_platform_admin` 及 `202609110001`–`202609120001` 没有已核实的生产部署记录。发布前先核对实际对象再决定如何修复历史和应用 migration。见 [第一阶段联调](./phase-one-integration.md)与[平台角色与管理页](./platform-admin.md) |
 | 管理页 | 代码已部署；migration 执行、指定所有者之后才可用。执行前线上无害：没有管理入口，`/admin` 显示 404 |
 | 数据库类型 | 已从线上重新生成（2026-09-10） |
 | 课程库 | **空的**。导入脚本已就绪；导入后会自动物化成当前学期课程，学生才搜得到 |
-| 前端 | 统一会话、课程流程、Profile onboarding、好友后端（#11–#14）已合并进 `main`，**已部署上线**（2026-09-10，`38b0636`）。未登录冒烟通过：登录页列出两所学校，受保护页面全部跳转登录，无 500。同日热修复 `3a43aa2`：新成员保存资料被权限拒绝、卡在 onboarding，见 [课程目录并入主干](./course-catalog-integration.md) |
+| 前端 | 统一会话、课程流程、Profile onboarding、好友后端（#11–#14）已合并进 `main`，**已部署上线**（2026-09-10，`38b0636`）。#15–#20 位于当前功能分支，本轮没有生产部署。未登录冒烟与 onboarding 热修复的历史结果见 [课程目录并入主干](./course-catalog-integration.md) |
+| Realtime | 代码中的完整 migration 链会把 `public.messages` 加入 `supabase_realtime` publication，本地已验证；当前托管环境尚未针对 #13/#16 完成订阅、断线补查和降级轮询实测 |
+| 私聊物理清理 | RPC 与默认 dry-run 运维命令已在当前分支实现；托管 migration 未确认、真实 PostgreSQL 多连接并发未验证、生产调度未启用，也未执行过生产消息删除 |
 
 `main` 上 320 项测试、构建、lint、类型检查均通过。
 

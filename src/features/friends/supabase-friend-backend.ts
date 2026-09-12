@@ -1,10 +1,12 @@
 import type {
+  BlockedMemberListItem,
   FindMemberResult,
   FriendBackend,
   FriendDiscovery,
   FriendListItem,
   FriendRequestView,
   FriendRelationshipState,
+  MemberBlockStatus,
   SharedCourseView,
 } from "./friendship-service";
 
@@ -70,6 +72,7 @@ export function createSupabaseFriendBackend(
           ? row.shared_courses
           : []) as SharedCourseView[],
         relationship: String(row.relationship_status) as FriendRelationshipState,
+        blockStatus: String(row.block_status ?? "none") as MemberBlockStatus,
         incomingRequestId:
           row.incoming_request_id === null
             ? null
@@ -145,6 +148,7 @@ export function createSupabaseFriendBackend(
           : []) as SharedCourseView[],
         hidden: Boolean(row.hidden),
         sendStatus: String(row.send_status) as "allowed" | "blocked",
+        blockStatus: String(row.block_status ?? "none") as MemberBlockStatus,
         conversationId: String(row.conversation_id),
       }));
     },
@@ -162,6 +166,18 @@ export function createSupabaseFriendBackend(
         createdAt: String(row.created_at),
         expiresAt: String(row.expires_at),
         resolvedAt: row.resolved_at === null ? null : String(row.resolved_at),
+      }));
+    },
+
+    async listBlockedMembers() {
+      const data = await call("list_blocked_members", {});
+      return rows(data).map((row): BlockedMemberListItem => ({
+        memberId: String(row.member_id),
+        displayName: String(row.display_name),
+        avatarUrl: row.avatar_url === null ? null : String(row.avatar_url),
+        activeFriendship: Boolean(row.active_friendship),
+        conversationId:
+          row.conversation_id === null ? null : String(row.conversation_id),
       }));
     },
   };

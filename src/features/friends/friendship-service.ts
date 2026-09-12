@@ -11,6 +11,12 @@ export type FriendRelationshipState =
   | "friend"
   | "blocked";
 
+export type MemberBlockStatus =
+  | "none"
+  | "blocked_by_me"
+  | "blocked_by_other"
+  | "mutual";
+
 export type FriendDiscovery = {
   memberId: string;
   displayName: string;
@@ -19,6 +25,7 @@ export type FriendDiscovery = {
   gradYear: number | null;
   sharedCourses: SharedCourseView[];
   relationship: FriendRelationshipState;
+  blockStatus: MemberBlockStatus;
   incomingRequestId: string | null;
 };
 
@@ -36,6 +43,7 @@ export type FriendListItem = {
   sharedCourses: SharedCourseView[];
   hidden: boolean;
   sendStatus: "allowed" | "blocked";
+  blockStatus: MemberBlockStatus;
   conversationId: string;
 };
 
@@ -52,6 +60,14 @@ export type FriendRequestView = {
   resolvedAt: string | null;
 };
 
+export type BlockedMemberListItem = {
+  memberId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  activeFriendship: boolean;
+  conversationId: string | null;
+};
+
 export interface FriendBackend {
   findMemberByEmail(email: string): Promise<FindMemberResult>;
   sendFriendRequest(targetMemberId: string, message: string): Promise<unknown>;
@@ -65,6 +81,7 @@ export interface FriendBackend {
   removeFriend(targetMemberId: string): Promise<unknown>;
   listFriends(includeHidden: boolean): Promise<FriendListItem[]>;
   listFriendRequests(): Promise<FriendRequestView[]>;
+  listBlockedMembers(): Promise<BlockedMemberListItem[]>;
 }
 
 const UUID_PATTERN =
@@ -193,6 +210,17 @@ export function createFriendshipService(backend: FriendBackend) {
         return {
           status: "loaded",
           requests: await backend.listFriendRequests(),
+        } as const;
+      } catch {
+        return { status: "temporarily_unavailable" } as const;
+      }
+    },
+
+    async listBlockedMembers() {
+      try {
+        return {
+          status: "loaded",
+          members: await backend.listBlockedMembers(),
         } as const;
       } catch {
         return { status: "temporarily_unavailable" } as const;

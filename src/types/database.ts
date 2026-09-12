@@ -12,35 +12,71 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: NonNullable<Json>
+          id: number
+          target: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: NonNullable<Json>
+          id?: never
+          target?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: NonNullable<Json>
+          id?: never
+          target?: string | null
+        }
+        Relationships: []
+      }
+      behavior_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string
+          reporter_id: string
+          status: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: string
+          reporter_id: string
+          status?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string
+          reporter_id?: string
+          status?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       conversation_members: {
         Row: {
+          cleared_at: string | null
           cleared_through_message_id: number | null
           conversation_id: string
           joined_at: string
@@ -48,6 +84,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cleared_at?: string | null
           cleared_through_message_id?: number | null
           conversation_id: string
           joined_at?: string
@@ -55,6 +92,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cleared_at?: string | null
           cleared_through_message_id?: number | null
           conversation_id?: string
           joined_at?: string
@@ -63,25 +101,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "conversation_members_cleared_message_fkey"
-            columns: ["conversation_id", "cleared_through_message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["conversation_id", "id"]
-          },
-          {
             foreignKeyName: "conversation_members_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_members_last_read_message_fkey"
-            columns: ["conversation_id", "last_read_message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["conversation_id", "id"]
           },
           {
             foreignKeyName: "conversation_members_user_id_fkey"
@@ -133,7 +157,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          code_normalized?: string | null
+          code_normalized?: never
           credits?: string | null
           department?: string | null
           description?: string | null
@@ -150,7 +174,7 @@ export type Database = {
         }
         Update: {
           code?: string
-          code_normalized?: string | null
+          code_normalized?: never
           credits?: string | null
           department?: string | null
           description?: string | null
@@ -251,7 +275,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          code_normalized?: string | null
+          code_normalized?: never
           created_at?: string
           created_by?: string | null
           id?: string
@@ -261,7 +285,7 @@ export type Database = {
         }
         Update: {
           code?: string
-          code_normalized?: string | null
+          code_normalized?: never
           created_at?: string
           created_by?: string | null
           id?: string
@@ -323,6 +347,112 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "member_accounts"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      direct_message_cleanup_eligibility: {
+        Row: {
+          conversation_id: string
+          eligible_since: string
+          message_id: number
+        }
+        Insert: {
+          conversation_id: string
+          eligible_since: string
+          message_id: number
+        }
+        Update: {
+          conversation_id?: string
+          eligible_since?: string
+          message_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_message_cleanup_eligibility_message_fkey"
+            columns: ["conversation_id", "message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["conversation_id", "id"]
+          },
+        ]
+      }
+      direct_message_cleanup_runs: {
+        Row: {
+          batch_size: number
+          candidate_count: number
+          candidate_message_ids: number[]
+          deleted_count: number
+          deleted_message_ids: number[]
+          error_details: string | null
+          evaluated_at: string
+          finished_at: string | null
+          id: string
+          result_status: string
+          run_mode: string
+          started_at: string
+        }
+        Insert: {
+          batch_size: number
+          candidate_count?: number
+          candidate_message_ids?: number[]
+          deleted_count?: number
+          deleted_message_ids?: number[]
+          error_details?: string | null
+          evaluated_at: string
+          finished_at?: string | null
+          id?: string
+          result_status: string
+          run_mode: string
+          started_at?: string
+        }
+        Update: {
+          batch_size?: number
+          candidate_count?: number
+          candidate_message_ids?: number[]
+          deleted_count?: number
+          deleted_message_ids?: number[]
+          error_details?: string | null
+          evaluated_at?: string
+          finished_at?: string | null
+          id?: string
+          result_status?: string
+          run_mode?: string
+          started_at?: string
+        }
+        Relationships: []
+      }
+      direct_message_clear_ranges: {
+        Row: {
+          after_message_id: number
+          cleared_at: string
+          conversation_id: string
+          id: number
+          member_id: string
+          through_message_id: number
+        }
+        Insert: {
+          after_message_id: number
+          cleared_at: string
+          conversation_id: string
+          id?: never
+          member_id: string
+          through_message_id: number
+        }
+        Update: {
+          after_message_id?: number
+          cleared_at?: string
+          conversation_id?: string
+          id?: never
+          member_id?: string
+          through_message_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_message_clear_ranges_member_fkey"
+            columns: ["conversation_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_members"
+            referencedColumns: ["conversation_id", "user_id"]
           },
         ]
       }
@@ -606,6 +736,7 @@ export type Database = {
       messages: {
         Row: {
           body: string
+          client_message_id: string | null
           conversation_id: string
           created_at: string
           deleted_at: string | null
@@ -615,6 +746,7 @@ export type Database = {
         }
         Insert: {
           body: string
+          client_message_id?: string | null
           conversation_id: string
           created_at?: string
           deleted_at?: string | null
@@ -624,6 +756,7 @@ export type Database = {
         }
         Update: {
           body?: string
+          client_message_id?: string | null
           conversation_id?: string
           created_at?: string
           deleted_at?: string | null
@@ -652,6 +785,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "friend_requests"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_roles: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -690,6 +852,71 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "member_accounts"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      report_evidence: {
+        Row: {
+          captured_at: string
+          report_id: string
+          reported_user_id: string
+          snapshot: NonNullable<Json>
+        }
+        Insert: {
+          captured_at?: string
+          report_id: string
+          reported_user_id: string
+          snapshot: NonNullable<Json>
+        }
+        Update: {
+          captured_at?: string
+          report_id?: string
+          reported_user_id?: string
+          snapshot?: NonNullable<Json>
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_evidence_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: true
+            referencedRelation: "behavior_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_source_retention: {
+        Row: {
+          message_id: number | null
+          report_id: string
+          source_id: string
+          source_type: string
+        }
+        Insert: {
+          message_id?: never
+          report_id: string
+          source_id: string
+          source_type: string
+        }
+        Update: {
+          message_id?: never
+          report_id?: string
+          source_id?: string
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_source_retention_message_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_source_retention_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: true
+            referencedRelation: "behavior_reports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -787,20 +1014,20 @@ export type Database = {
         Args: { max_rows?: number }
         Returns: {
           action: string
-          actor_email: string | null
-          actor_name: string | null
+          actor_email: string
+          actor_name: string
           created_at: string
           details: Json
           id: number
-          target: string | null
+          target: string
         }[]
       }
       admin_list_schools: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           catalog_count: number
           current_course_count: number
-          current_term: string | null
+          current_term: string
           domains: string[]
           enabled: boolean
           member_count: number
@@ -810,9 +1037,9 @@ export type Database = {
         }[]
       }
       admin_list_staff: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
-          display_name: string | null
+          display_name: string
           email: string
           granted_at: string
           role: string
@@ -834,11 +1061,19 @@ export type Database = {
       }
       admin_revoke_admin: { Args: { target_user: string }; Returns: undefined }
       admin_save_catalog_course: {
-        Args: { course_code: string; course_title: string; target_school: string }
+        Args: {
+          course_code: string
+          course_title: string
+          target_school: string
+        }
         Returns: string
       }
       admin_save_school: {
-        Args: { new_name_en: string; new_name_zh: string; target_school: string }
+        Args: {
+          new_name_en: string
+          new_name_zh: string
+          target_school: string
+        }
         Returns: undefined
       }
       admin_set_current_term: {
@@ -858,16 +1093,51 @@ export type Database = {
         Args: { target_conversation: string }
         Returns: boolean
       }
+      can_access_direct_conversation: {
+        Args: { target_conversation: string }
+        Returns: boolean
+      }
       can_send_to_course_conversation: {
         Args: { target_conversation: string }
         Returns: boolean
+      }
+      can_send_to_direct_conversation: {
+        Args: { target_conversation: string }
+        Returns: boolean
+      }
+      clear_direct_conversation: {
+        Args: { target_conversation_id: string; through_message_id: number }
+        Returns: string
       }
       consume_friend_rate_limit: {
         Args: { target_action: string }
         Returns: boolean
       }
-      current_platform_role: { Args: never; Returns: string }
-      current_school_id: { Args: never; Returns: string }
+      create_behavior_report: {
+        Args: {
+          report_details?: string
+          report_reason: string
+          target_id: string
+          target_type: string
+        }
+        Returns: {
+          report_id: string
+          result_status: string
+        }[]
+      }
+      current_platform_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_school_id: { Args: Record<PropertyKey, never>; Returns: string }
+      eligible_direct_message_cleanup: {
+        Args: { evaluation_time: string }
+        Returns: {
+          conversation_id: string
+          eligible_since: string
+          message_id: number
+        }[]
+      }
       enabled_school_id_for_email_domain: {
         Args: { candidate_domain: string }
         Returns: string
@@ -876,6 +1146,7 @@ export type Database = {
         Args: { candidate_email: string }
         Returns: {
           avatar_url: string
+          block_status: string
           display_name: string
           grad_year: number
           incoming_request_id: string
@@ -890,8 +1161,25 @@ export type Database = {
         Args: { target_member_id: string }
         Returns: string
       }
+      get_direct_conversation_view: {
+        Args: { target_conversation_id: string }
+        Returns: {
+          conversation_id: string
+          hidden: boolean
+          other_display_name: string
+          other_member_id: string
+          send_status: string
+        }[]
+      }
+      get_direct_unread_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          hidden_unread: number
+          visible_unread: number
+        }[]
+      }
       get_own_profile: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
           created_at: string
@@ -902,14 +1190,51 @@ export type Database = {
           updated_at: string
         }[]
       }
-      has_completed_onboarding: { Args: never; Returns: boolean }
+      has_completed_onboarding: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       hook_restrict_user_to_enabled_school: {
         Args: { event: Json }
         Returns: Json
       }
       is_course_member: { Args: { target_course: string }; Returns: boolean }
+      list_blocked_members: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          active_friendship: boolean
+          avatar_url: string
+          conversation_id: string
+          display_name: string
+          member_id: string
+        }[]
+      }
+      list_direct_conversation_unread: {
+        Args: { include_hidden?: boolean }
+        Returns: {
+          conversation_id: string
+          unread_count: number
+        }[]
+      }
+      list_direct_messages: {
+        Args: {
+          cursor_direction?: string
+          cursor_message_id?: number
+          page_size?: number
+          target_conversation_id: string
+        }
+        Returns: {
+          body: string
+          client_message_id: string
+          conversation_id: string
+          created_at: string
+          message_id: number
+          sender_display_name: string
+          sender_id: string
+        }[]
+      }
       list_friend_requests: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
           created_at: string
@@ -927,6 +1252,7 @@ export type Database = {
         Args: { include_hidden?: boolean }
         Returns: {
           avatar_url: string
+          block_status: string
           conversation_id: string
           display_name: string
           effective_name: string
@@ -938,6 +1264,10 @@ export type Database = {
           shared_courses: Json
         }[]
       }
+      mark_direct_conversation_read: {
+        Args: { target_conversation_id: string; through_message_id: number }
+        Returns: string
+      }
       materialize_catalog_courses: {
         Args: { target_school: string }
         Returns: {
@@ -947,15 +1277,65 @@ export type Database = {
           materialized_term: string
         }[]
       }
+      member_block_status: {
+        Args: { target_member_id: string }
+        Returns: string
+      }
       members_are_blocked: {
         Args: { first_member: string; second_member: string }
         Returns: boolean
       }
+      preview_direct_message_cleanup: {
+        Args: { evaluation_time?: string; requested_batch_size?: number }
+        Returns: {
+          audit_id: string
+          candidate_count: number
+          message_ids: number[]
+        }[]
+      }
       remove_friend: { Args: { target_member_id: string }; Returns: string }
+      require_platform_role: { Args: { minimum_role: string }; Returns: string }
       respond_to_friend_request: {
         Args: { decision: string; target_request_id: string }
         Returns: {
           conversation_id: string
+          result_status: string
+        }[]
+      }
+      run_direct_message_cleanup: {
+        Args: { requested_batch_size?: number }
+        Returns: {
+          audit_id: string
+          candidate_count: number
+          deleted_count: number
+          message_ids: number[]
+          result_status: string
+        }[]
+      }
+      send_conversation_message: {
+        Args: {
+          client_message_id: string
+          message_body: string
+          target_conversation_id: string
+        }
+        Returns: {
+          body: string
+          conversation_id: string
+          created_at: string
+          message_id: number
+          result_status: string
+          sender_display_name: string
+          sender_id: string
+        }[]
+      }
+      send_direct_message: {
+        Args: {
+          client_message_id?: string
+          message_body: string
+          target_conversation_id: string
+        }
+        Returns: {
+          message_id: number
           result_status: string
         }[]
       }
@@ -979,6 +1359,15 @@ export type Database = {
         Returns: string
       }
       shares_course_with: { Args: { target_user: string }; Returns: boolean }
+      write_admin_audit: {
+        Args: {
+          action_name: string
+          actor: string
+          detail: Json
+          target_name: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1107,9 +1496,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

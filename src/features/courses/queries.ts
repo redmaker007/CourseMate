@@ -243,11 +243,11 @@ async function resolveJoinedCourse(
 async function messageViews(
   supabase: SupabaseClient,
   conversationId: string,
-  options: { after?: number; before?: number; limit: number },
+  options: { after?: string; before?: string; limit: number },
 ) {
   let query = supabase
     .from("messages")
-    .select("id, sender_id, body, created_at")
+    .select("id, sender_id, body, created_at, client_message_id")
     .eq("conversation_id", conversationId);
   if (options.after !== undefined) query = query.gt("id", options.after);
   if (options.before !== undefined) query = query.lt("id", options.before);
@@ -271,7 +271,8 @@ async function messageViews(
     (profiles ?? []).map((profile) => [profile.id, profile.display_name]),
   );
   const messages = rows.map((row) => ({
-    id: row.id,
+    id: String(row.id),
+    clientMessageId: row.client_message_id,
     senderId: row.sender_id,
     senderName: row.sender_id
       ? (names.get(row.sender_id) ?? "成员")
@@ -333,7 +334,7 @@ export async function getCourseRoom(
 export async function getCourseMessagesAfter(
   member: CurrentMember,
   courseId: string,
-  after: number,
+  after: string,
 ) {
   const supabase = await createClient();
   const access = await resolveJoinedCourse(supabase, member, courseId);
@@ -348,7 +349,7 @@ export async function getCourseMessagesAfter(
 export async function getCourseMessagesBefore(
   member: CurrentMember,
   courseId: string,
-  before: number,
+  before: string,
 ) {
   const supabase = await createClient();
   const access = await resolveJoinedCourse(supabase, member, courseId);

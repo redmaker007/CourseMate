@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
@@ -12,21 +12,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * course-catalog-integration.test.ts 一样，复刻了 Supabase 对新表与新函数的
  * default privileges。
  */
-
-const MIGRATIONS = [
-  "202609050001_email_otp_request.sql",
-  "202609050002_member_account_binding.sql",
-  "202609070001_course_and_chat_schema.sql",
-  "202609070002_course_and_chat_rls.sql",
-  "202609090001_course_catalog.sql",
-  "202609090002_profile_onboarding.sql",
-  "202609100001_unified_conversation_core.sql",
-  "202609100002_course_flow.sql",
-  "202609100003_friendship_backend.sql",
-  "202609100004_integrate_course_catalog.sql",
-  "202609100005_harden_function_execute_grants.sql",
-  "202609100006_platform_admin.sql",
-] as const;
 
 const OWNER = "a1111111-1111-4111-8111-111111111111"; // wisc，所有者
 const ADMIN = "a2222222-2222-4222-8222-222222222222"; // umich，管理员
@@ -154,7 +139,11 @@ beforeAll(async () => {
       grant execute on functions to anon, authenticated, service_role;
   `);
 
-  for (const migration of MIGRATIONS) {
+  // 后续社交功能的权限与函数变更也必须通过既有管理功能回归。
+  const migrations = (await readdir(resolve(process.cwd(), "supabase/migrations")))
+    .filter((name) => /^\d+_.+\.sql$/.test(name))
+    .sort();
+  for (const migration of migrations) {
     await database.exec(
       await readFile(resolve(process.cwd(), "supabase/migrations", migration), "utf8"),
     );

@@ -1,4 +1,5 @@
 import type { SyncedCourseMessage } from "./message-sync";
+import type { ConversationMessageSendResult } from "@/features/messages/supabase-conversation-message";
 
 export type CourseOperationMember = {
   userId: string;
@@ -25,10 +26,11 @@ export interface CourseOperationDependencies {
   getJoinedCourse(courseId: string): Promise<JoinedCourseAccess | null>;
   joinOwnCourse(courseId: string): Promise<void>;
   leaveOwnCourse(courseId: string): Promise<void>;
-  insertOwnMessage(
+  sendMessage(
     conversationId: string,
+    clientMessageId: string,
     body: string,
-  ): Promise<SyncedCourseMessage>;
+  ): Promise<ConversationMessageSendResult>;
 }
 
 export function createCourseOperations(
@@ -77,28 +79,45 @@ export function createCourseOperations(
       }
     },
 
-    async sendCourseMessage(courseId: string, rawBody: string) {
-      const member = await dependencies.getCurrentMember();
-      if (!member?.onboardingComplete) {
-        return { status: "unauthenticated" } as const;
-      }
-
+    async sendCourseMessage(
+      conversationId: string,
+      clientMessageId: string,
+      rawBody: string,
+    ) {
       const body = rawBody.trim();
       if (!body || Array.from(body).length > 4_000) {
         return { status: "invalid" } as const;
       }
 
-      const course = await dependencies.getJoinedCourse(courseId);
-      if (!course || course.archived) {
-        return { status: "not_available" } as const;
-      }
-
       try {
-        const message = await dependencies.insertOwnMessage(
-          course.conversationId,
+        const result = await dependencies.sendMessage(
+          conversationId,
+          clientMessageId,
           body,
         );
-        return { status: "sent", message } as const;
+        if (result.status === "sent" && "message" in result) {
+          return {
+            status: "sent",
+            message: {
+              id: result.message.id,
+              clientMessageId: result.message.clientMessageId,
+              senderId: result.message.senderId,
+              senderName: result.message.senderDisplayName,
+              body: result.message.body,
+              createdAt: result.message.createdAt,
+            } satisfies SyncedCourseMessage,
+          } as const;
+        }
+        if (result.status === "onboarding_required") {
+          return { status: "unauthenticated" } as const;
+        }
+        if (result.status === "invalid_body" || result.status === "invalid_request") {
+          return { status: "invalid" } as const;
+        }
+        if (result.status === "not_available") {
+          return { status: "not_available" } as const;
+        }
+        return { status: "temporarily_unavailable" } as const;
       } catch {
         return { status: "temporarily_unavailable" } as const;
       }

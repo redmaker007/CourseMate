@@ -20,7 +20,7 @@ describe("CourseOperations", () => {
       getJoinedCourse: vi.fn(),
       joinOwnCourse,
       leaveOwnCourse: vi.fn(),
-      insertOwnMessage: vi.fn(),
+      sendMessage: vi.fn(),
     });
 
     await expect(operations.joinCourse("course-1")).resolves.toEqual({
@@ -45,7 +45,7 @@ describe("CourseOperations", () => {
       }),
       joinOwnCourse: vi.fn(),
       leaveOwnCourse,
-      insertOwnMessage: vi.fn(),
+      sendMessage: vi.fn(),
     });
 
     await expect(operations.leaveCourse("course-1")).resolves.toEqual({
@@ -56,13 +56,25 @@ describe("CourseOperations", () => {
 
   it("向服务端重新确认的活跃课程会话发送规范化文字", async () => {
     const savedMessage = {
-      id: 9,
+      id: "9",
+      clientMessageId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       senderId: "member-1",
       senderName: "Alice",
       body: "hello",
       createdAt: "2026-09-10T00:00:00Z",
     };
-    const insertOwnMessage = vi.fn().mockResolvedValue(savedMessage);
+    const sendMessage = vi.fn().mockResolvedValue({
+      status: "sent",
+      message: {
+        id: "9",
+        clientMessageId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        conversationId: "conversation-1",
+        senderId: "member-1",
+        senderDisplayName: "Alice",
+        body: "hello",
+        createdAt: "2026-09-10T00:00:00Z",
+      },
+    });
     const operations = createCourseOperations({
       getCurrentMember: async () => ({
         userId: "member-1",
@@ -77,13 +89,21 @@ describe("CourseOperations", () => {
       }),
       joinOwnCourse: vi.fn(),
       leaveOwnCourse: vi.fn(),
-      insertOwnMessage,
+      sendMessage,
     });
 
     await expect(
-      operations.sendCourseMessage("course-1", "  hello  "),
+      operations.sendCourseMessage(
+        "conversation-1",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "  hello  ",
+      ),
     ).resolves.toEqual({ status: "sent", message: savedMessage });
-    expect(insertOwnMessage).toHaveBeenCalledWith("conversation-1", "hello");
+    expect(sendMessage).toHaveBeenCalledWith(
+      "conversation-1",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "hello",
+    );
   });
 
   it.each([
@@ -106,7 +126,7 @@ describe("CourseOperations", () => {
       getJoinedCourse: vi.fn(),
       joinOwnCourse,
       leaveOwnCourse: vi.fn(),
-      insertOwnMessage: vi.fn(),
+      sendMessage: vi.fn(),
     });
 
     await expect(operations.joinCourse("course-1")).resolves.toEqual({
@@ -117,7 +137,7 @@ describe("CourseOperations", () => {
 
   it("does not leave or send to an archived course", async () => {
     const leaveOwnCourse = vi.fn();
-    const insertOwnMessage = vi.fn();
+    const sendMessage = vi.fn().mockResolvedValue({ status: "not_available" });
     const operations = createCourseOperations({
       getCurrentMember: async () => ({
         userId: "member-1",
@@ -132,21 +152,25 @@ describe("CourseOperations", () => {
       }),
       joinOwnCourse: vi.fn(),
       leaveOwnCourse,
-      insertOwnMessage,
+      sendMessage,
     });
 
     await expect(operations.leaveCourse("course-1")).resolves.toEqual({
       status: "not_available",
     });
     await expect(
-      operations.sendCourseMessage("course-1", "hello"),
+      operations.sendCourseMessage(
+        "conversation-1",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "hello",
+      ),
     ).resolves.toEqual({ status: "not_available" });
     expect(leaveOwnCourse).not.toHaveBeenCalled();
-    expect(insertOwnMessage).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledOnce();
   });
 
   it("rejects messages longer than 4000 Unicode characters", async () => {
-    const insertOwnMessage = vi.fn();
+    const sendMessage = vi.fn();
     const operations = createCourseOperations({
       getCurrentMember: async () => ({
         userId: "member-1",
@@ -157,12 +181,16 @@ describe("CourseOperations", () => {
       getJoinedCourse: vi.fn(),
       joinOwnCourse: vi.fn(),
       leaveOwnCourse: vi.fn(),
-      insertOwnMessage,
+      sendMessage,
     });
 
     await expect(
-      operations.sendCourseMessage("course-1", "你".repeat(4001)),
+      operations.sendCourseMessage(
+        "conversation-1",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "你".repeat(4001),
+      ),
     ).resolves.toEqual({ status: "invalid" });
-    expect(insertOwnMessage).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

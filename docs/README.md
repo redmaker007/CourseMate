@@ -18,11 +18,12 @@
 | OTP、登录、退出、学校准入 | [认证规格](specs/auth-email-otp.md)、[ADR-0001](adr/0001-separate-member-account-from-profile.md)；实测验收看 Issue #7 | `src/features/auth/`；`src/lib/supabase/`；`src/proxy.ts` |
 | 资料保存、首次登录卡住 | [ADR-0004](adr/0004-require-profile-onboarding-for-app-access.md)；权限事故见[课程整合交接](handoffs/course-catalog-integration.md)“新成员卡在 onboarding” | `src/features/profile/`；`src/app/onboarding/profile/` |
 | 搜课、加退课、课程消息 | [统一会话交接](handoffs/unified-conversation-core.md)；课程来源见[录入课程](runbooks/seed-courses.md) | `src/features/courses/`；`src/app/dashboard/`；`src/app/courses/`；`src/app/api/courses/` |
-| 好友与私聊 | [好友后端交接](handoffs/friendship-backend.md)；范围见[当前状态](STATUS.md) | `src/features/friends/friendship-service.ts`；`src/features/friends/supabase-friend-backend.ts` |
+| 好友、拉黑、私聊与可靠发送 | [好友页面](handoffs/friend-pages.md)、[第一阶段联调](handoffs/phase-one-integration.md)、[可靠发送验收](testing/issue-23-message-send.md) | `src/features/friends/`；`src/features/messages/`；`src/app/messages/` |
+| 举报、证据与私聊清理 | [举报交接](handoffs/behavior-reporting.md)、[清理交接](handoffs/direct-message-cleanup.md) | `src/features/reporting/`；`scripts/direct-message-cleanup.mjs`；`supabase/migrations/` |
 | 管理身份、学校、学期、录课 | [ADR-0005](adr/0005-platform-roles-and-admin-functions.md)、[管理手册](runbooks/platform-admin.md) | `src/features/admin/`；`src/app/admin/`；`supabase/migrations/202609100006_platform_admin.sql` |
 | xlsx 解析或导入脚本 | [录入课程](runbooks/seed-courses.md)；申请数据前读 [ADR-0002](adr/0002-do-not-reverse-engineer-university-course-search.md) | `scripts/course-catalog-parse.mts`；`scripts/import-course-catalog.mts`；`src/features/admin/components/catalog-import.tsx` |
 | 大厅与页面布局 | [协作约定](../CONTRIBUTING.md)、[路由交接](handoffs/frontend-routing-and-dashboard.md) | `src/app/**/page.tsx`；`src/features/*/components/` |
-| schema、RLS、函数权限 | [数据库说明](../supabase/README.md)、[新建项目手册](runbooks/new-supabase-project.md)及相关业务 ADR | `supabase/migrations/`；集成验证见 `course-catalog-integration.test.ts` 与 `platform-admin.test.ts` |
+| schema、RLS、函数权限 | [数据库说明](../supabase/README.md)、[新建项目手册](runbooks/new-supabase-project.md)及相关业务 ADR | `supabase/migrations/`；集成验证见 `phase-one-integration.test.ts` 与 `platform-admin.test.ts`（自动加载全部 SQL 迁移） |
 | 环境、部署、收不到验证码 | 对应[操作手册](../README.md#操作手册)；需要当时证据再看[环境交接](handoffs/environment-and-deployment.md) | `.env.example`；`supabase/config.toml`；`supabase/templates/email-otp.html` |
 
 ## 架构边界与已知陷阱
