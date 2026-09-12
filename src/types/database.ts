@@ -19,7 +19,7 @@ export type Database = {
           action: string
           actor_id: string | null
           created_at: string
-          details: NonNullable<Json>
+          details: Json
           id: number
           target: string | null
         }
@@ -27,7 +27,7 @@ export type Database = {
           action: string
           actor_id?: string | null
           created_at?: string
-          details?: NonNullable<Json>
+          details?: Json
           id?: never
           target?: string | null
         }
@@ -35,11 +35,44 @@ export type Database = {
           action?: string
           actor_id?: string | null
           created_at?: string
-          details?: NonNullable<Json>
+          details?: Json
           id?: never
           target?: string | null
         }
         Relationships: []
+      }
+      admin_school_test_context: {
+        Row: {
+          school_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          school_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          school_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_school_test_context_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_school_test_context_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "platform_roles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       behavior_reports: {
         Row: {
@@ -157,7 +190,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          code_normalized?: never
+          code_normalized?: string | null
           credits?: string | null
           department?: string | null
           description?: string | null
@@ -174,7 +207,7 @@ export type Database = {
         }
         Update: {
           code?: string
-          code_normalized?: never
+          code_normalized?: string | null
           credits?: string | null
           department?: string | null
           description?: string | null
@@ -275,7 +308,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          code_normalized?: never
+          code_normalized?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -285,7 +318,7 @@ export type Database = {
         }
         Update: {
           code?: string
-          code_normalized?: never
+          code_normalized?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -860,19 +893,19 @@ export type Database = {
           captured_at: string
           report_id: string
           reported_user_id: string
-          snapshot: NonNullable<Json>
+          snapshot: Json
         }
         Insert: {
           captured_at?: string
           report_id: string
           reported_user_id: string
-          snapshot: NonNullable<Json>
+          snapshot: Json
         }
         Update: {
           captured_at?: string
           report_id?: string
           reported_user_id?: string
-          snapshot?: NonNullable<Json>
+          snapshot?: Json
         }
         Relationships: [
           {
@@ -892,13 +925,13 @@ export type Database = {
           source_type: string
         }
         Insert: {
-          message_id?: never
+          message_id?: number | null
           report_id: string
           source_id: string
           source_type: string
         }
         Update: {
-          message_id?: never
+          message_id?: number | null
           report_id?: string
           source_id?: string
           source_type?: string
@@ -1023,7 +1056,7 @@ export type Database = {
         }[]
       }
       admin_list_schools: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           catalog_count: number
           current_course_count: number
@@ -1037,7 +1070,7 @@ export type Database = {
         }[]
       }
       admin_list_staff: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           display_name: string
           email: string
@@ -1129,11 +1162,12 @@ export type Database = {
           result_status: string
         }[]
       }
-      current_platform_role: {
-        Args: Record<PropertyKey, never>
+      current_platform_role: { Args: never; Returns: string }
+      current_school_id: { Args: never; Returns: string }
+      effective_member_school_id: {
+        Args: { target_user: string }
         Returns: string
       }
-      current_school_id: { Args: Record<PropertyKey, never>; Returns: string }
       eligible_direct_message_cleanup: {
         Args: { evaluation_time: string }
         Returns: {
@@ -1176,14 +1210,14 @@ export type Database = {
         }[]
       }
       get_direct_unread_counts: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           hidden_unread: number
           visible_unread: number
         }[]
       }
       get_own_profile: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           created_at: string
@@ -1194,17 +1228,14 @@ export type Database = {
           updated_at: string
         }[]
       }
-      has_completed_onboarding: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      has_completed_onboarding: { Args: never; Returns: boolean }
       hook_restrict_user_to_enabled_school: {
         Args: { event: Json }
         Returns: Json
       }
       is_course_member: { Args: { target_course: string }; Returns: boolean }
       list_blocked_members: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           active_friendship: boolean
           avatar_url: string
@@ -1238,7 +1269,7 @@ export type Database = {
         }[]
       }
       list_friend_requests: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           created_at: string
