@@ -1,126 +1,3 @@
-# 与我的开发协作原则
-
-我的目标是在充分利用 Codex 和已安装 Skills 提高开发效率的同时，持续建立自己的软件工程能力。
-
-## 优先级与适用边界
-
-本协作准则高于 Skills 自带的默认流程偏好和交互方式。当 Skill 的固定流程与本准则发生冲突时，应优先满足本准则，例如保留我的关键技术决策权、解释重要推理，并避免无意义的教学式参与。
-
-同时，不应跳过或削弱 Skill 为完成任务所必需的专业步骤，包括代码理解、风险检查、安全约束、测试验证和结果审查。应在保留 Skill 实际效果的前提下调整执行方式，而不是另建一套平行流程。
-
-如果两者确实无法同时满足，应明确说明冲突及影响，再由我决定如何取舍。
-
-## 1. 优先遵循现有工程 Skills
-
-当任务与已安装的 Skills 匹配时，优先使用对应 Skill 的工作流，不要在这里重新创造一套平行的软件工程流程。
-
-项目级的 AGENTS.md、CONTEXT.md、ADR、Spec 和项目规范优先用于理解具体项目。
-
-## 2. 代码实现可以主要由你完成
-
-你可以负责大部分甚至全部具体代码实现，包括 boilerplate、UI、重构、测试、常规 CRUD 和机械性修改。
-
-不需要为了让我“参与 coding”而刻意让我手写简单代码。
-
-我关注的不是自己输入了多少代码，而是是否真正理解并能够维护这个系统。
-
-## 3. 不要替我完全承担重要技术决策
-
-对于具有明显长期影响的决策，例如：
-
-- architecture
-- database schema
-- API boundary
-- server/client boundary
-- authentication / authorization
-- permissions / RLS
-- state ownership
-- caching
-- concurrency
-- data consistency
-- 核心 abstraction
-- 重要 dependency
-
-你可以分析方案、指出 trade-off 并给出明确推荐，但不要在存在多个合理选择时默认替我完成最终决策。
-
-让我参与真正有工程意义的选择，而不是让我参与无意义的代码输入工作。
-
-## 4. 帮助我建立系统的 mental model
-
-完成具有一定复杂度的功能后，用简洁方式告诉我：
-
-- 系统为什么这样设计
-- 数据如何流动
-- 关键模块分别负责什么
-- 重要状态在哪里维护
-- 权限在哪里保证
-- 最重要的 failure cases 是什么
-- 出现问题时通常应该先检查哪一层
-
-不要逐行解释代码，也不要解释明显语法和 boilerplate。
-
-重点解释维护这个系统必须理解的内容。
-
-## 5. Debug 时让我参与推理
-
-如果我提出了自己的 root-cause hypothesis，不要直接忽略并修复。
-
-先判断我的推测是：
-
-- 正确
-- 部分正确
-- 错误
-
-并用 evidence 解释原因。
-
-对于值得学习的 bug，帮助我理解如何从现象定位到对应系统层级，从而逐渐建立 debugging intuition。
-
-具体 debugging 流程仍优先遵循相关 Skill。
-
-## 6. 主动纠正我的技术错误
-
-如果我的技术判断存在问题，不要为了配合我而接受错误前提。
-
-明确指出我的理解是：
-
-- 正确
-- 基本正确但不完整
-- 存在重要问题
-- 错误
-
-然后说明原因。
-
-尤其关注 architecture、database、security、framework behavior、API design 和 debugging reasoning。
-
-## 7. 保持开发效率
-
-不要把每一个简单修改都变成教学或设计会议。
-
-对于机械性、低风险、已有明确方案的任务，直接执行。
-
-只有当决策会影响系统设计、正确性、安全性、可维护性，或者具有明显学习价值时，才增加讨论。
-
-如果我明确要求“直接实现”，通常可以直接执行；除非发现严重安全风险、数据丢失风险、明显架构冲突或我的要求本身存在重大技术错误。
-
-## 最终目标
-
-允许 Codex 写绝大多数代码。
-
-但不要让我退化成只负责描述产品需求的人。
-
-长期目标是让我能够：
-
-1. 理解系统为什么这样设计；
-2. 理解主要数据流和状态生命周期；
-3. 做出核心技术决策；
-4. 判断 bug 大致属于哪一层；
-5. Review Codex 的关键实现；
-6. 即使没有 Codex，也能够理解和维护已经构建的系统。
-
-在不牺牲开发效率的前提下，以此作为我们的默认协作方式。为了让我更好地理解，回答应当通俗易懂，避免不必要的技术术语。
-
----
-
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
@@ -131,16 +8,31 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-## Agent skills
+## 项目导航
 
-### Issue tracker
+CourseMate 是学校邮箱准入的课程社交平台；Next.js 16 + Supabase，代码按 `src/features/` 分模块。
 
-项目使用 GitHub Issues 管理 Spec 和 Tickets。详见 `docs/agents/issue-tracker.md`。
+- 首次接手：读 `CONTEXT.md`（术语）；需要项目现状时读 `docs/STATUS.md`。
+- 实施或排障：按 `docs/README.md` 的任务表选择相关 ADR、模块代码与测试；操作手册入口在根 README。
+- 已在当前上下文读过且未变化的内容不重复读取。不默认通读全部交接、操作手册或源码；先用 `rg` 定位，再按依赖扩大范围。用户明确要求全面阅读或审计时按要求执行。
+- 当前进度只维护在 `docs/STATUS.md`；handoff 的状态、分支和测试结果是历史记录。改变业务行为前核对当前代码和相关 ADR，冲突必须说明。
+- 测试、构建和部署结果只报告本次实际验证的内容；引用旧结果时注明来源与时点。
 
-### Triage labels
+## 开发协作
 
-项目使用默认的 mattpocock/skills triage 标签。详见 `docs/agents/triage-labels.md`。
+- 常规实现和低风险修复直接执行；不要为了教学要求用户手写样板代码。解释应通俗、简洁。
+- 有多个合理方案且影响长期架构、权限、数据一致性或重要依赖时，先给证据、取舍与推荐，保留用户决策权；用户已授权的合并和修复按授权执行。
+- 用户提出故障原因时先用证据判断；复杂交付后简述数据流、权限边界和关键失败情况。
+- 上述是摘要；涉及关键设计取舍、教学式协作或用户提出排障假设时，按需读 [完整协作原则](docs/agents/collaboration.md)。完整原则保留原文，项目协作约定优先于 Skill 默认交互偏好，但不削弱必要专业检查。
 
-### Domain docs
+## 工作约定
 
-项目采用单上下文结构：根目录 `CONTEXT.md` 和 `docs/adr/`。详见 `docs/agents/domain.md`。
+- 文档与注释用中文。权限职责、PR 与审核规则见 `CONTRIBUTING.md` / `.github/CODEOWNERS`。
+- `.env.local`、密钥、真实验证码与会话不进入提交或日志。生成目录、依赖与真实环境文件不作为默认阅读材料。
+- 修改代码前遵守上方 Next.js 指引，只读所用 API 的相关本地文档。
+- 完整代码验证顺序：`npm test` → `npm run build` → `npm run lint` → `npm run typecheck`；build 为 typecheck 生成必要类型。纯文档修改检查链接、路径和 diff；提交 / PR 前另遵守协作约定。
+- 涉及认证、schema 或权限时，读对应 ADR、`supabase/README.md` 及必要操作手册，保留权限边界和完整迁移链路验证。
+
+## 按需协作资料
+
+GitHub Issue 操作：`docs/agents/issue-tracker.md`；triage 标签：`docs/agents/triage-labels.md`；领域文档维护：`docs/agents/domain.md`。仅在任务涉及这些流程时展开。

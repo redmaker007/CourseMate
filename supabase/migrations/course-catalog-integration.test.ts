@@ -32,6 +32,9 @@ const MIGRATIONS = [
 
 const HARDENING = "202609100005_harden_function_execute_grants.sql";
 
+/** 硬化之后新增的 migration。放进链路，下面的函数执行权枚举检查才覆盖得到它们。 */
+const AFTER_HARDENING = ["202609100006_platform_admin.sql"] as const;
+
 /** 唯一允许未登录用户执行的函数：登录页在登录前就要用它判断邮箱属于哪所学校。 */
 const ANON_ALLOWED_FUNCTIONS = ["enabled_school_id_for_email_domain"];
 
@@ -174,6 +177,7 @@ beforeAll(async () => {
   );
 
   await applyMigration(HARDENING);
+  for (const migration of AFTER_HARDENING) await applyMigration(migration);
 
   await database.exec(`
     insert into auth.users (id, email, email_confirmed_at) values

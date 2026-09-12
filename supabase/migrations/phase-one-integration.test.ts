@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
@@ -11,26 +11,6 @@ const DAVE = "44444444-4444-4444-8444-444444444444";
 const INCOMPLETE = "55555555-5555-4555-8555-555555555555";
 const COURSE_SEND_ID = "66666666-6666-4666-8666-666666666666";
 const DIRECT_SEND_ID = "77777777-7777-4777-8777-777777777777";
-
-const MIGRATIONS = [
-  "202609050001_email_otp_request.sql",
-  "202609050002_member_account_binding.sql",
-  "202609070001_course_and_chat_schema.sql",
-  "202609070002_course_and_chat_rls.sql",
-  "202609090001_course_catalog.sql",
-  "202609090002_profile_onboarding.sql",
-  "202609100001_unified_conversation_core.sql",
-  "202609100002_course_flow.sql",
-  "202609100003_friendship_backend.sql",
-  "202609100004_integrate_course_catalog.sql",
-  "202609100005_harden_function_execute_grants.sql",
-  "202609110001_friend_page_queries.sql",
-  "202609110002_direct_messaging.sql",
-  "202609110003_direct_chat_page.sql",
-  "202609110004_reporting.sql",
-  "202609110005_direct_message_cleanup.sql",
-  "202609120001_reliable_message_sending.sql",
-] as const;
 
 type Attempt =
   | { ok: true; rows: Record<string, unknown>[] }
@@ -88,7 +68,11 @@ beforeAll(async () => {
       grant execute on functions to anon, authenticated, service_role;
   `);
 
-  for (const migration of MIGRATIONS) {
+  // 从磁盘发现完整迁移链，避免合并分支后漏掉管理权限或拉黑方向等迁移。
+  const migrations = (await readdir(resolve(process.cwd(), "supabase/migrations")))
+    .filter((name) => /^\d+_.+\.sql$/.test(name))
+    .sort();
+  for (const migration of migrations) {
     await database.exec(await readSql("migrations", migration));
   }
 
@@ -505,6 +489,20 @@ describe("phase-one full-chain integration", () => {
       )`,
     );
     expect(blocked.ok && blocked.rows).toEqual([{ status: "saved" }]);
+    const aliceBlockState = await asUser(
+      ALICE,
+      `select block_status from public.list_friends(true) where member_id = '${BOB}'`,
+    );
+    const bobBlockState = await asUser(
+      BOB,
+      `select block_status from public.list_friends(true) where member_id = '${ALICE}'`,
+    );
+    expect(aliceBlockState.ok && aliceBlockState.rows).toEqual([
+      { block_status: "blocked_by_me" },
+    ]);
+    expect(bobBlockState.ok && bobBlockState.rows).toEqual([
+      { block_status: "blocked_by_other" },
+    ]);
     expect(blockedAliceSend.ok && blockedAliceSend.rows).toEqual([
       { result_status: "not_allowed" },
     ]);
@@ -622,6 +620,28 @@ describe("phase-one full-chain integration", () => {
     expect(requestHistory.ok && requestHistory.rows).toEqual([
       { status: "accepted" },
       { status: "accepted" },
+    ]);
+  });
+
+  it("完整迁移后仍允许成员完成 onboarding 并更新受列权限保护的资料", async () => {
+    const inserted = await asUser(
+      INCOMPLETE,
+      `insert into public.profiles (id, display_name, major, grad_year)
+       values ('${INCOMPLETE}', 'New member', 'Math', 2027)`,
+    );
+    expect(inserted.ok, JSON.stringify(inserted)).toBe(true);
+    const updated = await asUser(
+      INCOMPLETE,
+      `update public.profiles set display_name = 'Updated member',
+         major = 'Physics', grad_year = 2028 where id = '${INCOMPLETE}'`,
+    );
+    expect(updated.ok, JSON.stringify(updated)).toBe(true);
+    const own = await asUser(
+      INCOMPLETE,
+      "select display_name, major, grad_year from public.get_own_profile()",
+    );
+    expect(own.ok && own.rows).toEqual([
+      { display_name: "Updated member", major: "Physics", grad_year: 2028 },
     ]);
   });
 });

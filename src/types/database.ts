@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: NonNullable<Json>
+          id: number
+          target: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: NonNullable<Json>
+          id?: never
+          target?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: NonNullable<Json>
+          id?: never
+          target?: string | null
+        }
+        Relationships: []
+      }
       behavior_reports: {
         Row: {
           created_at: string
@@ -130,7 +157,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          code_normalized?: string | null
+          code_normalized?: never
           credits?: string | null
           department?: string | null
           description?: string | null
@@ -147,7 +174,7 @@ export type Database = {
         }
         Update: {
           code?: string
-          code_normalized?: string | null
+          code_normalized?: never
           credits?: string | null
           department?: string | null
           description?: string | null
@@ -248,7 +275,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          code_normalized?: string | null
+          code_normalized?: never
           created_at?: string
           created_by?: string | null
           id?: string
@@ -258,7 +285,7 @@ export type Database = {
         }
         Update: {
           code?: string
-          code_normalized?: string | null
+          code_normalized?: never
           created_at?: string
           created_by?: string | null
           id?: string
@@ -761,6 +788,35 @@ export type Database = {
           },
         ]
       }
+      platform_roles: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -804,19 +860,19 @@ export type Database = {
           captured_at: string
           report_id: string
           reported_user_id: string
-          snapshot: Json
+          snapshot: NonNullable<Json>
         }
         Insert: {
           captured_at?: string
           report_id: string
           reported_user_id: string
-          snapshot: Json
+          snapshot: NonNullable<Json>
         }
         Update: {
           captured_at?: string
           report_id?: string
           reported_user_id?: string
-          snapshot?: Json
+          snapshot?: NonNullable<Json>
         }
         Relationships: [
           {
@@ -836,13 +892,13 @@ export type Database = {
           source_type: string
         }
         Insert: {
-          message_id?: number | null
+          message_id?: never
           report_id: string
           source_id: string
           source_type: string
         }
         Update: {
-          message_id?: number | null
+          message_id?: never
           report_id?: string
           source_id?: string
           source_type?: string
@@ -945,6 +1001,94 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_add_school_domain: {
+        Args: { new_domain: string; target_school: string }
+        Returns: undefined
+      }
+      admin_grant_admin: { Args: { target_email: string }; Returns: string }
+      admin_import_catalog_batch: {
+        Args: { entries: Json; target_school: string }
+        Returns: number
+      }
+      admin_list_audit_log: {
+        Args: { max_rows?: number }
+        Returns: {
+          action: string
+          actor_email: string
+          actor_name: string
+          created_at: string
+          details: Json
+          id: number
+          target: string
+        }[]
+      }
+      admin_list_schools: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          catalog_count: number
+          current_course_count: number
+          current_term: string
+          domains: string[]
+          enabled: boolean
+          member_count: number
+          name_en: string
+          name_zh: string
+          school_id: string
+        }[]
+      }
+      admin_list_staff: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          display_name: string
+          email: string
+          granted_at: string
+          role: string
+          user_id: string
+        }[]
+      }
+      admin_materialize_catalog: {
+        Args: { target_school: string }
+        Returns: {
+          created_count: number
+          existing_count: number
+          invalid_count: number
+          materialized_term: string
+        }[]
+      }
+      admin_remove_school_domain: {
+        Args: { target_domain: string }
+        Returns: undefined
+      }
+      admin_revoke_admin: { Args: { target_user: string }; Returns: undefined }
+      admin_save_catalog_course: {
+        Args: {
+          course_code: string
+          course_title: string
+          target_school: string
+        }
+        Returns: string
+      }
+      admin_save_school: {
+        Args: {
+          new_name_en: string
+          new_name_zh: string
+          target_school: string
+        }
+        Returns: undefined
+      }
+      admin_set_current_term: {
+        Args: { new_term: string; target_school: string }
+        Returns: {
+          created_count: number
+          existing_count: number
+          invalid_count: number
+          materialized_term: string
+        }[]
+      }
+      admin_set_school_enabled: {
+        Args: { should_enable: boolean; target_school: string }
+        Returns: undefined
+      }
       can_access_course_conversation: {
         Args: { target_conversation: string }
         Returns: boolean
@@ -981,7 +1125,11 @@ export type Database = {
           result_status: string
         }[]
       }
-      current_school_id: { Args: never; Returns: string }
+      current_platform_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_school_id: { Args: Record<PropertyKey, never>; Returns: string }
       eligible_direct_message_cleanup: {
         Args: { evaluation_time: string }
         Returns: {
@@ -1024,14 +1172,14 @@ export type Database = {
         }[]
       }
       get_direct_unread_counts: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           hidden_unread: number
           visible_unread: number
         }[]
       }
       get_own_profile: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
           created_at: string
@@ -1042,14 +1190,17 @@ export type Database = {
           updated_at: string
         }[]
       }
-      has_completed_onboarding: { Args: never; Returns: boolean }
+      has_completed_onboarding: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       hook_restrict_user_to_enabled_school: {
         Args: { event: Json }
         Returns: Json
       }
       is_course_member: { Args: { target_course: string }; Returns: boolean }
       list_blocked_members: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           active_friendship: boolean
           avatar_url: string
@@ -1083,7 +1234,7 @@ export type Database = {
         }[]
       }
       list_friend_requests: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
           created_at: string
@@ -1143,6 +1294,7 @@ export type Database = {
         }[]
       }
       remove_friend: { Args: { target_member_id: string }; Returns: string }
+      require_platform_role: { Args: { minimum_role: string }; Returns: string }
       respond_to_friend_request: {
         Args: { decision: string; target_request_id: string }
         Returns: {
@@ -1207,6 +1359,15 @@ export type Database = {
         Returns: string
       }
       shares_course_with: { Args: { target_user: string }; Returns: boolean }
+      write_admin_audit: {
+        Args: {
+          action_name: string
+          actor: string
+          detail: Json
+          target_name: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,5 +1,7 @@
 # 课程目录并入主干交接
 
+> 历史交接：正文进度、待办、分支与验证结果只代表记录时点；当前进度统一维护在 [STATUS.md](../STATUS.md)。操作步骤见 [操作手册索引](../../README.md#操作手册)，只需定位模块时见 [任务与代码索引](../README.md)。
+
 > 更新日期：2026-09-10
 >
 > 相关：[统一会话核心](./unified-conversation-core.md) · [Profile onboarding](./profile-onboarding.md) · [好友后端](./friendship-backend.md) · [录入课程 runbook](../runbooks/seed-courses.md) · [新建 Supabase 项目 runbook](../runbooks/new-supabase-project.md)

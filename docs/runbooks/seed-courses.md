@@ -1,5 +1,9 @@
 # Runbook：录入课程
 
+> **日常录课、切换学期、补录单门课，都用网站的管理页（`/admin`）**，不需要 service_role key，见 [管理页与平台角色](./platform-admin.md)。管理页与下面的命令行脚本共用同一个解析器，报告一致。
+>
+> 下面的命令行流程留给管理页用不了的场合：新建 Supabase 项目、还没有任何管理员的时候。本文对两张表的解释和报告的读法对两条路都适用。
+>
 > 数据授权申请见 [request-course-data.md](./request-course-data.md)。
 >
 > 为什么不逆向学校的公开课程接口，见 [ADR-0002](../adr/0002-do-not-reverse-engineer-university-course-search.md)。
@@ -85,6 +89,8 @@ SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/import-course-catalog.mts \
 
 ## 每学期切换
 
+**用管理页「学校与学期」切换，一步完成**：改学期、归档旧课程群、物化新学期课程。以下是没有管理页时的手工做法。
+
 更新 `school_term_settings.current_term` 之后重新物化，**不用重导课表**：
 
 ```sql
@@ -101,6 +107,8 @@ SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/import-course-catalog.mts   --school 
 ---
 
 ## 手工补录单门课
+
+**用管理页「新增或修改单门课」一步完成**：写进目录，并同步建好或改好当前学期的课程。以下是没有管理页时的手工做法。
 
 学生反馈某门课搜不到时，**补进目录再物化**，不要直接往 `courses` 里插：
 
@@ -131,8 +139,8 @@ select (select count(*) from public.courses) as 课程数,
 
 ---
 
-## 已讨论但决定暂不做的：`school_editors`
+## 已被取代：`school_editors`
 
-曾考虑加一张 `(user_id, school_id)` 的编辑权限表，让课表编辑权按学校隔离。**结论是现在不做**——团队成员用 Supabase 后台或导入脚本时都走 service_role，绕过 RLS，这张表在有管理页之前是死代码。
+曾考虑加一张 `(user_id, school_id)` 的编辑权限表，让课表编辑权按学校隔离。现在由平台角色取代，见 [ADR-0005](../adr/0005-platform-roles-and-admin-functions.md)：管理员经固定的数据库函数录课，不需要写表的 RLS 策略，也就没有「能插入却看不见自己插入内容」的坑。
 
-等到要给第三个人录课、又不想再开数据库权限时再加。届时注意一个坑：查看策略目前是「只能看自己学校的」，如果只加写权限不改这条，会做出一个**能插入却看不见自己插入内容**的编辑角色。
+目前管理员的范围是全平台。要按学校划分时，给 `platform_roles` 加一列 `school_id` 即可。

@@ -5,12 +5,15 @@ type DashboardHeaderProps = {
   schoolName: string;
   /** 退出登录的 Server Action。由页面传入——组件不决定退出后去哪。 */
   signOutAction: () => Promise<void>;
+  /** 只有带平台身份的成员才传，其余人看不到管理入口。 */
+  adminHref?: string;
 };
 
 export function DashboardHeader({
   email,
   schoolName,
   signOutAction,
+  adminHref,
 }: DashboardHeaderProps) {
   return (
     <header className="border-b border-slate-200 bg-white">
@@ -29,6 +32,14 @@ export function DashboardHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {adminHref ? (
+            <Link
+              className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100"
+              href={adminHref}
+            >
+              管理
+            </Link>
+          ) : null}
           <Link
             className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
             href="/friends"

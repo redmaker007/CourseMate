@@ -113,3 +113,9 @@ update public.schools set enabled = true where id = 'umich';
 ```
 
 **不要把开启学校的语句写进 migration 提交**，除非正式试点学校已经定了。
+
+有了所有者之后，开放学校、增删域名都可以在管理页完成，不用再写 SQL。
+
+## 7. 指定所有者
+
+新项目里没有任何人能进管理页（`/admin`）。第一位所有者只能在 SQL Editor 里手工指定一次，之后任命管理员都在网站上完成。步骤见 [管理页与平台角色](./platform-admin.md) 的「指定所有者」。

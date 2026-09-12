@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { getPlatformRole } from "@/features/admin/queries";
 import { getEnabledSchools } from "@/features/auth/queries";
 import { getCurrentMember } from "@/features/auth/session";
 import { CourseSearch } from "@/features/courses/components/course-search";
@@ -28,6 +29,9 @@ export default async function DashboardPage({
 
   const { signout, q, courseAction } = await searchParams;
   const courseQuery = typeof q === "string" ? q.trim() : "";
+
+  // 读不到身份时返回 null，只是不显示入口，不影响大厅本身。
+  const platformRole = await getPlatformRole();
 
   let schoolName = member.schoolId;
   try {
@@ -69,6 +73,7 @@ export default async function DashboardPage({
   return (
     <div className="min-h-screen bg-slate-50">
       <DashboardHeader
+        adminHref={platformRole ? "/admin" : undefined}
         email={member.email}
         schoolName={schoolName}
         signOutAction={signOutAndReturnToLoginAction}
