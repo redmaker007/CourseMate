@@ -1,5 +1,6 @@
 export type SyncedCourseMessage = {
   id: string;
+  clientMessageId?: string | null;
   senderId: string | null;
   senderName: string;
   body: string;

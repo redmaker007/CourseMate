@@ -1,5 +1,8 @@
+import type { ConversationMessageSendResult } from "./supabase-conversation-message";
+
 export type DirectMessage = {
   id: string;
+  clientMessageId?: string | null;
   conversationId: string;
   senderId: string | null;
   senderDisplayName: string;
@@ -35,8 +38,9 @@ export interface DirectMessageBackend {
   getConversation(conversationId: string): Promise<DirectConversationView | null>;
   sendMessage(
     conversationId: string,
+    clientMessageId: string,
     body: string,
-  ): Promise<{ status: string; messageId?: string }>;
+  ): Promise<ConversationMessageSendResult>;
   listMessages(
     conversationId: string,
     page: Required<DirectMessagePage>,
@@ -83,16 +87,23 @@ export function createDirectMessageService(backend: DirectMessageBackend) {
       }
     },
 
-    async sendMessage(conversationId: string, rawBody: string) {
+    async sendMessage(
+      conversationId: string,
+      clientMessageId: string,
+      rawBody: string,
+    ) {
       if (!validConversationId(conversationId)) {
         return { status: "invalid_conversation" } as const;
+      }
+      if (!validConversationId(clientMessageId)) {
+        return { status: "invalid_request" } as const;
       }
       const body = rawBody.trim();
       if ([...body].length < 1 || [...body].length > 4000) {
         return { status: "invalid_body" } as const;
       }
       try {
-        return await backend.sendMessage(conversationId, body);
+        return await backend.sendMessage(conversationId, clientMessageId, body);
       } catch {
         return { status: "temporarily_unavailable" } as const;
       }

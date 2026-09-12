@@ -24,6 +24,15 @@ import {
 import { initialDirectMessageActionState } from "./message-action-state";
 
 const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CLIENT_MESSAGE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const SAVED_MESSAGE = {
+  id: "42",
+  conversationId: CONVERSATION_ID,
+  senderId: "member-1",
+  senderDisplayName: "Alice",
+  body: "hello",
+  createdAt: "2026-09-12T00:00:00Z",
+};
 
 describe("direct message server actions", () => {
   beforeEach(() => {
@@ -33,16 +42,26 @@ describe("direct message server actions", () => {
   });
 
   it("sends through the authenticated service and returns the inserted id", async () => {
-    service.sendMessage.mockResolvedValue({ status: "sent", messageId: "42" });
+    service.sendMessage.mockResolvedValue({
+      status: "sent",
+      message: SAVED_MESSAGE,
+    });
     const form = new FormData();
     form.set("conversationId", CONVERSATION_ID);
+    form.set("clientMessageId", CLIENT_MESSAGE_ID);
     form.set("body", " hello ");
 
     await expect(
       sendDirectMessageAction(initialDirectMessageActionState, form),
-    ).resolves.toMatchObject({ status: "sent", messageId: "42" });
+    ).resolves.toMatchObject({
+      status: "sent",
+      clientMessageId: CLIENT_MESSAGE_ID,
+      attemptedBody: " hello ",
+      savedMessage: SAVED_MESSAGE,
+    });
     expect(service.sendMessage).toHaveBeenCalledWith(
       CONVERSATION_ID,
+      CLIENT_MESSAGE_ID,
       " hello ",
     );
     expect(cache.revalidatePath).toHaveBeenCalledWith(
@@ -68,15 +87,20 @@ describe("direct message server actions", () => {
     });
   });
 
-  it("rejects mutation attempts without a complete member session", async () => {
-    auth.getCurrentMember.mockResolvedValue(null);
+  it("lets the unified database boundary reject an incomplete sender", async () => {
+    service.sendMessage.mockResolvedValue({ status: "onboarding_required" });
     const form = new FormData();
     form.set("conversationId", CONVERSATION_ID);
+    form.set("clientMessageId", CLIENT_MESSAGE_ID);
     form.set("body", "hello");
 
     await expect(
       sendDirectMessageAction(initialDirectMessageActionState, form),
-    ).resolves.toMatchObject({ status: "unauthorized" });
-    expect(production.createService).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({
+      status: "onboarding_required",
+      clientMessageId: CLIENT_MESSAGE_ID,
+      attemptedBody: "hello",
+    });
+    expect(auth.getCurrentMember).not.toHaveBeenCalled();
   });
 });

@@ -44,19 +44,39 @@ export async function sendCourseMessageAction(
   formData: FormData,
 ): Promise<CourseMessageActionState> {
   const courseId = formData.get("courseId");
-  if (!isCourseId(courseId)) {
-    return { status: "invalid", message: "课程信息无效，请刷新页面。" };
+  const conversationId = formData.get("conversationId");
+  const clientMessageId = formData.get("clientMessageId");
+  const attemptedBody = String(formData.get("body") ?? "");
+  const attempt = {
+    clientMessageId: String(clientMessageId ?? ""),
+    attemptedBody,
+  };
+  if (
+    !isCourseId(courseId) ||
+    !isCourseId(conversationId) ||
+    !isCourseId(clientMessageId)
+  ) {
+    return {
+      status: "invalid",
+      message: "课程信息无效，请刷新页面。",
+      ...attempt,
+    };
   }
 
   let result: Awaited<ReturnType<Awaited<ReturnType<typeof createProductionCourseOperations>>["sendCourseMessage"]>>;
   try {
     const operations = await createProductionCourseOperations();
     result = await operations.sendCourseMessage(
-      courseId,
-      String(formData.get("body") ?? ""),
+      conversationId,
+      clientMessageId,
+      attemptedBody,
     );
   } catch {
-    return { status: "unavailable", message: "消息暂时无法发送。" };
+    return {
+      status: "unavailable",
+      message: "消息暂时无法发送。",
+      ...attempt,
+    };
   }
   switch (result.status) {
     case "sent":
@@ -64,13 +84,22 @@ export async function sendCourseMessageAction(
       return {
         status: "sent",
         message: "消息已发送。",
+        ...attempt,
         savedMessage: result.message,
       };
     case "invalid":
-      return { status: "invalid", message: "请输入 1–4000 个字符。" };
+      return {
+        status: "invalid",
+        message: "请输入 1–4000 个字符。",
+        ...attempt,
+      };
     case "unauthenticated":
     case "not_available":
     case "temporarily_unavailable":
-      return { status: "unavailable", message: "消息暂时无法发送。" };
+      return {
+        status: "unavailable",
+        message: "消息暂时无法发送。",
+        ...attempt,
+      };
   }
 }

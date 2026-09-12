@@ -247,7 +247,7 @@ async function messageViews(
 ) {
   let query = supabase
     .from("messages")
-    .select("id, sender_id, body, created_at")
+    .select("id, sender_id, body, created_at, client_message_id")
     .eq("conversation_id", conversationId);
   if (options.after !== undefined) query = query.gt("id", options.after);
   if (options.before !== undefined) query = query.lt("id", options.before);
@@ -272,6 +272,7 @@ async function messageViews(
   );
   const messages = rows.map((row) => ({
     id: String(row.id),
+    clientMessageId: row.client_message_id,
     senderId: row.sender_id,
     senderName: row.sender_id
       ? (names.get(row.sender_id) ?? "成员")

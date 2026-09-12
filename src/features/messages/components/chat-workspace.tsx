@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   startTransition,
   useActionState,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -15,6 +16,7 @@ import {
   type DirectMessageActionState,
 } from "../message-action-state";
 import { useDirectMessageSync } from "../use-direct-message-sync";
+import { useMessageSend } from "../use-message-send";
 import { SafeMessageText } from "./safe-message-text";
 import {
   ReportForm,
@@ -57,16 +59,13 @@ export function ChatWorkspace({
     initialMessages,
     initialHasOlderMessages,
   });
-  const { backfill, clearThrough } = sync;
+  const { clearThrough, mergeIncoming } = sync;
   const [body, setBody] = useState("");
-  const submitMessage: MutationAction = async (previousState, formData) => {
-    const result = await sendAction(previousState, formData);
-    if (result.status === "sent") {
-      setBody("");
-      void backfill();
-    }
-    return result;
-  };
+  const onSaved = useCallback(
+    (message: DirectMessage) => mergeIncoming([message]),
+    [mergeIncoming],
+  );
+  const onStart = useCallback(() => setBody(""), []);
   const submitClear: MutationAction = async (previousState, formData) => {
     const result = await clearAction(previousState, formData);
     if (result.status === "updated" && result.throughMessageId) {
@@ -74,10 +73,19 @@ export function ChatWorkspace({
     }
     return result;
   };
-  const [sendState, sendFormAction, sending] = useActionState(
-    submitMessage,
-    initialDirectMessageActionState,
-  );
+  const {
+    attempt,
+    formAction: sendFormAction,
+    pending: sending,
+    retry,
+    state: sendState,
+  } = useMessageSend({
+    action: sendAction,
+    fixedFields: { conversationId },
+    initialState: initialDirectMessageActionState,
+    onSaved,
+    onStart,
+  });
   const [clearState, clearFormAction, clearing] = useActionState(
     submitClear,
     initialDirectMessageActionState,
@@ -87,6 +95,9 @@ export function ChatWorkspace({
   const latestMessageId = sync.messages.at(-1)?.id;
   const bodyLength = Array.from(body.trim()).length;
   const bodyInvalid = bodyLength < 1 || bodyLength > 4000;
+  const visibleAttempt = attempt && !sync.messages.some(
+    (message) => message.clientMessageId === attempt.clientMessageId,
+  ) ? attempt : null;
 
   useEffect(() => {
     const markWhenVisible = () => {
@@ -169,7 +180,7 @@ export function ChatWorkspace({
               {sync.loadingOlder ? "加载中…" : "加载更早消息"}
             </button>
           ) : null}
-          {sync.messages.length === 0 ? (
+          {sync.messages.length === 0 && !visibleAttempt ? (
             <p className="py-12 text-center text-sm text-slate-500">
               清除位置之后还没有消息。
             </p>
@@ -208,6 +219,25 @@ export function ChatWorkspace({
                   </li>
                 );
               })}
+              {visibleAttempt ? (
+                <li className="flex justify-end" data-client-message-id={visibleAttempt.clientMessageId}>
+                  <article className="max-w-[85%] rounded-2xl bg-indigo-600 px-4 py-3 text-sm text-white opacity-75">
+                    <p className="mb-1 text-xs text-indigo-100">
+                      我 · {visibleAttempt.status === "sending" ? "发送中" : "发送失败"}
+                    </p>
+                    <SafeMessageText text={visibleAttempt.body} />
+                    {visibleAttempt.status === "failed" ? (
+                      <button
+                        className="mt-2 text-xs font-semibold text-white underline"
+                        onClick={retry}
+                        type="button"
+                      >
+                        重试
+                      </button>
+                    ) : null}
+                  </article>
+                </li>
+              ) : null}
             </ol>
           )}
         </section>
@@ -231,7 +261,13 @@ export function ChatWorkspace({
               ) : null}
             </form>
           ) : null}
-          <form action={sendFormAction} className="space-y-2">
+          <form
+            className="space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              sendFormAction(new FormData(event.currentTarget));
+            }}
+          >
             <input name="conversationId" type="hidden" value={conversationId} />
             <label className="sr-only" htmlFor="direct-message-body">消息</label>
             <textarea

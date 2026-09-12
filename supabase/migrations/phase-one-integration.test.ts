@@ -9,6 +9,8 @@ const BOB = "22222222-2222-4222-8222-222222222222";
 const CAROL = "33333333-3333-4333-8333-333333333333";
 const DAVE = "44444444-4444-4444-8444-444444444444";
 const INCOMPLETE = "55555555-5555-4555-8555-555555555555";
+const COURSE_SEND_ID = "66666666-6666-4666-8666-666666666666";
+const DIRECT_SEND_ID = "77777777-7777-4777-8777-777777777777";
 
 const MIGRATIONS = [
   "202609050001_email_otp_request.sql",
@@ -27,6 +29,7 @@ const MIGRATIONS = [
   "202609110003_direct_chat_page.sql",
   "202609110004_reporting.sql",
   "202609110005_direct_message_cleanup.sql",
+  "202609120001_reliable_message_sending.sql",
 ] as const;
 
 type Attempt =
@@ -205,16 +208,52 @@ describe("phase-one full-chain integration", () => {
 
     const wisconsinMessage = await asUser(
       ALICE,
-      `insert into public.messages (conversation_id, body)
-       values ('${wisconsin.conversation_id}', 'Wisconsin hello')`,
+      `select result_status, message_id::text
+       from public.send_conversation_message(
+         '${wisconsin.conversation_id}', 'Wisconsin hello', '${COURSE_SEND_ID}'
+       )`,
+    );
+    const wisconsinRetry = await asUser(
+      ALICE,
+      `select result_status, message_id::text
+       from public.send_conversation_message(
+         '${wisconsin.conversation_id}', 'Wisconsin hello', '${COURSE_SEND_ID}'
+       )`,
     );
     const michiganMessage = await asUser(
       CAROL,
-      `insert into public.messages (conversation_id, body)
-       values ('${michigan.conversation_id}', 'Michigan hello')`,
+      `select result_status
+       from public.send_conversation_message(
+         '${michigan.conversation_id}', 'Michigan hello', gen_random_uuid()
+       )`,
     );
-    expect(wisconsinMessage.ok).toBe(true);
-    expect(michiganMessage.ok).toBe(true);
+    const conflictingRetry = await asUser(
+      ALICE,
+      `select result_status
+       from public.send_conversation_message(
+         '${wisconsin.conversation_id}', 'Different body', '${COURSE_SEND_ID}'
+       )`,
+    );
+    expect(
+      wisconsinMessage.ok && wisconsinMessage.rows,
+      JSON.stringify(wisconsinMessage),
+    ).toEqual([
+      {
+        result_status: "sent",
+        message_id: wisconsinMessage.ok
+          ? wisconsinMessage.rows[0].message_id
+          : "",
+      },
+    ]);
+    expect(wisconsinRetry.ok && wisconsinRetry.rows).toEqual(
+      wisconsinMessage.ok ? wisconsinMessage.rows : [],
+    );
+    expect(michiganMessage.ok && michiganMessage.rows).toEqual([
+      { result_status: "sent" },
+    ]);
+    expect(conflictingRetry.ok && conflictingRetry.rows).toEqual([
+      { result_status: "idempotency_conflict" },
+    ]);
 
     const wisconsinHistory = await asUser(
       BOB,
@@ -248,6 +287,18 @@ describe("phase-one full-chain integration", () => {
       INCOMPLETE,
       `insert into public.course_members (course_id) values ('${wisconsin.id}')`,
     );
+    const incompleteSend = await asUser(
+      INCOMPLETE,
+      `select result_status from public.send_conversation_message(
+        '${wisconsin.conversation_id}', 'forged', gen_random_uuid()
+      )`,
+    );
+    const crossSchoolSend = await asUser(
+      CAROL,
+      `select result_status from public.send_conversation_message(
+        '${wisconsin.conversation_id}', 'forged', gen_random_uuid()
+      )`,
+    );
     const forgedMember = await asUser(
       ALICE,
       `insert into public.course_members (course_id, user_id)
@@ -260,6 +311,12 @@ describe("phase-one full-chain integration", () => {
     );
     expect(incompleteSearch.ok && incompleteSearch.rows).toEqual([]);
     expect(incompleteJoin.ok).toBe(false);
+    expect(incompleteSend.ok && incompleteSend.rows).toEqual([
+      { result_status: "onboarding_required" },
+    ]);
+    expect(crossSchoolSend.ok && crossSchoolSend.rows).toEqual([
+      { result_status: "not_available" },
+    ]);
     expect(forgedMember.ok).toBe(false);
     expect(memberCreatedCourse.ok).toBe(false);
 
@@ -345,19 +402,55 @@ describe("phase-one full-chain integration", () => {
 
     const sent = await asUser(
       BOB,
-      `select * from public.send_direct_message(
-        '${conversationId}', '<script>alert(1)</script> https://example.com'
+      `select result_status, message_id::text from public.send_conversation_message(
+        '${conversationId}', '<script>alert(1)</script> https://example.com', '${DIRECT_SEND_ID}'
       )`,
+    );
+    const retried = await asUser(
+      BOB,
+      `select result_status, message_id::text from public.send_conversation_message(
+        '${conversationId}', '<script>alert(1)</script> https://example.com', '${DIRECT_SEND_ID}'
+      )`,
+    );
+    const sentHistory = await asUser(
+      ALICE,
+      `select message_id::text, client_message_id::text
+       from public.list_direct_messages('${conversationId}')
+       where client_message_id is not null`,
     );
     const messageId = sent.ok ? String(sent.rows[0].message_id) : "";
     const unread = await asUser(
       ALICE,
       "select * from public.get_direct_unread_counts()",
     );
-    expect(sent.ok && sent.rows[0].result_status).toBe("sent");
+    expect(
+      sent.ok && sent.rows[0].result_status,
+      JSON.stringify(sent),
+    ).toBe("sent");
+    expect(retried.ok && retried.rows).toEqual(sent.ok ? sent.rows : []);
+    expect(sentHistory.ok && sentHistory.rows).toEqual([
+      {
+        message_id: messageId,
+        client_message_id: DIRECT_SEND_ID,
+      },
+    ]);
     expect(unread.ok && unread.rows).toEqual([
       { visible_unread: 0, hidden_unread: 1 },
     ]);
+
+    const sameClientIdFromAlice = await asUser(
+      ALICE,
+      `select result_status from public.send_conversation_message(
+        '${conversationId}', 'Alice reply', '${DIRECT_SEND_ID}'
+      )`,
+    );
+    expect(sameClientIdFromAlice.ok && sameClientIdFromAlice.rows).toEqual([
+      { result_status: "sent" },
+    ]);
+    await database.query(
+      `delete from public.messages
+       where sender_id = '${ALICE}' and client_message_id = '${DIRECT_SEND_ID}'`,
+    );
 
     const blocked = await asUser(
       ALICE,
@@ -365,11 +458,15 @@ describe("phase-one full-chain integration", () => {
     );
     const blockedAliceSend = await asUser(
       ALICE,
-      `select result_status from public.send_direct_message('${conversationId}', 'blocked')`,
+      `select result_status from public.send_conversation_message(
+        '${conversationId}', 'blocked', gen_random_uuid()
+      )`,
     );
     const blockedBobSend = await asUser(
       BOB,
-      `select result_status from public.send_direct_message('${conversationId}', 'blocked')`,
+      `select result_status from public.send_conversation_message(
+        '${conversationId}', 'blocked', gen_random_uuid()
+      )`,
     );
     expect(blocked.ok && blocked.rows).toEqual([{ status: "saved" }]);
     expect(blockedAliceSend.ok && blockedAliceSend.rows).toEqual([

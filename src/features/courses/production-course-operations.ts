@@ -1,18 +1,26 @@
 import "server-only";
 
 import { getCurrentMember } from "@/features/auth/session";
+import {
+  sendSupabaseConversationMessage,
+  type ConversationMessageRpcClient,
+} from "@/features/messages/supabase-conversation-message";
 import { createClient } from "@/lib/supabase/server";
 
 import { createCourseOperations } from "./course-operations";
 
 export async function createProductionCourseOperations() {
   const supabase = await createClient();
-  const memberPromise = getCurrentMember();
+  let memberPromise: ReturnType<typeof getCurrentMember> | undefined;
+  const currentMember = () => memberPromise ??= getCurrentMember();
+  const messageClient = {
+    rpc: supabase.rpc.bind(supabase) as unknown as ConversationMessageRpcClient["rpc"],
+  };
 
   return createCourseOperations({
-    getCurrentMember: () => memberPromise,
+    getCurrentMember: currentMember,
     async getCourseCandidate(courseId) {
-      const member = await memberPromise;
+      const member = await currentMember();
       if (!member?.onboardingComplete) return null;
       const [{ data: course, error: courseError }, { data: term, error: termError }] =
         await Promise.all([
@@ -38,7 +46,7 @@ export async function createProductionCourseOperations() {
       };
     },
     async getJoinedCourse(courseId) {
-      const member = await memberPromise;
+      const member = await currentMember();
       if (!member?.onboardingComplete) return null;
       const { data: membership, error: membershipError } = await supabase
         .from("course_members")
@@ -76,7 +84,7 @@ export async function createProductionCourseOperations() {
       if (error) throw error;
     },
     async leaveOwnCourse(courseId) {
-      const member = await memberPromise;
+      const member = await currentMember();
       if (!member) throw new Error("Member session unavailable");
       const { error } = await supabase
         .from("course_members")
@@ -85,27 +93,13 @@ export async function createProductionCourseOperations() {
         .eq("user_id", member.userId);
       if (error) throw error;
     },
-    async insertOwnMessage(conversationId, body) {
-      const member = await memberPromise;
-      if (!member) throw new Error("Member session unavailable");
-      const { data: message, error } = await supabase
-        .from("messages")
-        .insert({ conversation_id: conversationId, body })
-        .select("id, sender_id, body, created_at")
-        .single();
-      if (error) throw error;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", member.userId)
-        .maybeSingle();
-      return {
-        id: String(message.id),
-        senderId: message.sender_id,
-        senderName: profile?.display_name ?? "成员",
-        body: message.body,
-        createdAt: message.created_at,
-      };
+    sendMessage(conversationId, clientMessageId, body) {
+      return sendSupabaseConversationMessage(
+        messageClient,
+        conversationId,
+        clientMessageId,
+        body,
+      );
     },
   });
 }

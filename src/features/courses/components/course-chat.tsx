@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
+
+import { useMessageSend } from "@/features/messages/use-message-send";
 
 import { sendCourseMessageAction } from "../actions";
 import { initialCourseMessageActionState } from "../course-action-state";
@@ -37,17 +39,28 @@ export function CourseChat({
     initialMessages,
     initialHasOlderMessages,
   });
-  const [actionState, formAction, pending] = useActionState(
-    sendCourseMessageAction,
-    initialCourseMessageActionState,
-  );
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (!actionState.savedMessage) return;
-    mergeIncoming([actionState.savedMessage]);
-    formRef.current?.reset();
-  }, [actionState.savedMessage, mergeIncoming]);
+  const onSaved = useCallback(
+    (message: SyncedCourseMessage) => mergeIncoming([message]),
+    [mergeIncoming],
+  );
+  const onStart = useCallback(() => formRef.current?.reset(), []);
+  const {
+    attempt,
+    formAction,
+    pending,
+    retry,
+    state: actionState,
+  } = useMessageSend({
+    action: sendCourseMessageAction,
+    fixedFields: { courseId, conversationId },
+    initialState: initialCourseMessageActionState,
+    onSaved,
+    onStart,
+  });
+  const visibleAttempt = attempt && !messages.some(
+    (message) => message.clientMessageId === attempt.clientMessageId,
+  ) ? attempt : null;
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -63,7 +76,7 @@ export function CourseChat({
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-          {messages.length} 条
+          {messages.length + (visibleAttempt ? 1 : 0)} 条
         </span>
       </div>
 
@@ -79,8 +92,9 @@ export function CourseChat({
       ) : null}
 
       <ol className="max-h-[32rem] space-y-3 overflow-y-auto rounded-2xl bg-slate-50 p-4">
-        {messages.length ? (
-          messages.map((message) => {
+        {messages.length || visibleAttempt ? (
+          <>
+          {messages.map((message) => {
             const own = message.senderId === currentUserId;
             return (
               <li className={own ? "ml-auto max-w-[85%]" : "max-w-[85%]"} key={message.id}>
@@ -98,15 +112,43 @@ export function CourseChat({
                 </p>
               </li>
             );
-          })
+          })}
+          {visibleAttempt ? (
+            <li className="ml-auto max-w-[85%]" data-client-message-id={visibleAttempt.clientMessageId}>
+              <p className="mb-1 text-xs text-slate-500">
+                我 · {visibleAttempt.status === "sending" ? "发送中" : "发送失败"}
+              </p>
+              <p className="whitespace-pre-wrap break-words rounded-2xl bg-indigo-600 px-4 py-3 text-sm text-white opacity-75">
+                {visibleAttempt.body}
+              </p>
+              {visibleAttempt.status === "failed" ? (
+                <button
+                  className="mt-1 text-xs font-semibold text-rose-700 underline"
+                  onClick={retry}
+                  type="button"
+                >
+                  重试
+                </button>
+              ) : null}
+            </li>
+          ) : null}
+          </>
         ) : (
           <li className="py-10 text-center text-sm text-slate-500">还没有消息。</li>
         )}
       </ol>
 
       {!archived ? (
-        <form action={formAction} className="mt-5 space-y-3" ref={formRef}>
+        <form
+          className="mt-5 space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            formAction(new FormData(event.currentTarget));
+          }}
+          ref={formRef}
+        >
           <input name="courseId" type="hidden" value={courseId} />
+          <input name="conversationId" type="hidden" value={conversationId} />
           <label className="sr-only" htmlFor="course-message-body">
             消息内容
           </label>

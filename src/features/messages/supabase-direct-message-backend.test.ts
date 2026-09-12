@@ -3,13 +3,22 @@ import { describe, expect, it, vi } from "vitest";
 import { createSupabaseDirectMessageBackend } from "./supabase-direct-message-backend";
 
 const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CLIENT_MESSAGE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 describe("Supabase direct message backend", () => {
   it("maps send and list RPCs without converting bigint ids to numbers", async () => {
     const rpc = vi
       .fn()
       .mockResolvedValueOnce({
-        data: [{ result_status: "sent", message_id: "9007199254740993" }],
+        data: [{
+          result_status: "sent",
+          message_id: "9007199254740993",
+          conversation_id: CONVERSATION_ID,
+          sender_id: "member-1",
+          sender_display_name: "Alice",
+          body: "hello",
+          created_at: "2026-09-11T00:00:00Z",
+        }],
         error: null,
       })
       .mockResolvedValueOnce({
@@ -21,15 +30,19 @@ describe("Supabase direct message backend", () => {
             sender_display_name: "已注销用户",
             body: "hello",
             created_at: "2026-09-11T00:00:00Z",
+            client_message_id: CLIENT_MESSAGE_ID,
           },
         ],
         error: null,
       });
     const backend = createSupabaseDirectMessageBackend({ rpc });
 
-    await expect(backend.sendMessage(CONVERSATION_ID, "hello")).resolves.toEqual(
-      { status: "sent", messageId: "9007199254740993" },
-    );
+    await expect(
+      backend.sendMessage(CONVERSATION_ID, CLIENT_MESSAGE_ID, "hello"),
+    ).resolves.toMatchObject({
+      status: "sent",
+      message: { id: "9007199254740993", body: "hello" },
+    });
     await expect(
       backend.listMessages(CONVERSATION_ID, {
         direction: "after",
@@ -39,6 +52,7 @@ describe("Supabase direct message backend", () => {
     ).resolves.toEqual([
       {
         id: "9007199254740993",
+        clientMessageId: CLIENT_MESSAGE_ID,
         conversationId: CONVERSATION_ID,
         senderId: null,
         senderDisplayName: "已注销用户",
@@ -46,6 +60,11 @@ describe("Supabase direct message backend", () => {
         createdAt: "2026-09-11T00:00:00Z",
       },
     ]);
+    expect(rpc).toHaveBeenNthCalledWith(1, "send_conversation_message", {
+      target_conversation_id: CONVERSATION_ID,
+      client_message_id: CLIENT_MESSAGE_ID,
+      message_body: "hello",
+    });
     expect(rpc).toHaveBeenNthCalledWith(2, "list_direct_messages", {
       target_conversation_id: CONVERSATION_ID,
       cursor_direction: "after",

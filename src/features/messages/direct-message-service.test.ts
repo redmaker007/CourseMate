@@ -6,12 +6,13 @@ import {
 } from "./direct-message-service";
 
 const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CLIENT_MESSAGE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function backend(
   overrides: Partial<DirectMessageBackend> = {},
 ): DirectMessageBackend {
   return {
-    sendMessage: vi.fn().mockResolvedValue({ status: "sent", messageId: "1" }),
+    sendMessage: vi.fn().mockResolvedValue({ status: "sent" }),
     listMessages: vi.fn().mockResolvedValue([]),
     markRead: vi.fn().mockResolvedValue({ status: "updated" }),
     clearConversation: vi.fn().mockResolvedValue({ status: "updated" }),
@@ -26,16 +27,29 @@ describe("direct message service", () => {
   it("trims and sends a Unicode plain-text message up to 4000 characters", async () => {
     const sendMessage = vi
       .fn()
-      .mockResolvedValue({ status: "sent", messageId: "9007199254740993" });
+      .mockResolvedValue({
+        status: "sent",
+        message: {
+          id: "9007199254740993",
+          conversationId: CONVERSATION_ID,
+          senderId: "member-1",
+          senderDisplayName: "Alice",
+          body: "界".repeat(4000),
+          createdAt: "2026-09-12T00:00:00Z",
+        },
+      });
     const service = createDirectMessageService(backend({ sendMessage }));
     const body = `  ${"界".repeat(4000)}  `;
 
-    await expect(service.sendMessage(CONVERSATION_ID, body)).resolves.toEqual({
+    await expect(
+      service.sendMessage(CONVERSATION_ID, CLIENT_MESSAGE_ID, body),
+    ).resolves.toMatchObject({
       status: "sent",
-      messageId: "9007199254740993",
+      message: { id: "9007199254740993" },
     });
     expect(sendMessage).toHaveBeenCalledWith(
       CONVERSATION_ID,
+      CLIENT_MESSAGE_ID,
       "界".repeat(4000),
     );
   });
@@ -44,15 +58,18 @@ describe("direct message service", () => {
     const sendMessage = vi.fn();
     const service = createDirectMessageService(backend({ sendMessage }));
 
-    await expect(service.sendMessage(CONVERSATION_ID, "   ")).resolves.toEqual({
-      status: "invalid_body",
-    });
     await expect(
-      service.sendMessage(CONVERSATION_ID, "界".repeat(4001)),
+      service.sendMessage(CONVERSATION_ID, CLIENT_MESSAGE_ID, "   "),
     ).resolves.toEqual({ status: "invalid_body" });
-    await expect(service.sendMessage("not-a-uuid", "hello")).resolves.toEqual({
-      status: "invalid_conversation",
-    });
+    await expect(
+      service.sendMessage(CONVERSATION_ID, CLIENT_MESSAGE_ID, "界".repeat(4001)),
+    ).resolves.toEqual({ status: "invalid_body" });
+    await expect(
+      service.sendMessage("not-a-uuid", CLIENT_MESSAGE_ID, "hello"),
+    ).resolves.toEqual({ status: "invalid_conversation" });
+    await expect(
+      service.sendMessage(CONVERSATION_ID, "not-a-uuid", "hello"),
+    ).resolves.toEqual({ status: "invalid_request" });
     expect(sendMessage).not.toHaveBeenCalled();
   });
 

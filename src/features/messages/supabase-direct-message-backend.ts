@@ -2,12 +2,12 @@ import type {
   DirectMessage,
   DirectMessageBackend,
 } from "./direct-message-service";
+import {
+  sendSupabaseConversationMessage,
+  type ConversationMessageRpcClient,
+} from "./supabase-conversation-message";
 
-type RpcResult = { data: unknown; error: unknown };
-
-export interface DirectMessageRpcClient {
-  rpc(name: string, arguments_: Record<string, unknown>): Promise<RpcResult>;
-}
+export type DirectMessageRpcClient = ConversationMessageRpcClient;
 
 function rows(data: unknown): Record<string, unknown>[] {
   return Array.isArray(data)
@@ -52,19 +52,13 @@ export function createSupabaseDirectMessageBackend(
       };
     },
 
-    async sendMessage(conversationId, body) {
-      const row = firstRow(
-        await call("send_direct_message", {
-          target_conversation_id: conversationId,
-          message_body: body,
-        }),
+    sendMessage(conversationId, clientMessageId, body) {
+      return sendSupabaseConversationMessage(
+        client,
+        conversationId,
+        clientMessageId,
+        body,
       );
-      return {
-        status: String(row.result_status ?? "not_available"),
-        ...(row.message_id === null || row.message_id === undefined
-          ? {}
-          : { messageId: String(row.message_id) }),
-      };
     },
 
     async listMessages(conversationId, page) {
@@ -77,6 +71,10 @@ export function createSupabaseDirectMessageBackend(
       return rows(data).map(
         (row): DirectMessage => ({
           id: String(row.message_id),
+          clientMessageId:
+            row.client_message_id === null || row.client_message_id === undefined
+              ? null
+              : String(row.client_message_id),
           conversationId: String(row.conversation_id),
           senderId: row.sender_id === null ? null : String(row.sender_id),
           senderDisplayName: String(row.sender_display_name),

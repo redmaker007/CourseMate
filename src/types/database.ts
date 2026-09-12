@@ -606,6 +606,7 @@ export type Database = {
       messages: {
         Row: {
           body: string
+          client_message_id: string | null
           conversation_id: string
           created_at: string
           deleted_at: string | null
@@ -615,6 +616,7 @@ export type Database = {
         }
         Insert: {
           body: string
+          client_message_id?: string | null
           conversation_id: string
           created_at?: string
           deleted_at?: string | null
@@ -624,6 +626,7 @@ export type Database = {
         }
         Update: {
           body?: string
+          client_message_id?: string | null
           conversation_id?: string
           created_at?: string
           deleted_at?: string | null

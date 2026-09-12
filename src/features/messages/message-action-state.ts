@@ -1,7 +1,11 @@
+import type { DirectMessage } from "./direct-message-service";
+
 export type DirectMessageActionState = {
   status: string;
   message: string;
-  messageId?: string;
+  clientMessageId?: string;
+  attemptedBody?: string;
+  savedMessage?: DirectMessage;
   throughMessageId?: string;
 };
 
