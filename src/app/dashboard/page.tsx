@@ -1,3 +1,4 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -72,6 +73,7 @@ export default async function DashboardPage({
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SchoolTestBanner member={member} />
       <DashboardHeader
         adminHref={platformRole ? "/admin" : undefined}
         email={member.email}

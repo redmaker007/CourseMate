@@ -1,3 +1,4 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import { notFound, redirect } from "next/navigation";
 
 import { getCurrentMember } from "@/features/auth/session";
@@ -33,6 +34,8 @@ export default async function MessagePage({
   if (messageResult.status !== "loaded") notFound();
 
   return (
+    <>
+      <SchoolTestBanner member={member} />
     <ChatWorkspace
       clearAction={clearDirectConversationAction}
       conversationId={conversationId}
@@ -45,5 +48,6 @@ export default async function MessagePage({
       sendAction={sendDirectMessageAction}
       sendStatus={conversationResult.conversation.sendStatus}
     />
+    </>
   );
 }

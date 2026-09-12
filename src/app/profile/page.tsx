@@ -1,3 +1,4 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -18,6 +19,7 @@ export default async function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-12">
+      <SchoolTestBanner member={member} />
       <section className="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-200/60 sm:p-9">
         <div className="mb-8 flex items-start gap-4">
           {profile.avatarUrl ? (

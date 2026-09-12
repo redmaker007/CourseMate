@@ -1,3 +1,4 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -24,6 +25,7 @@ export default async function AddCourseMemberFriendPage({
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-12">
+      <SchoolTestBanner member={member} />
       <section className="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
         <Link className="text-sm font-semibold text-indigo-700" href="/friends">
           返回好友页

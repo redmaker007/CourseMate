@@ -1,3 +1,4 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -27,6 +28,7 @@ export default async function CoursePage({
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
+      <SchoolTestBanner member={member} />
       <div className="mx-auto max-w-5xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">

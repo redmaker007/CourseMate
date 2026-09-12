@@ -1,3 +1,4 @@
+import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
 import "server-only";
 
 import Link from "next/link";
@@ -64,6 +65,7 @@ export async function renderFriendsPage(filtered: boolean) {
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
+      <SchoolTestBanner member={member} />
       <div className="mx-auto max-w-6xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           {filtered ? (

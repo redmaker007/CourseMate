@@ -1089,6 +1089,10 @@ export type Database = {
         Args: { should_enable: boolean; target_school: string }
         Returns: undefined
       }
+      admin_set_test_school: {
+        Args: { target_school?: string }
+        Returns: string
+      }
       can_access_course_conversation: {
         Args: { target_conversation: string }
         Returns: boolean

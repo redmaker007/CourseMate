@@ -6,7 +6,10 @@ import { createSupabaseMemberSessionReader } from "./supabase-email-otp-adapters
 
 export type CurrentMember = {
   userId: string;
+  /** 当前业务学校；测试时由数据库选择。 */
   schoolId: string;
+  /** 跨校测试时保留真实邮箱归属，正常使用时不设置。 */
+  homeSchoolId?: string;
   email: string;
   onboardingComplete: boolean;
 };
@@ -34,12 +37,17 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
     } = await supabase.auth.getUser();
     if (!user?.email) return null;
 
-    const { data: onboardingComplete, error: onboardingError } =
-      await supabase.rpc("has_completed_onboarding");
-    if (onboardingError) return null;
+    const [onboarding, school] = await Promise.all([
+      supabase.rpc("has_completed_onboarding"),
+      supabase.rpc("current_school_id"),
+    ]);
+    if (onboarding.error || school.error || !school.data) return null;
+    const onboardingComplete = onboarding.data;
 
     return {
       ...session,
+      schoolId: school.data,
+      ...(school.data !== session.schoolId ? { homeSchoolId: session.schoolId } : {}),
       email: user.email,
       onboardingComplete: onboardingComplete === true,
     };
