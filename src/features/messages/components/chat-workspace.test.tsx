@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DirectMessage } from "../direct-message-service";
+import type { DirectMessageActionState } from "../message-action-state";
 
 const sync = vi.hoisted(() => ({ useDirectMessageSync: vi.fn() }));
 vi.mock("../use-direct-message-sync", () => sync);
@@ -263,6 +264,136 @@ describe("chat workspace", () => {
     const retryForm = sendAction.mock.calls[1][1];
     expect(retryForm.get("clientMessageId")).toBe(generatedId);
     expect(retryForm.get("body")).toBe("hello");
+  });
+
+  it("keeps earlier failed messages when a later send also fails", async () => {
+    const ids = [
+      CLIENT_MESSAGE_ID,
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    ];
+    vi.stubGlobal("crypto", { randomUUID: () => ids.shift()! });
+    let finish!: (state: DirectMessageActionState) => void;
+    const sendAction = vi.fn((
+      _previousState: DirectMessageActionState,
+      _formData: FormData,
+    ): Promise<DirectMessageActionState> => {
+      void _previousState;
+      void _formData;
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    sync.useDirectMessageSync.mockReturnValue({
+      messages: [],
+      connected: true,
+      hasOlderMessages: false,
+      loadingOlder: false,
+      loadOlder: vi.fn(),
+      backfill: vi.fn(),
+      clearThrough: vi.fn(),
+      mergeIncoming: vi.fn(),
+    });
+    render(
+      <ChatWorkspace
+        clearAction={vi.fn()}
+        conversationId={CONVERSATION_ID}
+        currentUserId="alice"
+        initialHasOlderMessages={false}
+        initialMessages={[]}
+        markReadAction={vi.fn()}
+        otherDisplayName="Bob"
+        reportAction={vi.fn()}
+        sendAction={sendAction}
+        sendStatus="allowed"
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "消息" });
+
+    fireEvent.change(input, { target: { value: "first" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    const firstForm = sendAction.mock.calls[0][1];
+    await act(async () => finish({
+      status: "temporarily_unavailable",
+      message: "服务暂时不可用，请稍后重试。",
+      clientMessageId: String(firstForm.get("clientMessageId")),
+      attemptedBody: "first",
+    }));
+    await waitFor(() => expect(screen.getByText(/发送失败/)).toBeTruthy());
+    const sendButton = await screen.findByRole("button", { name: "发送" });
+    fireEvent.change(input, { target: { value: "second" } });
+    await waitFor(() => expect((sendButton as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(sendButton);
+    const secondForm = sendAction.mock.calls[1][1];
+    await act(async () => finish({
+      status: "temporarily_unavailable",
+      message: "服务暂时不可用，请稍后重试。",
+      clientMessageId: String(secondForm.get("clientMessageId")),
+      attemptedBody: "second",
+    }));
+
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "重试" })).toHaveLength(2));
+    expect(screen.getByText("first")).toBeTruthy();
+    expect(screen.getByText("second")).toBeTruthy();
+  });
+
+  it("merges an Action result once before repeated synced copies arrive", async () => {
+    const savedMessage: DirectMessage = {
+      ...MESSAGE,
+      id: "44",
+      clientMessageId: CLIENT_MESSAGE_ID,
+      senderId: "alice",
+      senderDisplayName: "Alice",
+      body: "saved once",
+    };
+    const mergeIncoming = vi.fn();
+    const sendAction = vi.fn(async (
+      _previousState: DirectMessageActionState,
+      _formData: FormData,
+    ): Promise<DirectMessageActionState> => {
+      void _previousState;
+      void _formData;
+      return {
+        status: "sent",
+        message: "消息已发送。",
+        clientMessageId: CLIENT_MESSAGE_ID,
+        attemptedBody: savedMessage.body,
+        savedMessage,
+      };
+    });
+    const syncResult = {
+      messages: [] as DirectMessage[],
+      connected: true,
+      hasOlderMessages: false,
+      loadingOlder: false,
+      loadOlder: vi.fn(),
+      backfill: vi.fn(),
+      clearThrough: vi.fn(),
+      mergeIncoming,
+    };
+    sync.useDirectMessageSync.mockReturnValue(syncResult);
+    const props = {
+      clearAction: vi.fn(),
+      conversationId: CONVERSATION_ID,
+      currentUserId: "alice",
+      initialHasOlderMessages: false,
+      initialMessages: [] as DirectMessage[],
+      markReadAction: vi.fn().mockResolvedValue("updated"),
+      otherDisplayName: "Bob",
+      reportAction: vi.fn(),
+      sendAction,
+      sendStatus: "allowed" as const,
+    };
+    const view = render(<ChatWorkspace {...props} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "消息" }), {
+      target: { value: savedMessage.body },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+
+    await waitFor(() => expect(mergeIncoming).toHaveBeenCalledWith([savedMessage]));
+    expect(document.querySelector("[data-client-message-id]")).toBeNull();
+
+    syncResult.messages = [savedMessage];
+    view.rerender(<ChatWorkspace {...props} />);
+    view.rerender(<ChatWorkspace {...props} />);
+    expect(screen.getAllByText(savedMessage.body)).toHaveLength(1);
   });
 
   it("keeps history visible but disables sending for a removed friendship", () => {

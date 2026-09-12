@@ -3,7 +3,6 @@ import "server-only";
 import { getCurrentMember } from "@/features/auth/session";
 import {
   sendSupabaseConversationMessage,
-  type ConversationMessageRpcClient,
 } from "@/features/messages/supabase-conversation-message";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,9 +12,6 @@ export async function createProductionCourseOperations() {
   const supabase = await createClient();
   let memberPromise: ReturnType<typeof getCurrentMember> | undefined;
   const currentMember = () => memberPromise ??= getCurrentMember();
-  const messageClient = {
-    rpc: supabase.rpc.bind(supabase) as unknown as ConversationMessageRpcClient["rpc"],
-  };
 
   return createCourseOperations({
     getCurrentMember: currentMember,
@@ -95,7 +91,7 @@ export async function createProductionCourseOperations() {
     },
     sendMessage(conversationId, clientMessageId, body) {
       return sendSupabaseConversationMessage(
-        messageClient,
+        supabase,
         conversationId,
         clientMessageId,
         body,

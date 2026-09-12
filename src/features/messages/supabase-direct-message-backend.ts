@@ -4,10 +4,14 @@ import type {
 } from "./direct-message-service";
 import {
   sendSupabaseConversationMessage,
-  type ConversationMessageRpcClient,
 } from "./supabase-conversation-message";
 
-export type DirectMessageRpcClient = ConversationMessageRpcClient;
+export interface DirectMessageRpcClient {
+  rpc(
+    name: string,
+    arguments_: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: unknown }>;
+}
 
 function rows(data: unknown): Record<string, unknown>[] {
   return Array.isArray(data)

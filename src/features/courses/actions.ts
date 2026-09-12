@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { CourseMessageActionState } from "./course-action-state";
-import { isCourseId } from "./course-identifiers";
+import { isUuid } from "./course-identifiers";
 import { createProductionCourseOperations } from "./production-course-operations";
 
 export async function joinCourseAction(courseId: string) {
-  if (!isCourseId(courseId)) redirect("/dashboard?courseAction=invalid");
+  if (!isUuid(courseId)) redirect("/dashboard?courseAction=invalid");
   let result: Awaited<ReturnType<Awaited<ReturnType<typeof createProductionCourseOperations>>["joinCourse"]>>;
   try {
     const operations = await createProductionCourseOperations();
@@ -24,7 +24,7 @@ export async function joinCourseAction(courseId: string) {
 }
 
 export async function leaveCourseAction(courseId: string) {
-  if (!isCourseId(courseId)) redirect("/dashboard?courseAction=invalid");
+  if (!isUuid(courseId)) redirect("/dashboard?courseAction=invalid");
   let result: Awaited<ReturnType<Awaited<ReturnType<typeof createProductionCourseOperations>>["leaveCourse"]>>;
   try {
     const operations = await createProductionCourseOperations();
@@ -52,9 +52,9 @@ export async function sendCourseMessageAction(
     attemptedBody,
   };
   if (
-    !isCourseId(courseId) ||
-    !isCourseId(conversationId) ||
-    !isCourseId(clientMessageId)
+    !isUuid(courseId) ||
+    !isUuid(conversationId) ||
+    !isUuid(clientMessageId)
   ) {
     return {
       status: "invalid",

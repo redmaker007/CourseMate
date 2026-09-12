@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentMember } from "@/features/auth/session";
-import { isCourseId } from "@/features/courses/course-identifiers";
+import { isUuid } from "@/features/courses/course-identifiers";
 import {
   getCourseMessagesAfter,
   getCourseMessagesBefore,
@@ -28,7 +28,7 @@ export async function GET(
   }
 
   const { courseId } = await params;
-  if (!isCourseId(courseId)) {
+  if (!isUuid(courseId)) {
     return NextResponse.json({ error: "invalid_course" }, { status: 400 });
   }
   const result = rawBefore

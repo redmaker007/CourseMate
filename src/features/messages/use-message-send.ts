@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 
 type SendState<T> = {
   status: string;
@@ -31,34 +31,51 @@ export function useMessageSend<T, S extends SendState<T>>({
   onSaved(message: T): void;
   onStart(): void;
 }) {
-  const [attempt, setAttempt] = useState<MessageSendAttempt | null>(null);
+  const [attempts, setAttempts] = useState<MessageSendAttempt[]>([]);
   const [state, setState] = useState(initialState);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const formAction = useCallback((formData: FormData) => {
     const clientMessageId = String(
       formData.get("clientMessageId") || crypto.randomUUID(),
     );
     const body = String(formData.get("body") ?? "");
     formData.set("clientMessageId", clientMessageId);
-    setAttempt({ clientMessageId, body, status: "sending" });
+    setAttempts((current) => [
+      ...current.filter((attempt) => attempt.clientMessageId !== clientMessageId),
+      { clientMessageId, body, status: "sending" },
+    ]);
     onStart();
-    startTransition(async () => {
-      try {
-        const result = await action(state, formData);
+    setPending(true);
+    void action(state, formData)
+      .then((result) => {
         setState(result);
         if (result.status === "sent" && result.savedMessage) {
           onSaved(result.savedMessage);
-          setAttempt(null);
+          setAttempts((current) => current.filter(
+            (attempt) => attempt.clientMessageId !== clientMessageId,
+          ));
         } else {
-          setAttempt({ clientMessageId, body, status: "failed" });
+          setAttempts((current) => current.map((attempt) =>
+            attempt.clientMessageId === clientMessageId
+              ? { ...attempt, status: "failed" }
+              : attempt,
+          ));
         }
-      } catch {
-        setAttempt({ clientMessageId, body, status: "failed" });
-      }
-    });
+      })
+      .catch(() => {
+        setAttempts((current) => current.map((attempt) =>
+          attempt.clientMessageId === clientMessageId
+            ? { ...attempt, status: "failed" }
+            : attempt,
+        ));
+      })
+      .finally(() => setPending(false));
   }, [action, onSaved, onStart, state]);
 
-  const retry = useCallback(() => {
+  const retry = useCallback((clientMessageId: string) => {
+    const attempt = attempts.find(
+      (candidate) => candidate.clientMessageId === clientMessageId,
+    );
     if (!attempt || pending) return;
     const formData = new FormData();
     for (const [name, value] of Object.entries(fixedFields)) {
@@ -67,7 +84,7 @@ export function useMessageSend<T, S extends SendState<T>>({
     formData.set("clientMessageId", attempt.clientMessageId);
     formData.set("body", attempt.body);
     formAction(formData);
-  }, [attempt, fixedFields, formAction, pending]);
+  }, [attempts, fixedFields, formAction, pending]);
 
-  return { attempt, formAction, pending, retry, state };
+  return { attempts, formAction, pending, retry, state };
 }

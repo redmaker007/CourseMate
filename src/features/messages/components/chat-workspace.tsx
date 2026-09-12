@@ -74,7 +74,7 @@ export function ChatWorkspace({
     return result;
   };
   const {
-    attempt,
+    attempts,
     formAction: sendFormAction,
     pending: sending,
     retry,
@@ -95,9 +95,9 @@ export function ChatWorkspace({
   const latestMessageId = sync.messages.at(-1)?.id;
   const bodyLength = Array.from(body.trim()).length;
   const bodyInvalid = bodyLength < 1 || bodyLength > 4000;
-  const visibleAttempt = attempt && !sync.messages.some(
+  const visibleAttempts = attempts.filter((attempt) => !sync.messages.some(
     (message) => message.clientMessageId === attempt.clientMessageId,
-  ) ? attempt : null;
+  ));
 
   useEffect(() => {
     const markWhenVisible = () => {
@@ -180,7 +180,7 @@ export function ChatWorkspace({
               {sync.loadingOlder ? "加载中…" : "加载更早消息"}
             </button>
           ) : null}
-          {sync.messages.length === 0 && !visibleAttempt ? (
+          {sync.messages.length === 0 && visibleAttempts.length === 0 ? (
             <p className="py-12 text-center text-sm text-slate-500">
               清除位置之后还没有消息。
             </p>
@@ -219,17 +219,17 @@ export function ChatWorkspace({
                   </li>
                 );
               })}
-              {visibleAttempt ? (
-                <li className="flex justify-end" data-client-message-id={visibleAttempt.clientMessageId}>
+              {visibleAttempts.map((attempt) => (
+                <li className="flex justify-end" data-client-message-id={attempt.clientMessageId} key={attempt.clientMessageId}>
                   <article className="max-w-[85%] rounded-2xl bg-indigo-600 px-4 py-3 text-sm text-white opacity-75">
                     <p className="mb-1 text-xs text-indigo-100">
-                      我 · {visibleAttempt.status === "sending" ? "发送中" : "发送失败"}
+                      我 · {attempt.status === "sending" ? "发送中" : "发送失败"}
                     </p>
-                    <SafeMessageText text={visibleAttempt.body} />
-                    {visibleAttempt.status === "failed" ? (
+                    <SafeMessageText text={attempt.body} />
+                    {attempt.status === "failed" ? (
                       <button
                         className="mt-2 text-xs font-semibold text-white underline"
-                        onClick={retry}
+                        onClick={() => retry(attempt.clientMessageId)}
                         type="button"
                       >
                         重试
@@ -237,7 +237,7 @@ export function ChatWorkspace({
                     ) : null}
                   </article>
                 </li>
-              ) : null}
+              ))}
             </ol>
           )}
         </section>

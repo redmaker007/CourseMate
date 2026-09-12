@@ -289,6 +289,8 @@ describe("CourseChat", () => {
     expect(document.querySelector(
       "[data-client-message-id]",
     )).toBeNull();
+    await act(async () => insertCallback?.());
+    expect(screen.getAllByText("hello")).toHaveLength(1);
   });
 
   it("renders archived history without a send form", () => {

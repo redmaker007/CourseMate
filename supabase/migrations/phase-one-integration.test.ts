@@ -320,6 +320,42 @@ describe("phase-one full-chain integration", () => {
     expect(forgedMember.ok).toBe(false);
     expect(memberCreatedCourse.ok).toBe(false);
 
+    await asUser(
+      BOB,
+      `delete from public.course_members where course_id = '${wisconsin.id}'`,
+    );
+    const sameSchoolNonMemberSend = await asUser(
+      BOB,
+      `select result_status from public.send_conversation_message(
+        '${wisconsin.conversation_id}', 'forged', gen_random_uuid()
+      )`,
+    );
+    expect(sameSchoolNonMemberSend.ok && sameSchoolNonMemberSend.rows).toEqual([
+      { result_status: "not_available" },
+    ]);
+    await asUser(
+      BOB,
+      `insert into public.course_members (course_id) values ('${wisconsin.id}')`,
+    );
+
+    await database.query(
+      `update public.conversations set archived_at = now()
+       where id = '${wisconsin.conversation_id}'`,
+    );
+    const archivedCourseSend = await asUser(
+      ALICE,
+      `select result_status from public.send_conversation_message(
+        '${wisconsin.conversation_id}', 'forged', gen_random_uuid()
+      )`,
+    );
+    expect(archivedCourseSend.ok && archivedCourseSend.rows).toEqual([
+      { result_status: "not_available" },
+    ]);
+    await database.query(
+      `update public.conversations set archived_at = null
+       where id = '${wisconsin.conversation_id}'`,
+    );
+
     for (const [memberId, courseId] of [
       [ALICE, wisconsin.id],
       [BOB, wisconsin.id],
@@ -548,6 +584,15 @@ describe("phase-one full-chain integration", () => {
       `select public.remove_friend('${BOB}') as status`,
     );
     expect(removed.ok && removed.rows).toEqual([{ status: "removed" }]);
+    const removedFriendSend = await asUser(
+      ALICE,
+      `select result_status from public.send_conversation_message(
+        '${conversationId}', 'forged', gen_random_uuid()
+      )`,
+    );
+    expect(removedFriendSend.ok && removedFriendSend.rows).toEqual([
+      { result_status: "not_allowed" },
+    ]);
     const requestedAgain = await asUser(
       ALICE,
       `select * from public.send_friend_request('${BOB}', 'welcome back')`,

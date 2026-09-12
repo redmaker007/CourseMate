@@ -46,7 +46,7 @@ export function CourseChat({
   );
   const onStart = useCallback(() => formRef.current?.reset(), []);
   const {
-    attempt,
+    attempts,
     formAction,
     pending,
     retry,
@@ -58,9 +58,9 @@ export function CourseChat({
     onSaved,
     onStart,
   });
-  const visibleAttempt = attempt && !messages.some(
+  const visibleAttempts = attempts.filter((attempt) => !messages.some(
     (message) => message.clientMessageId === attempt.clientMessageId,
-  ) ? attempt : null;
+  ));
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -76,7 +76,7 @@ export function CourseChat({
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-          {messages.length + (visibleAttempt ? 1 : 0)} 条
+          {messages.length + visibleAttempts.length} 条
         </span>
       </div>
 
@@ -92,7 +92,7 @@ export function CourseChat({
       ) : null}
 
       <ol className="max-h-[32rem] space-y-3 overflow-y-auto rounded-2xl bg-slate-50 p-4">
-        {messages.length || visibleAttempt ? (
+        {messages.length || visibleAttempts.length ? (
           <>
           {messages.map((message) => {
             const own = message.senderId === currentUserId;
@@ -113,25 +113,25 @@ export function CourseChat({
               </li>
             );
           })}
-          {visibleAttempt ? (
-            <li className="ml-auto max-w-[85%]" data-client-message-id={visibleAttempt.clientMessageId}>
+          {visibleAttempts.map((attempt) => (
+            <li className="ml-auto max-w-[85%]" data-client-message-id={attempt.clientMessageId} key={attempt.clientMessageId}>
               <p className="mb-1 text-xs text-slate-500">
-                我 · {visibleAttempt.status === "sending" ? "发送中" : "发送失败"}
+                我 · {attempt.status === "sending" ? "发送中" : "发送失败"}
               </p>
               <p className="whitespace-pre-wrap break-words rounded-2xl bg-indigo-600 px-4 py-3 text-sm text-white opacity-75">
-                {visibleAttempt.body}
+                {attempt.body}
               </p>
-              {visibleAttempt.status === "failed" ? (
+              {attempt.status === "failed" ? (
                 <button
                   className="mt-1 text-xs font-semibold text-rose-700 underline"
-                  onClick={retry}
+                  onClick={() => retry(attempt.clientMessageId)}
                   type="button"
                 >
                   重试
                 </button>
               ) : null}
             </li>
-          ) : null}
+          ))}
           </>
         ) : (
           <li className="py-10 text-center text-sm text-slate-500">还没有消息。</li>

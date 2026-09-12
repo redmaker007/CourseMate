@@ -23,7 +23,14 @@ export type ConversationMessageSendResult =
 type RpcResult = { data: unknown; error: unknown };
 
 export interface ConversationMessageRpcClient {
-  rpc(name: string, arguments_: Record<string, unknown>): Promise<RpcResult>;
+  rpc(
+    name: "send_conversation_message",
+    arguments_: {
+      target_conversation_id: string;
+      client_message_id: string;
+      message_body: string;
+    },
+  ): PromiseLike<RpcResult>;
 }
 
 export async function sendSupabaseConversationMessage(
