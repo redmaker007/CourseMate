@@ -26,6 +26,7 @@ vi.mock("../actions", () => ({
 }));
 
 import { sendCourseMessageAction } from "../actions";
+import type { CourseMessageActionState } from "../course-action-state";
 import { CourseChat } from "./course-chat";
 
 const COURSE_ID = "13000000-0000-4000-8000-000000000001";
@@ -246,8 +247,9 @@ describe("CourseChat", () => {
   });
 
   it("hides the pending copy when Realtime returns the saved message first", async () => {
+    let finish!: (state: CourseMessageActionState) => void;
     vi.mocked(sendCourseMessageAction).mockImplementation(
-      () => new Promise(() => undefined),
+      () => new Promise((resolve) => { finish = resolve; }),
     );
     render(
       <CourseChat
@@ -290,6 +292,21 @@ describe("CourseChat", () => {
       "[data-client-message-id]",
     )).toBeNull();
     await act(async () => insertCallback?.());
+    expect(screen.getAllByText("hello")).toHaveLength(1);
+    await act(async () => finish({
+      status: "sent",
+      message: "消息已发送。",
+      clientMessageId: generatedId,
+      attemptedBody: "hello",
+      savedMessage: {
+        id: "2",
+        clientMessageId: generatedId,
+        senderId: "member-1",
+        senderName: "Alice",
+        body: "hello",
+        createdAt: "2026-09-12T00:00:00Z",
+      },
+    }));
     expect(screen.getAllByText("hello")).toHaveLength(1);
   });
 
