@@ -166,16 +166,14 @@ describe("phase-one full-chain integration", () => {
     const courses = await database.query<{
       id: string;
       school_id: string;
-      conversation_id: string;
     }>(`
-      select course.id::text, course.school_id, link.conversation_id::text
+      select course.id::text, course.school_id
       from public.courses course
-      join public.course_conversations link on link.course_id = course.id
       where course.code_normalized = 'TEST00'
       order by course.school_id
     `);
-    const michigan = courses.rows[0];
-    const wisconsin = courses.rows[1];
+    const michigan = courses.rows[0] as { id: string; school_id: string; conversation_id: string };
+    const wisconsin = courses.rows[1] as { id: string; school_id: string; conversation_id: string };
 
     for (const [memberId, courseId] of [
       [ALICE, wisconsin.id],
@@ -189,6 +187,20 @@ describe("phase-one full-chain integration", () => {
       );
       expect(joined.ok, JSON.stringify(joined)).toBe(true);
     }
+
+    const conversations = await database.query<{
+      course_id: string;
+      conversation_id: string;
+    }>(`
+      select link.course_id::text, link.conversation_id::text
+      from public.course_conversations link
+      where link.course_id in ('${michigan.id}', '${wisconsin.id}')
+    `);
+    const conversationByCourse = new Map(
+      conversations.rows.map((row) => [row.course_id, row.conversation_id]),
+    );
+    wisconsin.conversation_id = conversationByCourse.get(wisconsin.id)!;
+    michigan.conversation_id = conversationByCourse.get(michigan.id)!;
 
     const wisconsinMessage = await asUser(
       ALICE,

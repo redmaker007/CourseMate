@@ -17,7 +17,7 @@
 |---|---|---|
 | OTP、登录、退出、学校准入 | [认证规格](specs/auth-email-otp.md)、[ADR-0001](adr/0001-separate-member-account-from-profile.md)；实测验收看 Issue #7 | `src/features/auth/`；`src/lib/supabase/`；`src/proxy.ts` |
 | 资料保存、首次登录卡住 | [ADR-0004](adr/0004-require-profile-onboarding-for-app-access.md)；权限事故见[课程整合交接](handoffs/course-catalog-integration.md)“新成员卡在 onboarding” | `src/features/profile/`；`src/app/onboarding/profile/` |
-| 搜课、加退课、课程消息 | [统一会话交接](handoffs/unified-conversation-core.md)；课程来源见[录入课程](runbooks/seed-courses.md) | `src/features/courses/`；`src/app/dashboard/`；`src/app/courses/`；`src/app/api/courses/` |
+| 搜课、加退课、课程消息 | [ADR-0007](adr/0007-lazy-course-conversation-creation.md)、[统一会话交接](handoffs/unified-conversation-core.md)；课程来源见[录入课程](runbooks/seed-courses.md) | `src/features/courses/`；`src/app/dashboard/`；`src/app/courses/`；`src/app/api/courses/` |
 | 好友、拉黑、私聊与可靠发送 | [好友页面](handoffs/friend-pages.md)、[第一阶段联调](handoffs/phase-one-integration.md)、[可靠发送验收](testing/issue-23-message-send.md) | `src/features/friends/`；`src/features/messages/`；`src/app/messages/` |
 | 举报、证据与私聊清理 | [举报交接](handoffs/behavior-reporting.md)、[清理交接](handoffs/direct-message-cleanup.md) | `src/features/reporting/`；`scripts/direct-message-cleanup.mjs`；`supabase/migrations/` |
 | 管理身份、学校、学期、录课 | [ADR-0005](adr/0005-platform-roles-and-admin-functions.md)、[管理手册](runbooks/platform-admin.md) | `src/features/admin/`；`src/app/admin/`；`supabase/migrations/202609100006_platform_admin.sql` |

@@ -125,17 +125,25 @@ insert into public.course_catalog (school_id, code, subject, number, title) valu
 
 - **`code_normalized` 不能出现在插入语句里**，它是生成列，手填直接报错
 - `subject` 与 `number` 是必填的，要与 `code` 对应（`EECS 280` → `EECS` / `280`）
-- 物化出的每门课都会自动建一个课程会话，是预期行为
+- 物化出的课不会自动建课程会话；会话在第一个学生加入这门课时才惰性建出（见 [ADR-0007](../adr/0007-lazy-course-conversation-creation.md)），物化本身只负责把目录变成可加入的 `courses` 行
 - 物化建出的课 `created_by` 为 NULL，不属于任何学生
 
 数据库会拦住：学期格式不对、`school_id` 不存在、重复录入。**拦不住**：课名写成乱码、课号张冠李戴——只能靠人核对。
 
-物化后验证课程数与课程会话数应当相等：
+物化后验证课程会话的不变式——只可能是「有会话的课都至少有一名学生」，课程会话数不应超过课程数（大部分课通常还没人加入，数量会明显更少）：
 
 ```sql
-select (select count(*) from public.courses) as 课程数,
-       (select count(*) from public.course_conversations) as 课程会话数;
+select
+  (select count(*) from public.courses) as 课程数,
+  (select count(*) from public.course_conversations) as 课程会话数,
+  (select count(*) from public.course_conversations cc
+     where not exists (
+       select 1 from public.conversation_members cm
+       where cm.conversation_id = cc.conversation_id
+     )) as 异常_没有成员却有会话的数量;
 ```
+
+最后一列应当恒为 0。
 
 ---
 

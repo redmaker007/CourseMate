@@ -419,6 +419,14 @@ describe("学期切换", () => {
       { materialized_term: "2026-fall", created_count: 1, existing_count: 0, invalid_count: 0 },
     ]);
 
+    // 惰性模型下物化出来的课还没有会话；MEMBER 加入后才有，才能验证下面的归档
+    expect(await conversationArchivedAt("uw-madison", "ACCT I S 100", "2026-fall")).toEqual([]);
+    const oldCourse = await database.query<{ id: string }>(
+      `select id::text from public.courses
+       where school_id = 'uw-madison' and code = 'ACCT I S 100' and term = '2026-fall'`,
+    );
+    await rows(MEMBER, `insert into public.course_members (course_id) values ('${oldCourse.rows[0].id}')`);
+
     expect(
       await rows(ADMIN, "select * from public.admin_set_current_term('uw-madison', ' 2027-Spring ')"),
     ).toEqual([
@@ -426,9 +434,9 @@ describe("学期切换", () => {
     ]);
 
     const [oldConversation] = await conversationArchivedAt("uw-madison", "ACCT I S 100", "2026-fall");
-    const [newConversation] = await conversationArchivedAt("uw-madison", "ACCT I S 100", "2027-spring");
     expect(oldConversation.archived_at).not.toBeNull();
-    expect(newConversation.archived_at).toBeNull();
+    // 新学期物化出的课还没人加入，惰性模型下没有会话——这本身就是预期行为
+    expect(await conversationArchivedAt("uw-madison", "ACCT I S 100", "2027-spring")).toEqual([]);
 
     expect(await latestAudit()).toMatchObject({
       actor_id: ADMIN,
@@ -522,7 +530,7 @@ describe("课程录入", () => {
     ).toBe("这所学校还没有设置当前学期，请先设置。");
   });
 
-  it("单门课：新课进目录并建出当前学期课程和会话；再次保存会同步改名", async () => {
+  it("单门课：新课进目录并建出当前学期课程；会话要等学生加入才出现", async () => {
     expect(
       await rows(ADMIN, "select public.admin_save_catalog_course('umich', ' eecs  370 ', 'Intro to Computer Organization') as outcome"),
     ).toEqual([{ outcome: "created" }]);
@@ -534,6 +542,15 @@ describe("课程录入", () => {
     expect(catalog.rows).toEqual([
       { code: "EECS 370", subject: "EECS", number: "370", title: "Intro to Computer Organization" },
     ]);
+
+    // 建课本身不再自动建会话
+    expect(await conversationArchivedAt("umich", "EECS 370", "2026-fall")).toEqual([]);
+
+    // ADMIN 本身也是 umich 已完成 onboarding 的成员，加入后才惰性建出会话
+    const course = await database.query<{ id: string }>(
+      `select id::text from public.courses where school_id = 'umich' and code = 'EECS 370' and term = '2026-fall'`,
+    );
+    await rows(ADMIN, `insert into public.course_members (course_id) values ('${course.rows[0].id}')`);
     expect(await conversationArchivedAt("umich", "EECS 370", "2026-fall")).toEqual([
       { archived_at: null },
     ]);
@@ -541,11 +558,11 @@ describe("课程录入", () => {
     expect(
       await rows(ADMIN, "select public.admin_save_catalog_course('umich', 'EECS 370', 'Computer Organization') as outcome"),
     ).toEqual([{ outcome: "updated" }]);
-    const course = await database.query(
+    const renamed = await database.query(
       `select title from public.courses
        where school_id = 'umich' and code = 'EECS 370' and term = '2026-fall'`,
     );
-    expect(course.rows).toEqual([{ title: "Computer Organization" }]);
+    expect(renamed.rows).toEqual([{ title: "Computer Organization" }]);
     expect(await catalogTitle("umich", "EECS 370")).toBe("Computer Organization");
   });
 

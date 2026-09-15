@@ -155,19 +155,24 @@ beforeAll(async () => {
       ('umich', 'EECS 280', 'Programming and Data Structures', '2026-fall');
   `);
 
-  const [course] = await superuser<{ id: string; conversation_id: string }>(`
-    select courses.id::text, links.conversation_id::text
+  const [course] = await superuser<{ id: string }>(`
+    select courses.id::text
     from public.courses courses
-    join public.course_conversations links on links.course_id = courses.id
     where courses.code = 'COMP SCI 400'
   `);
   uwCourse = course.id;
-  uwConversation = course.conversation_id;
 
-  // UW 学生照常加入自己学校的课
+  // UW 学生照常加入自己学校的课——这一步现在也是该课程会话第一次被创建的时机
   await database.exec(
     `insert into public.course_members (course_id, user_id) values ('${uwCourse}', '${UW_STUDENT}')`,
   );
+
+  const [conversation] = await superuser<{ conversation_id: string }>(`
+    select links.conversation_id::text
+    from public.course_conversations links
+    where links.course_id = '${uwCourse}'
+  `);
+  uwConversation = conversation.conversation_id;
 });
 
 afterAll(async () => {
