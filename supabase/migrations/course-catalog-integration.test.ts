@@ -33,7 +33,10 @@ const MIGRATIONS = [
 const HARDENING = "202609100005_harden_function_execute_grants.sql";
 
 /** 硬化之后新增的 migration。放进链路，下面的函数执行权枚举检查才覆盖得到它们。 */
-const AFTER_HARDENING = ["202609100006_platform_admin.sql"] as const;
+const AFTER_HARDENING = [
+  "202609100006_platform_admin.sql",
+  "202609140001_lazy_course_conversation_creation.sql",
+] as const;
 
 /** 唯一允许未登录用户执行的函数：登录页在登录前就要用它判断邮箱属于哪所学校。 */
 const ANON_ALLOWED_FUNCTIONS = ["enabled_school_id_for_email_domain"];
@@ -372,14 +375,12 @@ describe("物化目录为可加入的课程", () => {
     });
   });
 
-  it("物化出的课自动配好未归档的课程会话", async () => {
+  it("物化出的课不会自动建课程会话", async () => {
     const course = await courseId("ACCT I S 100", "2026-fall");
-    expect(await conversationArchivedAt(course!)).toEqual({
-      archived_at: null,
-    });
+    expect(await conversationArchivedAt(course!)).toBeUndefined();
   });
 
-  it("学生能加入物化出的课，并自动成为会话成员", async () => {
+  it("学生能加入物化出的课，加入时才惰性建出未归档的会话，并自动成为会话成员", async () => {
     const course = await courseId("ACCT I S 100", "2026-fall");
     const joined = await asUser(
       ALICE,
@@ -387,6 +388,8 @@ describe("物化目录为可加入的课程", () => {
        returning course_id`,
     );
     expect(joined.ok).toBe(true);
+
+    expect(await conversationArchivedAt(course!)).toEqual({ archived_at: null });
 
     const membership = await database.query<{ n: number }>(
       `select count(*)::int as n
@@ -432,9 +435,8 @@ describe("学期切换", () => {
 
     const newCourse = await courseId("ACCT I S 100", "2027-spring");
     expect(newCourse).toBeTruthy();
-    expect(await conversationArchivedAt(newCourse!)).toEqual({
-      archived_at: null,
-    });
+    // 新学期物化出的课还没人加入，惰性模型下没有会话——这本身就是预期行为
+    expect(await conversationArchivedAt(newCourse!)).toBeUndefined();
 
     const history = await database.query<{ n: number }>(
       `select count(*)::int as n from public.course_members

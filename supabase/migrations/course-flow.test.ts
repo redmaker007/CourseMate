@@ -46,6 +46,13 @@ async function asUser(userId: string, sql: string): Promise<Attempt> {
   }
 }
 
+async function hasCourseConversation(courseId: string) {
+  const result = await database.query<{ n: number }>(
+    `select count(*)::int as n from public.course_conversations where course_id = '${courseId}'`,
+  );
+  return result.rows[0].n > 0;
+}
+
 beforeAll(async () => {
   database = new PGlite();
   await database.exec(`
@@ -68,6 +75,7 @@ beforeAll(async () => {
       grant all on tables to anon, authenticated, service_role;
   `);
   for (const migration of MIGRATIONS) await applyMigration(migration);
+  await applyMigration("202609140001_lazy_course_conversation_creation.sql");
 
   await database.exec(`
     insert into public.schools (id, name_zh, name_en, enabled)
@@ -146,6 +154,8 @@ describe("课程目录准入", () => {
     const michiganCourse = await database.query<{ id: string }>(
       "select id::text from public.courses where school_id = 'umich' and code = 'TEST00'",
     );
+
+    expect(await hasCourseConversation(madisonCourse.rows[0].id)).toBe(false);
 
     const joined = await asUser(
       ALICE,
@@ -246,13 +256,14 @@ describe("课程目录准入", () => {
   });
 
   it("runs the Michigan join, chat, member-list, isolation, and leave flow", async () => {
-    const course = await database.query<{ id: string; conversation_id: string }>(`
-      select courses.id::text, links.conversation_id::text
+    const course = await database.query<{ id: string }>(`
+      select courses.id::text
       from public.courses courses
-      join public.course_conversations links on links.course_id = courses.id
       where courses.school_id = 'umich' and courses.code = 'TEST00'
     `);
-    const { id: courseId, conversation_id: conversationId } = course.rows[0];
+    const { id: courseId } = course.rows[0];
+
+    expect(await hasCourseConversation(courseId)).toBe(false);
 
     expect(
       (await asUser(
@@ -260,6 +271,14 @@ describe("课程目录准入", () => {
         `insert into public.course_members (course_id) values ('${courseId}')`,
       )).ok,
     ).toBe(true);
+
+    const conversation = await database.query<{ conversation_id: string }>(`
+      select links.conversation_id::text
+      from public.course_conversations links
+      where links.course_id = '${courseId}'
+    `);
+    const { conversation_id: conversationId } = conversation.rows[0];
+
     expect(
       (await asUser(
         CAROL,
@@ -311,19 +330,51 @@ describe("课程目录准入", () => {
         ('uw-madison', 'OLD 100', 'Imported archive', '2026-fall');
     `);
 
-    const states = await database.query<{ code: string; archived: boolean }>(`
-      select courses.code, conversations.archived_at is not null as archived
-      from public.courses courses
-      join public.course_conversations links on links.course_id = courses.id
-      join public.conversations conversations on conversations.id = links.conversation_id
-      where courses.school_id = 'uw-madison'
-        and courses.code in ('TEST00', 'NEW 100', 'OLD 100')
-      order by courses.code
-    `);
-    expect(states.rows).toEqual([
-      { code: "NEW 100", archived: false },
-      { code: "OLD 100", archived: true },
-      { code: "TEST00", archived: true },
-    ]);
+    const newCourse = await database.query<{ id: string }>(
+      `select id::text from public.courses where school_id = 'uw-madison' and code = 'NEW 100'`,
+    );
+    const oldCourse = await database.query<{ id: string }>(
+      `select id::text from public.courses where school_id = 'uw-madison' and code = 'OLD 100'`,
+    );
+
+    // 惰性建会话：刚插入、还没人加入的新课不会有课程会话，不管是不是当前学期
+    expect(await hasCourseConversation(newCourse.rows[0].id)).toBe(false);
+    expect(await hasCourseConversation(oldCourse.rows[0].id)).toBe(false);
+
+    // TEST00（Madison）在之前的测试里已经有 ALICE 加入过，学期切换后应变为归档
+    const testCourse = await database.query<{ id: string }>(
+      `select id::text from public.courses where school_id = 'uw-madison' and code = 'TEST00'`,
+    );
+    expect(
+      (await database.query<{ archived: boolean }>(`
+        select conversations.archived_at is not null as archived
+        from public.course_conversations links
+        join public.conversations conversations on conversations.id = links.conversation_id
+        where links.course_id = '${testCourse.rows[0].id}'
+      `)).rows,
+    ).toEqual([{ archived: true }]);
+
+    // 学期切换之后才第一次加入的课，惰性建出的会话应当直接是未归档的——因为
+    // course_members_insert_self 已经把"能加入"限定为当前学期课，不需要复刻旧的
+    // 按学期比较逻辑
+    expect(
+      (await asUser(
+        ALICE,
+        `insert into public.course_members (course_id) values ('${newCourse.rows[0].id}')`,
+      )).ok,
+    ).toBe(true);
+    expect(
+      (await database.query<{ archived: boolean }>(`
+        select conversations.archived_at is not null as archived
+        from public.course_conversations links
+        join public.conversations conversations on conversations.id = links.conversation_id
+        where links.course_id = '${newCourse.rows[0].id}'
+      `)).rows,
+    ).toEqual([{ archived: false }]);
+
+    // OLD 100 已经不是当前学期，RLS 会拒绝任何学生加入——在新模型下它永远不会
+    // 产生会话，这是额外的好处：连"建出来但注定加入不了、只能一直挂着的会话"
+    // 也不会再出现
+    expect(await hasCourseConversation(oldCourse.rows[0].id)).toBe(false);
   });
 });

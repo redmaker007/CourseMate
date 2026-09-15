@@ -141,6 +141,7 @@ beforeAll(async () => {
   `);
 
   await applyMigration(database, "202609100001_unified_conversation_core.sql");
+  await applyMigration(database, "202609140001_lazy_course_conversation_creation.sql");
 });
 
 afterAll(async () => {
@@ -440,7 +441,7 @@ describe("统一会话 RLS", () => {
 });
 
 describe("统一会话生命周期", () => {
-  it("建课、加课和退课只维护统一会话模型", async () => {
+  it("建课不会自动建会话；第一个学生加入时才惰性建，第二个学生直接复用", async () => {
     const created = await asRole(
       "authenticated",
       `insert into public.courses (school_id, code, title, term)
@@ -451,6 +452,21 @@ describe("统一会话生命周期", () => {
     expect(created.ok).toBe(true);
     const newCourseId = (created as { ok: true; rows: { id: string }[] }).rows[0].id;
 
+    const beforeJoin = await database.query(
+      `select c.id::text
+       from public.conversations c
+       join public.course_conversations cc on cc.conversation_id = c.id
+       where cc.course_id = '${newCourseId}'`,
+    );
+    expect(beforeJoin.rows).toHaveLength(0);
+
+    const joined = await asRole(
+      "authenticated",
+      `insert into public.course_members (course_id) values ('${newCourseId}')`,
+      BOB,
+    );
+    expect(joined.ok).toBe(true);
+
     const conversation = await database.query<{ id: string }>(
       `select c.id::text
        from public.conversations c
@@ -458,14 +474,6 @@ describe("统一会话生命周期", () => {
        where cc.course_id = '${newCourseId}' and c.kind = 'course'`,
     );
     expect(conversation.rows).toHaveLength(1);
-
-    const joined = await asRole(
-      "authenticated",
-      `insert into public.course_members (course_id)
-       values ('${newCourseId}')`,
-      BOB,
-    );
-    expect(joined.ok).toBe(true);
     expect(
       (
         await database.query(
@@ -475,9 +483,24 @@ describe("统一会话生命周期", () => {
       ).rows,
     ).toHaveLength(1);
 
+    // 第二个学生（DAVE，beforeAll 里已经建好 profile，同校）直接复用同一个会话
+    const secondJoined = await asRole(
+      "authenticated",
+      `insert into public.course_members (course_id) values ('${newCourseId}')`,
+      DAVE,
+    );
+    expect(secondJoined.ok).toBe(true);
+    expect(
+      (
+        await database.query(
+          `select count(*)::int as n from public.course_conversations where course_id = '${newCourseId}'`,
+        )
+      ).rows,
+    ).toEqual([{ n: 1 }]);
+
     const left = await asRole(
       "authenticated",
-      `delete from public.course_members where course_id = '${newCourseId}'`,
+      `delete from public.course_members where course_id = '${newCourseId}' and user_id = '${BOB}'`,
       BOB,
     );
     expect(left.ok).toBe(true);
@@ -488,7 +511,7 @@ describe("统一会话生命周期", () => {
            where conversation_id = '${conversation.rows[0].id}'`,
         )
       ).rows,
-    ).toHaveLength(0);
+    ).toEqual([{ user_id: DAVE }]);
 
     const legacyTables = await database.query<{ table_name: string }>(
       `select table_name from information_schema.tables
