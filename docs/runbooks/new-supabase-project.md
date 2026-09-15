@@ -10,19 +10,20 @@
 
 把 `supabase/migrations/` 下的 SQL 按文件名顺序贴进后台 SQL Editor 执行，**一次一个文件**。不需要 Docker，也不需要 CLI。
 
-⚠️ **SQL Editor 不会把一个文件当作一个事务执行。** 2026-09-10 应用统一会话 migration 时实测：
+⚠️ **Studio 网页版 SQL Editor 不会把粘贴的文件当作一个事务执行。** 2026-09-10 应用统一会话 migration 时实测：
 
 - 文件里的 `begin; … commit;` 不起作用，每条语句各自提交
 - **遇到错误不会停**，报错之后的语句照样执行，最后只报告一个错误
 - 跨语句使用的临时表（`create temp table … on commit drop`）一建完就消失
 
-所以「中途失败会整体回滚」在 SQL Editor 里不成立，「校验失败就中止」这种防护也拦不住后面的破坏性语句——那次校验块报错了，但它身后删旧表的语句照样执行了。执行后**只要看到任何报错，先别跑下一个文件**，把线上当前状态查清楚再说。
+所以「中途失败会整体回滚」在 Studio 网页版 SQL Editor 里不成立，「校验失败就中止」这种防护也拦不住后面的破坏性语句——那次校验块报错了，但它身后删旧表的语句照样执行了。执行后**只要看到任何报错，先别跑下一个文件**，把线上当前状态查清楚再说。
+
+**这是 Studio 网页版 SQL Editor 这个工具的行为，不是 PostgreSQL 本身的行为。** 2026-09-12 生产迁移时用 `supabase db query --linked` 直连执行过对照实验：同样带 `begin/commit` 的多语句脚本，故意让中间一条语句失败，整个事务确认回滚（失败前建的表也不存在）；执行角色是 `postgres`，与迁移历史表记录的一致（见[发布记录](../handoffs/release-20260912.md)）。也就是说 PostgreSQL 的事务、`begin/commit`、临时表在直连场景下都正常工作，只是网页版 SQL Editor 不会真的把整段粘贴内容包进一个事务。
 
 写新 migration 时：
 
-- 不要跨语句使用临时表
-- 不要依赖「前面的校验失败会阻止后面的删除」
-- 需要真正原子执行时，改用直连数据库的方式（`psql --single-transaction`，或 `supabase db push`）。注意线上的迁移记录表目前是空的——之前的 migration 都是手工贴进 SQL Editor 的——直接 `db push` 会从第一个文件重跑，需要先用 `supabase migration repair` 标记已应用的版本
+- 贴进 Studio 网页版 SQL Editor 执行的文件里不要跨语句使用临时表，也不要依赖「前面的校验失败会阻止后面的删除」
+- 需要真正原子执行时，改用直连数据库的方式（`psql --single-transaction`，`supabase db query --linked`，或 `supabase db push`）——这些路径下 `begin/commit` 按 PostgreSQL 正常语义整体生效。注意线上的迁移记录表目前是空的——之前的 migration 都是手工贴进 SQL Editor 的——直接 `db push` 会从第一个文件重跑，需要先用 `supabase migration repair` 标记已应用的版本
 
 ### 收回函数执行权要写全
 

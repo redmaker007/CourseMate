@@ -1164,6 +1164,10 @@ export type Database = {
       }
       current_platform_role: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
+      direct_message_clear_position: {
+        Args: { target_conversation_id: string }
+        Returns: number
+      }
       effective_member_school_id: {
         Args: { target_user: string }
         Returns: string

@@ -87,6 +87,22 @@ SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/import-course-catalog.mts \
 
 ---
 
+## 没有 xlsx、或数据已经是逐行 SQL 形式：直连兜底导入
+
+`scripts/import-course-catalog.mts --apply` 是数据不多的场合外唯一支持的批量导入方式；下面这条路径**只留给它用不了的场合**——没有装 Node/没有检出仓库、还没有任何管理员、或者数据已经是别处生成好的逐行 SQL（例如把 xlsx 转成了 `INSERT INTO course_catalog VALUES (...)` 这种形式）。它写的是同一张 `public.course_catalog`，不是第二套导入系统。
+
+用 [`supabase/templates/course-catalog-import.sql`](../../supabase/templates/course-catalog-import.sql)：把模板里的示例行换成实际数据、把学校 id 换成实际值，然后**直连执行**——`supabase db query --linked --file ...` 或 `psql "$DATABASE_URL" -f ...`。
+
+⚠️ **不要把整份文件贴进 Studio 网页版 SQL Editor 执行。** 模板靠 `begin/commit` 保证整批要么全写入要么全不写入，但网页版 SQL Editor 不会把粘贴内容当一个事务执行——每条语句各自提交，出错也不停（原因和证据见 [新建 Supabase 项目](./new-supabase-project.md)）。这也是之前一次批量导入在 SQL Editor 里报「建了个叫 `the` 的表、未开 RLS」假警告的场景：那次贴的其实是纯 `INSERT`，没有任何 `CREATE TABLE`，Studio 的检测只是把课程简介英文原文里出现的 "…into the…" 误判成了 `SELECT INTO 新表`；只要模板本身没有 DDL，这类误报可以确认和实际权限无关，不需要为了让扫描器满意去改课程原文或关掉保护。
+
+这条路径和 `/admin` 页面共享同一张目标表和同一个物化函数，因此：
+
+- 冲突键固定是 `(school_id, code_normalized)`，`code_normalized` 是生成列，不能出现在插入列表里
+- 不创建表、不建索引、不改列、不关闭或修改任何 RLS 与权限
+- 写完目录后模板会自己调用 `materialize_catalog_courses()`，不需要另外手工物化
+
+---
+
 ## 每学期切换
 
 **用管理页「学校与学期」切换，一步完成**：改学期、归档旧课程群、物化新学期课程。以下是没有管理页时的手工做法。
