@@ -26,7 +26,7 @@
 
 在 SQL Editor 里执行 `supabase/migrations/202609100006_platform_admin.sql`。
 
-SQL Editor 不按事务执行（见 [新建 Supabase 项目](./new-supabase-project.md)），执行后跑一遍下面的检查。应当返回 **14 行，两列全部为 `true`**：
+Studio 网页版 SQL Editor 不按事务执行这个文件（工具本身的行为，不是 PostgreSQL 的限制，见 [新建 Supabase 项目](./new-supabase-project.md)），执行后跑一遍下面的检查。应当返回 **14 行，两列全部为 `true`**：
 
 ```sql
 select p.proname,

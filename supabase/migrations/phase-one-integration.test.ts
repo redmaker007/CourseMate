@@ -162,6 +162,72 @@ describe("phase-one full-chain integration", () => {
     ]);
   });
 
+  it("每张 public 业务表都开了 RLS，触发器函数和 messages 写权限都收紧了", async () => {
+    // 202609150001 之前，friend_rate_limit_* 两张表在线上手工开了 RLS，
+    // 但迁移文件没有声明——本地/PGlite 从零建库会漏掉。这条断言确保"每张表都开
+    // RLS"这个约束由测试保证，而不是靠人记得，新表忘了开也会在这里挂掉。
+    const tablesWithoutRls = await database.query<{ relname: string }>(`
+      select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+      order by c.relname
+    `);
+    expect(tablesWithoutRls.rows).toEqual([]);
+
+    // 触发器函数不会被 PostgREST 暴露成 RPC，之前的迁移特意跳过了它们的
+    // EXECUTE 收权；202609150001 重新评估后收回了，这里确认收回真的生效。
+    const triggerFunctionsStillPublic = await database.query<{
+      proname: string;
+    }>(`
+      select procedure.proname
+      from pg_proc procedure
+      join pg_namespace namespace on namespace.oid = procedure.pronamespace
+      where namespace.nspname = 'public'
+        and procedure.prorettype = 'trigger'::regtype
+        and (
+          has_function_privilege('anon', procedure.oid, 'execute')
+          or has_function_privilege('authenticated', procedure.oid, 'execute')
+        )
+      order by procedure.proname
+    `);
+    expect(triggerFunctionsStillPublic.rows).toEqual([]);
+
+    // messages 只应该保留 authenticated 的 select；insert/update/delete 一律
+    // 必须走 send_conversation_message / send_direct_message。
+    const messagePrivileges = await database.query<{
+      grantee: string;
+      privilege_type: string;
+    }>(`
+      select grantee, privilege_type
+      from information_schema.table_privileges
+      where table_schema = 'public' and table_name = 'messages'
+        and grantee in ('anon', 'authenticated')
+      order by grantee, privilege_type
+    `);
+    expect(messagePrivileges.rows).toEqual([
+      { grantee: "authenticated", privilege_type: "SELECT" },
+    ]);
+
+    // 新建的表默认不应该再有 anon/authenticated 的任何权限——这是
+    // 202609150001 第 3 部分改的 default privileges，用一张即用即弃的表直接
+    // 证明"以后忘写 grant 的新表默认关闭"，而不是只检查现有表的历史状态。
+    await database.exec(
+      "create table public.__default_privilege_probe (id int primary key)",
+    );
+    const probePrivileges = await database.query<{
+      grantee: string;
+      privilege_type: string;
+    }>(`
+      select grantee, privilege_type
+      from information_schema.table_privileges
+      where table_schema = 'public' and table_name = '__default_privilege_probe'
+        and grantee in ('anon', 'authenticated')
+    `);
+    await database.exec("drop table public.__default_privilege_probe");
+    expect(probePrivileges.rows).toEqual([]);
+  });
+
   it("runs isolated TEST00 join, chat, member-list, and leave journeys for both schools", async () => {
     const courses = await database.query<{
       id: string;
@@ -274,6 +340,18 @@ describe("phase-one full-chain integration", () => {
       { user_id: DAVE },
     ]);
     expect(crossSchoolHistory.ok && crossSchoolHistory.rows).toEqual([]);
+
+    // 202609150001 收回了 messages 的直写权限：即使是活跃课程成员，绕开
+    // send_conversation_message 直接 insert 也必须失败。
+    const directTableInsertAttempt = await asUser(
+      ALICE,
+      `insert into public.messages (conversation_id, sender_id, body)
+       values ('${wisconsin.conversation_id}', '${ALICE}', 'bypassing the rpc')`,
+    );
+    expect(
+      directTableInsertAttempt.ok,
+      JSON.stringify(directTableInsertAttempt),
+    ).toBe(false);
 
     const incompleteSearch = await asUser(
       INCOMPLETE,
@@ -543,6 +621,27 @@ describe("phase-one full-chain integration", () => {
       ALICE,
       `select public.clear_direct_conversation('${conversationId}', ${messageId})`,
     );
+
+    // 202609150001 之前，直接 SELECT messages 不看个人清除游标：ALICE 清除后
+    // 应该看不到任何一条(这段对话此时只有两条消息，且都在清除点之前)，而还没
+    // 清除的 BOB 应该仍能看到完整历史，和 list_direct_messages 的行为对齐。
+    const aliceDirectSelectAfterClear = await asUser(
+      ALICE,
+      `select id from public.messages
+       where conversation_id = '${conversationId}' order by id`,
+    );
+    const bobDirectSelectBeforeOwnClear = await asUser(
+      BOB,
+      `select id from public.messages
+       where conversation_id = '${conversationId}' order by id`,
+    );
+    expect(
+      aliceDirectSelectAfterClear.ok && aliceDirectSelectAfterClear.rows,
+    ).toEqual([]);
+    expect(
+      bobDirectSelectBeforeOwnClear.ok && bobDirectSelectBeforeOwnClear.rows.length,
+    ).toBe(2);
+
     const afterOneClear = await asRole(
       "service_role",
       "select * from public.preview_direct_message_cleanup(clock_timestamp() + interval '1000 hours', 100)",
