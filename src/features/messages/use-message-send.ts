@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const SEND_TIMEOUT_MS = 15_000;
 
 type SendState<T> = {
   status: string;
@@ -34,42 +36,74 @@ export function useMessageSend<T, S extends SendState<T>>({
 }) {
   const [attempts, setAttempts] = useState<MessageSendAttempt[]>([]);
   const [state, setState] = useState(initialState);
-  const [pending, setPending] = useState(false);
+  const pending = attempts.some((attempt) => attempt.status === "sending");
+  const requestVersions = useRef(new Map<string, number>());
+  const timeoutHandles = useRef(new Set<ReturnType<typeof setTimeout>>());
+
+  useEffect(() => () => {
+    for (const timeoutHandle of timeoutHandles.current) {
+      clearTimeout(timeoutHandle);
+    }
+  }, []);
+
   const formAction = useCallback((formData: FormData) => {
     const clientMessageId = String(
       formData.get("clientMessageId") || crypto.randomUUID(),
     );
     const body = String(formData.get("body") ?? "");
     formData.set("clientMessageId", clientMessageId);
+    const requestVersion = (requestVersions.current.get(clientMessageId) ?? 0) + 1;
+    requestVersions.current.set(clientMessageId, requestVersion);
     setAttempts((current) => [
       ...current.filter((attempt) => attempt.clientMessageId !== clientMessageId),
       { clientMessageId, body, status: "sending" },
     ]);
     onStart();
-    setPending(true);
+    const timeoutHandle = setTimeout(() => {
+      timeoutHandles.current.delete(timeoutHandle);
+      if (requestVersions.current.get(clientMessageId) !== requestVersion) return;
+      setAttempts((current) => current.map((attempt) =>
+        attempt.clientMessageId === clientMessageId
+          ? { ...attempt, status: "failed", retryable: true }
+          : attempt,
+      ));
+    }, SEND_TIMEOUT_MS);
+    timeoutHandles.current.add(timeoutHandle);
+    const clearWatchdog = () => {
+      clearTimeout(timeoutHandle);
+      timeoutHandles.current.delete(timeoutHandle);
+    };
     void action(state, formData)
       .then((result) => {
-        setState(result);
+        clearWatchdog();
+        const currentVersion = requestVersions.current.get(clientMessageId);
+        if (currentVersion === undefined) return;
         if (result.status === "sent" && result.savedMessage) {
+          requestVersions.current.delete(clientMessageId);
+          setState(result);
           onSaved(result.savedMessage);
           setAttempts((current) => current.filter(
             (attempt) => attempt.clientMessageId !== clientMessageId,
           ));
-        } else {
-          setAttempts((current) => current.map((attempt) =>
-            attempt.clientMessageId === clientMessageId
-              ? {
-                  ...attempt,
-                  status: "failed",
-                  retryable: ["temporarily_unavailable", "unavailable"].includes(
-                    result.status,
-                  ),
-                }
-              : attempt,
-          ));
+          return;
         }
+        if (currentVersion !== requestVersion) return;
+        setState(result);
+        setAttempts((current) => current.map((attempt) =>
+          attempt.clientMessageId === clientMessageId
+            ? {
+                ...attempt,
+                status: "failed",
+                retryable: ["temporarily_unavailable", "unavailable"].includes(
+                  result.status,
+                ),
+              }
+            : attempt,
+        ));
       })
       .catch(() => {
+        clearWatchdog();
+        if (requestVersions.current.get(clientMessageId) !== requestVersion) return;
         setAttempts((current) => current.map((attempt) =>
           attempt.clientMessageId === clientMessageId
             ? {
@@ -79,8 +113,7 @@ export function useMessageSend<T, S extends SendState<T>>({
               }
             : attempt,
         ));
-      })
-      .finally(() => setPending(false));
+      });
   }, [action, onSaved, onStart, state]);
 
   const retry = useCallback((clientMessageId: string) => {

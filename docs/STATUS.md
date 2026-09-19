@@ -18,7 +18,8 @@
 
 ## 生产发布暂停与待办
 
-- **Issue #29 已在功能分支实现，尚未发布**：`202609160001_course_member_relationships.sql` 新增受限批量关系摘要，并修正 active 好友在拉黑状态下的身份优先级；前端课程成员、邮箱搜索与私聊失败展示已接入。2026-09-20 本地验证通过：74 个测试文件、453 项测试及构建、lint、类型检查。发布必须先应用 migration，再发布依赖该 RPC 的前端，并从目标 Supabase 重新生成 `src/types/database.ts`。
+- **Issue #29 已在功能分支实现，尚未发布**：`202609160001_course_member_relationships.sql` 新增受限批量关系摘要，并修正 active 好友在拉黑状态下的身份优先级；前端课程成员、邮箱搜索与私聊失败展示已接入。2026-09-20 本地验证通过：74 个测试文件、457 项测试及构建、lint、类型检查。发布必须先应用 migration，再发布依赖该 RPC 的前端，并从目标 Supabase 重新生成 `src/types/database.ts`。
+- **Issue #30 与 #29 共用功能分支和后续 PR**：私聊请求 15 秒未返回时从“发送中”降级为可重试失败；重试沿用原 `clientMessageId`，迟到成功优先并忽略重复回执。上述完整验证同时覆盖 Issue #30；尚未发布。
 
 - **Vercel Git 集成已连接，生产分支是 `main`。** 当前生产 deployment 为 `dpl_GRDM8T2uzj4VqswkCnHT1JVfochf`，提交 `2b3cb4e`。此前“未连接”的记录已过时。
 - **新版已上线（2026-09-12）**：从 `main` 的 `4607e6e`（PR #25）手动 `vercel deploy --prod`，生产 deployment 为 `dpl_9i1xfZpdyp9fcJ648RMbLTdnZ5Zu`。上一版 `dpl_GRDM8T2uzj4VqswkCnHT1JVfochf`（`2b3cb4e`）是前端回滚目标；回滚前端不会回滚数据库。未登录冒烟通过，登录后的完整验收仍待进行。

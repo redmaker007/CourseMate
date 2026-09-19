@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DirectMessage } from "../direct-message-service";
@@ -23,6 +24,38 @@ const MESSAGE: DirectMessage = {
 };
 const NEXT_MESSAGE: DirectMessage = { ...MESSAGE, id: "43", body: "next" };
 
+function mockEmptySync(mergeIncoming = vi.fn(), connected = true) {
+  sync.useDirectMessageSync.mockReturnValue({
+    messages: [],
+    connected,
+    hasOlderMessages: false,
+    loadingOlder: false,
+    loadOlder: vi.fn(),
+    backfill: vi.fn(),
+    clearThrough: vi.fn(),
+    mergeIncoming,
+  });
+}
+
+function renderSendWorkspace(
+  sendAction: ComponentProps<typeof ChatWorkspace>["sendAction"],
+) {
+  return render(
+    <ChatWorkspace
+      clearAction={vi.fn()}
+      conversationId={CONVERSATION_ID}
+      currentUserId="alice"
+      initialHasOlderMessages={false}
+      initialMessages={[]}
+      markReadAction={vi.fn()}
+      otherDisplayName="Bob"
+      reportAction={vi.fn()}
+      sendAction={sendAction}
+      sendStatus="allowed"
+    />,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal("crypto", { randomUUID: () => CLIENT_MESSAGE_ID });
@@ -30,6 +63,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -280,6 +314,138 @@ describe("chat workspace", () => {
     });
   });
 
+  it("turns a stalled request into a retryable failure after 15 seconds", async () => {
+    vi.useFakeTimers();
+    const finishes: Array<(state: DirectMessageActionState) => void> = [];
+    const sendAction = vi.fn((
+      _previousState: DirectMessageActionState,
+      _formData: FormData,
+    ) => {
+      void _previousState;
+      void _formData;
+      return new Promise<DirectMessageActionState>((resolve) => {
+        finishes.push(resolve);
+      });
+    });
+    const mergeIncoming = vi.fn();
+    mockEmptySync(mergeIncoming);
+    renderSendWorkspace(sendAction);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "消息" }), {
+      target: { value: "stalled" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    expect(screen.getByText("我 · 发送中")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    expect(screen.getByRole("img", { name: "发送失败" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(sendAction).toHaveBeenCalledTimes(2);
+    expect(sendAction.mock.calls[1][1].get("clientMessageId")).toBe(
+      sendAction.mock.calls[0][1].get("clientMessageId"),
+    );
+
+    const savedMessage: DirectMessage = {
+      ...MESSAGE,
+      id: "44",
+      clientMessageId: CLIENT_MESSAGE_ID,
+      senderId: "alice",
+      senderDisplayName: "Alice",
+      body: "stalled",
+    };
+    await act(async () => {
+      finishes[0]({
+        status: "sent",
+        message: "消息已发送。",
+        clientMessageId: CLIENT_MESSAGE_ID,
+        attemptedBody: savedMessage.body,
+        savedMessage,
+      });
+    });
+    expect(mergeIncoming).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("[data-client-message-id]")).toBeNull();
+
+    await act(async () => {
+      finishes[1]({
+        status: "sent",
+        message: "消息已发送。",
+        clientMessageId: CLIENT_MESSAGE_ID,
+        attemptedBody: savedMessage.body,
+        savedMessage,
+      });
+    });
+    expect(mergeIncoming).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a retryable failure when the network request rejects", async () => {
+    const sendAction = vi.fn().mockRejectedValue(new Error("network down"));
+    mockEmptySync(vi.fn(), false);
+    renderSendWorkspace(sendAction);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "消息" }), {
+      target: { value: "offline" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+
+    expect(await screen.findByRole("img", { name: "发送失败" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "重试" })).toBeTruthy();
+  });
+
+  it("keeps a newer message pending when an older timed-out request succeeds", async () => {
+    vi.useFakeTimers();
+    const nextClientMessageId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn()
+        .mockReturnValueOnce(CLIENT_MESSAGE_ID)
+        .mockReturnValueOnce(nextClientMessageId),
+    });
+    const finishes: Array<(state: DirectMessageActionState) => void> = [];
+    const sendAction = vi.fn((
+      _previousState: DirectMessageActionState,
+      _formData: FormData,
+    ) => {
+      void _previousState;
+      void _formData;
+      return new Promise<DirectMessageActionState>((resolve) => {
+        finishes.push(resolve);
+      });
+    });
+    const mergeIncoming = vi.fn();
+    mockEmptySync(mergeIncoming);
+    renderSendWorkspace(sendAction);
+
+    const input = screen.getByRole("textbox", { name: "消息" });
+    fireEvent.change(input, { target: { value: "first" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    fireEvent.change(input, { target: { value: "second" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+
+    await act(async () => {
+      finishes[0]({
+        status: "sent",
+        message: "消息已发送。",
+        clientMessageId: CLIENT_MESSAGE_ID,
+        attemptedBody: "first",
+        savedMessage: {
+          ...MESSAGE,
+          clientMessageId: CLIENT_MESSAGE_ID,
+          senderId: "alice",
+          senderDisplayName: "Alice",
+          body: "first",
+        },
+      });
+    });
+
+    expect(mergeIncoming).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "发送中…" })).toBeTruthy();
+  });
+
   it("keeps earlier failed messages when a later send also fails", async () => {
     const ids = [
       CLIENT_MESSAGE_ID,
@@ -410,7 +576,9 @@ describe("chat workspace", () => {
     expect(screen.getAllByText(savedMessage.body)).toHaveLength(1);
   });
 
-  it("keeps history visible but disables sending for a removed friendship", () => {
+  it.each(["blocked", "readonly"] as const)(
+    "keeps history visible but disables sending when status is %s",
+    (sendStatus) => {
     sync.useDirectMessageSync.mockReturnValue({
       messages: [MESSAGE],
       connected: false,
@@ -432,7 +600,7 @@ describe("chat workspace", () => {
         otherDisplayName="Bob"
         reportAction={vi.fn()}
         sendAction={vi.fn()}
-        sendStatus="readonly"
+        sendStatus={sendStatus}
       />,
     );
 
@@ -441,7 +609,10 @@ describe("chat workspace", () => {
       (screen.getByRole("textbox", { name: "消息" }) as HTMLTextAreaElement)
         .disabled,
     ).toBe(true);
-    // 只读可能来自好友关系结束，也可能来自双方当前不在同一学校（管理员跨校测试）
-    expect(screen.getByText(/不允许发送新消息/)).toBeTruthy();
-  });
+    expect(
+      (screen.getByRole("button", { name: "发送" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(screen.getByText(/发送新消息/)).toBeTruthy();
+    },
+  );
 });
