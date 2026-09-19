@@ -1248,16 +1248,6 @@ export type Database = {
           member_id: string
         }[]
       }
-      list_course_member_relationships: {
-        Args: { target_course_id: string }
-        Returns: {
-          conversation_id: string | null
-          member_id: string
-          relationship_status: string
-          restriction_status: string
-          send_status: string | null
-        }[]
-      }
       list_direct_conversation_unread: {
         Args: { include_hidden?: boolean }
         Returns: {

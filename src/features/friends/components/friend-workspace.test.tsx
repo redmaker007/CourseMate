@@ -111,8 +111,11 @@ describe("friend workspace", () => {
     expect(document.querySelector('input[type="hidden"][name="email"]')).toBeNull();
   });
 
-  it("does not offer another request when email discovery returns a restricted active friend", async () => {
-    const blockedFriendSearch = vi.fn(async () => ({
+  it.each([
+    { label: "普通或隐藏", blockStatus: "none" as const },
+    { label: "受限", blockStatus: "blocked_by_other" as const },
+  ])("does not offer another request for a $label active friend", async ({ blockStatus }) => {
+    const friendSearch = vi.fn(async () => ({
       status: "found" as const,
       message: "找到成员。",
       member: {
@@ -123,7 +126,7 @@ describe("friend workspace", () => {
         gradYear: FRIEND.gradYear,
         sharedCourses: FRIEND.sharedCourses,
         relationship: "friend" as const,
-        blockStatus: "blocked_by_other" as const,
+        blockStatus,
         incomingRequestId: null,
       },
     }));
@@ -133,7 +136,7 @@ describe("friend workspace", () => {
         mutationAction={action}
         reportAction={reportAction}
         requests={[]}
-        searchAction={blockedFriendSearch}
+        searchAction={friendSearch}
       />,
     );
 

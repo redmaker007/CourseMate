@@ -231,7 +231,7 @@ export function ChatWorkspace({
                       我 · {attempt.status === "sending" ? "发送中" : "发送失败"}
                     </p>
                     <SafeMessageText text={attempt.body} />
-                    {attempt.failureStatus === "temporarily_unavailable" ? (
+                    {attempt.retryable ? (
                       <button
                         className="mt-2 text-xs font-semibold text-white underline"
                         onClick={() => retry(attempt.clientMessageId)}

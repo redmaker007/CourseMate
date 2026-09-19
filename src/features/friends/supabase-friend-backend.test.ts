@@ -3,15 +3,36 @@ import { describe, expect, it, vi } from "vitest";
 import { createSupabaseFriendBackend } from "./supabase-friend-backend";
 
 describe("Supabase friend backend", () => {
-  it("maps one course relationship batch without exposing unrelated fields", async () => {
+  it("maps every course relationship state without exposing unrelated fields", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: [
         {
           member_id: "22222222-2222-4222-8222-222222222222",
+          relationship_status: "none",
+          restriction_status: "none",
+          send_status: null,
+          conversation_id: null,
+        },
+        {
+          member_id: "33333333-3333-4333-8333-333333333333",
+          relationship_status: "outgoing_request",
+          restriction_status: "none",
+          send_status: null,
+          conversation_id: null,
+        },
+        {
+          member_id: "44444444-4444-4444-8444-444444444444",
+          relationship_status: "incoming_request",
+          restriction_status: "none",
+          send_status: null,
+          conversation_id: null,
+        },
+        {
+          member_id: "55555555-5555-4555-8555-555555555555",
           relationship_status: "friend",
           restriction_status: "blocked",
           send_status: "blocked",
-          conversation_id: "33333333-3333-4333-8333-333333333333",
+          conversation_id: "66666666-6666-4666-8666-666666666666",
         },
       ],
       error: null,
@@ -25,10 +46,31 @@ describe("Supabase friend backend", () => {
     ).resolves.toEqual([
       {
         memberId: "22222222-2222-4222-8222-222222222222",
+        relationshipStatus: "none",
+        restrictionStatus: "none",
+        sendStatus: null,
+        conversationId: null,
+      },
+      {
+        memberId: "33333333-3333-4333-8333-333333333333",
+        relationshipStatus: "outgoing_request",
+        restrictionStatus: "none",
+        sendStatus: null,
+        conversationId: null,
+      },
+      {
+        memberId: "44444444-4444-4444-8444-444444444444",
+        relationshipStatus: "incoming_request",
+        restrictionStatus: "none",
+        sendStatus: null,
+        conversationId: null,
+      },
+      {
+        memberId: "55555555-5555-4555-8555-555555555555",
         relationshipStatus: "friend",
         restrictionStatus: "blocked",
         sendStatus: "blocked",
-        conversationId: "33333333-3333-4333-8333-333333333333",
+        conversationId: "66666666-6666-4666-8666-666666666666",
       },
     ]);
     expect(rpc).toHaveBeenCalledWith("list_course_member_relationships", {

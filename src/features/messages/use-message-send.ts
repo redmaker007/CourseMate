@@ -16,7 +16,7 @@ export type MessageSendAttempt = {
   clientMessageId: string;
   body: string;
   status: "sending" | "failed";
-  failureStatus?: string;
+  retryable?: boolean;
 };
 
 export function useMessageSend<T, S extends SendState<T>>({
@@ -58,7 +58,13 @@ export function useMessageSend<T, S extends SendState<T>>({
         } else {
           setAttempts((current) => current.map((attempt) =>
             attempt.clientMessageId === clientMessageId
-              ? { ...attempt, status: "failed", failureStatus: result.status }
+              ? {
+                  ...attempt,
+                  status: "failed",
+                  retryable: ["temporarily_unavailable", "unavailable"].includes(
+                    result.status,
+                  ),
+                }
               : attempt,
           ));
         }
@@ -69,7 +75,7 @@ export function useMessageSend<T, S extends SendState<T>>({
             ? {
                 ...attempt,
                 status: "failed",
-                failureStatus: "temporarily_unavailable",
+                retryable: true,
               }
             : attempt,
         ));
@@ -83,9 +89,7 @@ export function useMessageSend<T, S extends SendState<T>>({
     );
     if (
       !attempt ||
-      !["temporarily_unavailable", "unavailable"].includes(
-        attempt.failureStatus ?? "",
-      ) ||
+      !attempt.retryable ||
       pending
     ) return;
     const formData = new FormData();

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "22222222-2222-4222-8222-222222222222";
 const CAROL = "33333333-3333-4333-8333-333333333333";
+const DAVE = "44444444-4444-4444-8444-444444444444";
 const INCOMPLETE = "55555555-5555-4555-8555-555555555555";
 
 const BASE_MIGRATIONS = [
@@ -96,11 +97,13 @@ beforeAll(async () => {
       ('${ALICE}', 'alice@wisc.edu', now()),
       ('${BOB}', 'bob@wisc.edu', now()),
       ('${CAROL}', 'carol@umich.edu', now()),
+      ('${DAVE}', 'dave@wisc.edu', now()),
       ('${INCOMPLETE}', 'incomplete@wisc.edu', now());
     insert into public.profiles (id, display_name, major, grad_year) values
       ('${ALICE}', 'Alice', 'Computer Science', 2027),
       ('${BOB}', 'Bob', 'Mathematics', 2028),
-      ('${CAROL}', 'Carol', 'Physics', 2027);
+      ('${CAROL}', 'Carol', 'Physics', 2027),
+      ('${DAVE}', 'Dave', 'Chemistry', 2029);
 
     insert into public.courses (school_id, code, title, term, created_by) values
       ('uw-madison', 'TEST00', '测试00-测试课程', '2026-fall', '${ALICE}'),
@@ -584,6 +587,10 @@ describe("好友发现与关系状态数据库", () => {
       ALICE,
       `select * from public.list_course_member_relationships('${michigan.id}')`,
     );
+    const sameSchoolNonMember = await asUser(
+      DAVE,
+      `select * from public.list_course_member_relationships('${wisconsin.id}')`,
+    );
     const forgedCourse = await asUser(
       ALICE,
       "select * from public.list_course_member_relationships('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')",
@@ -598,6 +605,7 @@ describe("好友发现与关系状态数据库", () => {
       order by role
     `);
     expect(crossSchool.ok && crossSchool.rows).toEqual([]);
+    expect(sameSchoolNonMember.ok && sameSchoolNonMember.rows).toEqual([]);
     expect(forgedCourse.ok && forgedCourse.rows).toEqual([]);
     expect(grants.rows).toEqual([
       { role: "anon", allowed: false },
@@ -1184,6 +1192,14 @@ describe("好友发现与关系状态数据库", () => {
         major: "Mathematics",
         grad_year: 2028,
       },
+    ]);
+    await asUser(ALICE, `select public.set_friend_hidden('${BOB}', true)`);
+    const hiddenFriend = await asUser(
+      ALICE,
+      "select relationship_status from public.find_member_by_email('bob@wisc.edu')",
+    );
+    expect(hiddenFriend.ok && hiddenFriend.rows).toEqual([
+      { relationship_status: "friend" },
     ]);
   });
 
