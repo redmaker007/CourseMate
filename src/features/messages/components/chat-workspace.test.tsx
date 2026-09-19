@@ -259,11 +259,25 @@ describe("chat workspace", () => {
       });
     });
     await waitFor(() => expect(screen.getByText(/发送失败/)).toBeTruthy());
+    expect(screen.getByRole("img", { name: "发送失败" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     await waitFor(() => expect(sendAction).toHaveBeenCalledTimes(2));
     const retryForm = sendAction.mock.calls[1][1];
     expect(retryForm.get("clientMessageId")).toBe(generatedId);
     expect(retryForm.get("body")).toBe("hello");
+
+    await act(async () => {
+      finish({
+        status: "not_allowed",
+        message: "当前关系状态不允许发送消息。",
+        clientMessageId: generatedId,
+        attemptedBody: "hello",
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
+      expect(screen.getByText("当前关系状态不允许发送消息。")).toBeTruthy();
+    });
   });
 
   it("keeps earlier failed messages when a later send also fails", async () => {

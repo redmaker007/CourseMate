@@ -1,6 +1,11 @@
 import "server-only";
 
 import type { CurrentMember } from "@/features/auth/session";
+import type { CourseMemberRelationshipSummary } from "@/features/friends/friendship-service";
+import {
+  createSupabaseFriendBackend,
+  type FriendshipRpcClient,
+} from "@/features/friends/supabase-friend-backend";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -26,6 +31,16 @@ export type CourseMemberView = {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  relationshipStatus:
+    | "self"
+    | "unavailable"
+    | "none"
+    | "outgoing_request"
+    | "incoming_request"
+    | "friend";
+  restrictionStatus: "none" | "blocked" | null;
+  sendStatus: "allowed" | "blocked" | "readonly" | null;
+  conversationId: string | null;
 };
 
 export type CourseRoom = {
@@ -305,13 +320,40 @@ export async function getCourseRoom(
         .in("id", userIds)
     : { data: [], error: null };
   if (profileError) throw profileError;
+  const invokeRpc = supabase.rpc.bind(supabase) as unknown as FriendshipRpcClient["rpc"];
+  let relationships: CourseMemberRelationshipSummary[] | null = null;
+  try {
+    relationships = await createSupabaseFriendBackend({ rpc: invokeRpc })
+      .listCourseMemberRelationships(courseId);
+  } catch {
+    // 课程主体仍可查看，关系入口安全降级。
+  }
   const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const relationshipById = new Map(
+    (relationships ?? []).map((relationship) => [relationship.memberId, relationship]),
+  );
   const members = userIds.map((userId) => {
     const profile = profileById.get(userId);
+    const relationship = relationshipById.get(userId);
+    const relationshipUnavailable = relationships === null || (!relationship && userId !== member.userId);
     return {
       userId,
       displayName: profile?.display_name ?? "成员",
       avatarUrl: profile?.avatar_url ?? null,
+      relationshipStatus: userId === member.userId
+        ? "self" as const
+        : relationshipUnavailable
+          ? "unavailable" as const
+          : relationship!.relationshipStatus,
+      restrictionStatus: relationshipUnavailable || userId === member.userId
+        ? null
+        : relationship!.restrictionStatus,
+      sendStatus: relationshipUnavailable || userId === member.userId
+        ? null
+        : relationship!.sendStatus,
+      conversationId: relationshipUnavailable || userId === member.userId
+        ? null
+        : relationship!.conversationId,
     };
   });
   const messages = await messageViews(supabase, access.conversationId, {

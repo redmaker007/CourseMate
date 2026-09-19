@@ -223,10 +223,15 @@ export function ChatWorkspace({
                 <li className="flex justify-end" data-client-message-id={attempt.clientMessageId} key={attempt.clientMessageId}>
                   <article className="max-w-[85%] rounded-2xl bg-indigo-600 px-4 py-3 text-sm text-white opacity-75">
                     <p className="mb-1 text-xs text-indigo-100">
+                      {attempt.status === "failed" ? (
+                        <span aria-label="发送失败" className="mr-1 font-bold text-rose-300" role="img">
+                          !
+                        </span>
+                      ) : null}
                       我 · {attempt.status === "sending" ? "发送中" : "发送失败"}
                     </p>
                     <SafeMessageText text={attempt.body} />
-                    {attempt.status === "failed" ? (
+                    {attempt.failureStatus === "temporarily_unavailable" ? (
                       <button
                         className="mt-2 text-xs font-semibold text-white underline"
                         onClick={() => retry(attempt.clientMessageId)}

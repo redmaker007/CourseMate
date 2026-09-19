@@ -3,6 +3,39 @@ import { describe, expect, it, vi } from "vitest";
 import { createSupabaseFriendBackend } from "./supabase-friend-backend";
 
 describe("Supabase friend backend", () => {
+  it("maps one course relationship batch without exposing unrelated fields", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          member_id: "22222222-2222-4222-8222-222222222222",
+          relationship_status: "friend",
+          restriction_status: "blocked",
+          send_status: "blocked",
+          conversation_id: "33333333-3333-4333-8333-333333333333",
+        },
+      ],
+      error: null,
+    });
+    const backend = createSupabaseFriendBackend({ rpc });
+
+    await expect(
+      backend.listCourseMemberRelationships(
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    ).resolves.toEqual([
+      {
+        memberId: "22222222-2222-4222-8222-222222222222",
+        relationshipStatus: "friend",
+        restrictionStatus: "blocked",
+        sendStatus: "blocked",
+        conversationId: "33333333-3333-4333-8333-333333333333",
+      },
+    ]);
+    expect(rpc).toHaveBeenCalledWith("list_course_member_relationships", {
+      target_course_id: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
   it("maps the restricted discovery RPC without returning the searched email", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: [

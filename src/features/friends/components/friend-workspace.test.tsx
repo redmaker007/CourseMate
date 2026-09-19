@@ -111,6 +111,40 @@ describe("friend workspace", () => {
     expect(document.querySelector('input[type="hidden"][name="email"]')).toBeNull();
   });
 
+  it("does not offer another request when email discovery returns a restricted active friend", async () => {
+    const blockedFriendSearch = vi.fn(async () => ({
+      status: "found" as const,
+      message: "找到成员。",
+      member: {
+        memberId: FRIEND.memberId,
+        displayName: FRIEND.displayName,
+        avatarUrl: null,
+        major: FRIEND.major,
+        gradYear: FRIEND.gradYear,
+        sharedCourses: FRIEND.sharedCourses,
+        relationship: "friend" as const,
+        blockStatus: "blocked_by_other" as const,
+        incomingRequestId: null,
+      },
+    }));
+    render(
+      <FriendWorkspace
+        friends={[]}
+        mutationAction={action}
+        reportAction={reportAction}
+        requests={[]}
+        searchAction={blockedFriendSearch}
+      />,
+    );
+
+    const email = document.querySelector<HTMLInputElement>('input[name="email"]')!;
+    fireEvent.change(email, { target: { value: "bob@wisc.edu" } });
+    fireEvent.submit(email.form!);
+
+    expect(await screen.findByText("你们已经是好友。")).toBeTruthy();
+    expect(document.querySelector('textarea[name="message"]')).toBeNull();
+  });
+
   it("shows actionable request history and the real conversation entry", () => {
     render(
       <FriendWorkspace
