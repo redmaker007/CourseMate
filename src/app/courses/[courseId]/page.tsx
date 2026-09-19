@@ -5,9 +5,55 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentMember } from "@/features/auth/session";
 import { leaveCourseAction } from "@/features/courses/actions";
 import { CourseChat } from "@/features/courses/components/course-chat";
-import { getCourseRoom } from "@/features/courses/queries";
+import {
+  getCourseRoom,
+  type CourseMemberView,
+} from "@/features/courses/queries";
 
 export const dynamic = "force-dynamic";
+
+function MemberRelationshipAction({ member }: { member: CourseMemberView }) {
+  if (member.relationshipStatus === "self") {
+    return <span className="mt-1 block text-xs text-slate-500">我</span>;
+  }
+  if (member.relationshipStatus === "unavailable") {
+    return <span className="mt-1 block text-xs text-amber-700">关系状态暂不可用</span>;
+  }
+  if (member.relationshipStatus === "friend") {
+    if (!member.conversationId) {
+      return <span className="mt-1 block text-xs text-rose-700">好友数据异常</span>;
+    }
+    return (
+      <div className="mt-1 flex items-center gap-2 text-xs">
+        <span className="text-slate-600">已是好友</span>
+        <Link className="font-medium text-indigo-700 hover:text-indigo-950" href={`/messages/${member.conversationId}`}>
+          发消息
+        </Link>
+      </div>
+    );
+  }
+  if (member.restrictionStatus === "blocked") {
+    return <span className="mt-1 block text-xs text-slate-600">当前无法添加</span>;
+  }
+  if (member.relationshipStatus === "outgoing_request") {
+    return <span className="mt-1 block text-xs text-slate-600">申请已发送</span>;
+  }
+  if (member.relationshipStatus === "incoming_request") {
+    return (
+      <Link className="mt-1 inline-block text-xs font-medium text-indigo-700 hover:text-indigo-950" href="/friends">
+        处理申请
+      </Link>
+    );
+  }
+  return (
+    <Link
+      className="mt-1 inline-block text-xs font-medium text-indigo-700 hover:text-indigo-950"
+      href={`/friends/add?memberId=${member.userId}`}
+    >
+      添加好友
+    </Link>
+  );
+}
 
 export default async function CoursePage({
   params,
@@ -84,16 +130,7 @@ export default async function CoursePage({
                   <p className="truncate text-sm font-semibold text-slate-900">
                     {courseMember.displayName}
                   </p>
-                  {courseMember.userId !== member.userId ? (
-                    <Link
-                      className="mt-1 inline-block text-xs font-medium text-indigo-700 hover:text-indigo-950"
-                      href={`/friends/add?memberId=${courseMember.userId}`}
-                    >
-                      添加好友
-                    </Link>
-                  ) : (
-                    <span className="mt-1 block text-xs text-slate-500">我</span>
-                  )}
+                  <MemberRelationshipAction member={courseMember} />
                 </li>
               ))}
             </ul>

@@ -68,6 +68,14 @@ export type BlockedMemberListItem = {
   conversationId: string | null;
 };
 
+export type CourseMemberRelationshipSummary = {
+  memberId: string;
+  relationshipStatus: "none" | "outgoing_request" | "incoming_request" | "friend";
+  restrictionStatus: "none" | "blocked";
+  sendStatus: "allowed" | "blocked" | "readonly" | null;
+  conversationId: string | null;
+};
+
 export interface FriendBackend {
   findMemberByEmail(email: string): Promise<FindMemberResult>;
   sendFriendRequest(targetMemberId: string, message: string): Promise<unknown>;
@@ -82,6 +90,9 @@ export interface FriendBackend {
   listFriends(includeHidden: boolean): Promise<FriendListItem[]>;
   listFriendRequests(): Promise<FriendRequestView[]>;
   listBlockedMembers(): Promise<BlockedMemberListItem[]>;
+  listCourseMemberRelationships(
+    courseId: string,
+  ): Promise<CourseMemberRelationshipSummary[]>;
 }
 
 const UUID_PATTERN =

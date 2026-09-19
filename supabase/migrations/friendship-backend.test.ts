@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "22222222-2222-4222-8222-222222222222";
 const CAROL = "33333333-3333-4333-8333-333333333333";
+const DAVE = "44444444-4444-4444-8444-444444444444";
 const INCOMPLETE = "55555555-5555-4555-8555-555555555555";
 
 const BASE_MIGRATIONS = [
@@ -96,11 +97,13 @@ beforeAll(async () => {
       ('${ALICE}', 'alice@wisc.edu', now()),
       ('${BOB}', 'bob@wisc.edu', now()),
       ('${CAROL}', 'carol@umich.edu', now()),
+      ('${DAVE}', 'dave@wisc.edu', now()),
       ('${INCOMPLETE}', 'incomplete@wisc.edu', now());
     insert into public.profiles (id, display_name, major, grad_year) values
       ('${ALICE}', 'Alice', 'Computer Science', 2027),
       ('${BOB}', 'Bob', 'Mathematics', 2028),
-      ('${CAROL}', 'Carol', 'Physics', 2027);
+      ('${CAROL}', 'Carol', 'Physics', 2027),
+      ('${DAVE}', 'Dave', 'Chemistry', 2029);
 
     insert into public.courses (school_id, code, title, term, created_by) values
       ('uw-madison', 'TEST00', '测试00-测试课程', '2026-fall', '${ALICE}'),
@@ -118,6 +121,7 @@ beforeAll(async () => {
   await applyMigration("202609110002_direct_messaging.sql");
   await applyMigration("202609110003_direct_chat_page.sql");
   await applyMigration("202609110006_block_direction.sql");
+  await applyMigration("202609160001_course_member_relationships.sql");
 });
 
 describe("direct messaging database boundary", () => {
@@ -515,6 +519,103 @@ beforeEach(async () => {
 });
 
 describe("好友发现与关系状态数据库", () => {
+  it("批量返回课程成员关系且不越过课程与学校边界", async () => {
+    const courses = await database.query<{ id: string; school_id: string }>(`
+      select id::text, school_id from public.courses order by school_id
+    `);
+    const wisconsin = courses.rows.find((course) => course.school_id === "uw-madison")!;
+    const michigan = courses.rows.find((course) => course.school_id === "umich")!;
+
+    const initial = await asUser(
+      ALICE,
+      `select * from public.list_course_member_relationships('${wisconsin.id}')`,
+    );
+    expect(initial.ok && initial.rows).toEqual([
+      {
+        member_id: BOB,
+        relationship_status: "none",
+        restriction_status: "none",
+        send_status: null,
+        conversation_id: null,
+      },
+    ]);
+
+    const request = await asUser(
+      ALICE,
+      `select * from public.send_friend_request('${BOB}', 'hello')`,
+    );
+    const requestId = request.ok ? String(request.rows[0].request_id) : "";
+    const outgoing = await asUser(
+      ALICE,
+      `select relationship_status from public.list_course_member_relationships('${wisconsin.id}')`,
+    );
+    const incoming = await asUser(
+      BOB,
+      `select relationship_status from public.list_course_member_relationships('${wisconsin.id}')`,
+    );
+    expect(outgoing.ok && outgoing.rows).toEqual([
+      { relationship_status: "outgoing_request" },
+    ]);
+    expect(incoming.ok && incoming.rows).toEqual([
+      { relationship_status: "incoming_request" },
+    ]);
+
+    const accepted = await asUser(
+      BOB,
+      `select * from public.respond_to_friend_request('${requestId}', 'accept')`,
+    );
+    const conversationId = accepted.ok
+      ? String(accepted.rows[0].conversation_id)
+      : "";
+    await asUser(ALICE, `select public.set_friend_hidden('${BOB}', true)`);
+    await asUser(BOB, `select public.set_member_blocked('${ALICE}', true)`);
+    const restrictedFriend = await asUser(
+      ALICE,
+      `select * from public.list_course_member_relationships('${wisconsin.id}')`,
+    );
+    expect(restrictedFriend.ok && restrictedFriend.rows).toEqual([
+      {
+        member_id: BOB,
+        relationship_status: "friend",
+        restriction_status: "blocked",
+        send_status: "blocked",
+        conversation_id: conversationId,
+      },
+    ]);
+
+    const crossSchool = await asUser(
+      ALICE,
+      `select * from public.list_course_member_relationships('${michigan.id}')`,
+    );
+    const sameSchoolNonMember = await asUser(
+      DAVE,
+      `select * from public.list_course_member_relationships('${wisconsin.id}')`,
+    );
+    const forgedCourse = await asUser(
+      ALICE,
+      "select * from public.list_course_member_relationships('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')",
+    );
+    const grants = await database.query<{ role: string; allowed: boolean }>(`
+      select role, has_function_privilege(
+        role,
+        'public.list_course_member_relationships(uuid)',
+        'EXECUTE'
+      ) as allowed
+      from (values ('anon'), ('authenticated')) roles(role)
+      order by role
+    `);
+    expect(crossSchool.ok && crossSchool.rows).toEqual([]);
+    expect(sameSchoolNonMember.ok && sameSchoolNonMember.rows).toEqual([]);
+    expect(forgedCourse.ok && forgedCourse.rows).toEqual([]);
+    expect(grants.rows).toEqual([
+      { role: "anon", allowed: false },
+      { role: "authenticated", allowed: true },
+    ]);
+    expect(JSON.stringify(restrictedFriend.ok ? restrictedFriend.rows : [])).not.toContain(
+      "@wisc.edu",
+    );
+  });
+
   it("按规范化完整邮箱发现同校成员且结果不包含邮箱", async () => {
     const result = await asUser(
       ALICE,
@@ -842,8 +943,8 @@ describe("好友发现与关系状态数据库", () => {
       BOB,
       `select public.friend_relationship_status('${ALICE}') as status`,
     );
-    expect(aliceStatus.ok && aliceStatus.rows).toEqual([{ status: "blocked" }]);
-    expect(bobStatus.ok && bobStatus.rows).toEqual([{ status: "blocked" }]);
+    expect(aliceStatus.ok && aliceStatus.rows).toEqual([{ status: "friend" }]);
+    expect(bobStatus.ok && bobStatus.rows).toEqual([{ status: "friend" }]);
 
     const listStatus = await asUser(
       ALICE,
@@ -1091,6 +1192,14 @@ describe("好友发现与关系状态数据库", () => {
         major: "Mathematics",
         grad_year: 2028,
       },
+    ]);
+    await asUser(ALICE, `select public.set_friend_hidden('${BOB}', true)`);
+    const hiddenFriend = await asUser(
+      ALICE,
+      "select relationship_status from public.find_member_by_email('bob@wisc.edu')",
+    );
+    expect(hiddenFriend.ok && hiddenFriend.rows).toEqual([
+      { relationship_status: "friend" },
     ]);
   });
 

@@ -1,5 +1,6 @@
 import type {
   BlockedMemberListItem,
+  CourseMemberRelationshipSummary,
   FindMemberResult,
   FriendBackend,
   FriendDiscovery,
@@ -52,6 +53,27 @@ export function createSupabaseFriendBackend(
   }
 
   return {
+    async listCourseMemberRelationships(courseId) {
+      const data = await call("list_course_member_relationships", {
+        target_course_id: courseId,
+      });
+      return rows(data).map((row): CourseMemberRelationshipSummary => ({
+        memberId: String(row.member_id),
+        relationshipStatus: String(
+          row.relationship_status,
+        ) as CourseMemberRelationshipSummary["relationshipStatus"],
+        restrictionStatus: String(
+          row.restriction_status,
+        ) as CourseMemberRelationshipSummary["restrictionStatus"],
+        sendStatus: row.send_status === null
+          ? null
+          : String(row.send_status) as CourseMemberRelationshipSummary["sendStatus"],
+        conversationId: row.conversation_id === null
+          ? null
+          : String(row.conversation_id),
+      }));
+    },
+
     async findMemberByEmail(email): Promise<FindMemberResult> {
       const row = firstRow(
         await call("find_member_by_email", { candidate_email: email }),

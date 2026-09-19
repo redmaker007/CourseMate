@@ -56,8 +56,24 @@ describe("CoursePage", () => {
       messages: [],
       hasOlderMessages: false,
       members: [
-        { userId: "member-1", displayName: "Me", avatarUrl: null },
-        { userId: "member-2", displayName: "Friend", avatarUrl: null },
+        {
+          userId: "member-1",
+          displayName: "Me",
+          avatarUrl: null,
+          relationshipStatus: "self",
+          restrictionStatus: null,
+          sendStatus: null,
+          conversationId: null,
+        },
+        {
+          userId: "member-2",
+          displayName: "Friend",
+          avatarUrl: null,
+          relationshipStatus: "none",
+          restrictionStatus: "none",
+          sendStatus: null,
+          conversationId: null,
+        },
       ],
     });
 
@@ -74,6 +90,75 @@ describe("CoursePage", () => {
       "/friends/add?memberId=member-2",
     );
     expect(document.body.textContent).not.toContain("@wisc.edu");
+  });
+
+  it("renders authoritative relationship states without duplicate request entry points", async () => {
+    queries.getCourseRoom.mockResolvedValue({
+      course: {
+        id: COURSE_ID,
+        code: "TEST00",
+        title: "测试课程",
+        term: "2026-fall",
+        memberCount: 8,
+        archived: false,
+        conversationId: "course-conversation",
+      },
+      messages: [],
+      hasOlderMessages: false,
+      members: [
+        { userId: "member-1", displayName: "Me", relationshipStatus: "self" },
+        {
+          userId: "member-2",
+          displayName: "Friend",
+          relationshipStatus: "friend",
+          restrictionStatus: "blocked",
+          sendStatus: "blocked",
+          conversationId: "direct-2",
+        },
+        {
+          userId: "member-3",
+          displayName: "Broken Friend",
+          relationshipStatus: "friend",
+          restrictionStatus: "none",
+          sendStatus: null,
+          conversationId: null,
+        },
+        { userId: "member-4", displayName: "Outgoing", relationshipStatus: "outgoing_request" },
+        { userId: "member-5", displayName: "Incoming", relationshipStatus: "incoming_request" },
+        {
+          userId: "member-6",
+          displayName: "Restricted",
+          relationshipStatus: "none",
+          restrictionStatus: "blocked",
+        },
+        {
+          userId: "member-7",
+          displayName: "Available",
+          relationshipStatus: "none",
+          restrictionStatus: "none",
+        },
+        { userId: "member-8", displayName: "Unavailable", relationshipStatus: "unavailable" },
+      ],
+    });
+
+    render(
+      await CoursePage({
+        params: Promise.resolve({ courseId: COURSE_ID }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByRole("link", { name: "发消息" }).getAttribute("href")).toBe(
+      "/messages/direct-2",
+    );
+    expect(screen.getByText("好友数据异常")).toBeTruthy();
+    expect(screen.getByText("申请已发送")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "处理申请" }).getAttribute("href")).toBe(
+      "/friends",
+    );
+    expect(screen.getByText("当前无法添加")).toBeTruthy();
+    expect(screen.getByText("关系状态暂不可用")).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "添加好友" })).toHaveLength(1);
   });
 
   it("does not disclose a course room to a non-member", async () => {

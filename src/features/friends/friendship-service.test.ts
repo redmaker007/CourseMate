@@ -17,6 +17,7 @@ function backend(overrides: Partial<FriendBackend> = {}): FriendBackend {
     listFriends: vi.fn().mockResolvedValue([]),
     listFriendRequests: vi.fn().mockResolvedValue([]),
     listBlockedMembers: vi.fn().mockResolvedValue([]),
+    listCourseMemberRelationships: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }
