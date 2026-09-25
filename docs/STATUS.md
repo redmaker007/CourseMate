@@ -1,7 +1,7 @@
 # 当前状态
 
-核对日期：2026-09-20。代码基线：`feature/issue-29-course-member-relationships`，基于 `main` 的 `33c6f91`。
-本页区分本地分支与生产状态；Issue #29 尚未部署，生产数据库与前端保持下方已记录状态。
+核对日期：2026-09-25（生产数据库搬迁）；代码状态核对于 2026-09-20，基线 `feature/issue-29-course-member-relationships`，基于 `main` 的 `33c6f91`。
+本页区分代码基线与生产状态；生产状态以下方带日期的条目为准，其中 2026-09-25 的搬迁条目是当前生产数据库的起点。
 
 ## 代码已实现
 
@@ -19,7 +19,15 @@
 
 ## 生产发布暂停与待办
 
-- **Issue #29 已在功能分支实现，尚未发布**：`202609160001_course_member_relationships.sql` 新增受限批量关系摘要，并修正 active 好友在拉黑状态下的身份优先级；前端课程成员、邮箱搜索与私聊失败展示已接入。2026-09-20 本地验证通过：74 个测试文件、457 项测试及构建、lint、类型检查。发布必须先应用 migration，再发布依赖该 RPC 的前端，并从目标 Supabase 重新生成 `src/types/database.ts`。
+- **生产数据库已搬到新 Supabase 项目（2026-09-25，us-west-2 → us-east-2）**：新项目 `CourseMate-east`（ref `xpmkpkplftgtfzecdwpd`）；旧项目 `CourseMate`（ref `cqrlxcxcgrcoamqnjkwu`）停写后原样保留，作为切换时刻的快照与回滚对照，观察几天确认稳定后再删，并把新项目改名回 `CourseMate`。步骤与踩坑见[迁移手册](runbooks/migrate-supabase-project.md)。
+  - **数据核对**：`supabase db dump`（roles / schema / data）→ `psql --single-transaction` 导入。`auth` 与 `public` 共 30 张表的行数与旧库逐表一致（`auth.users` 7、`messages` 30、`course_catalog` 4988、`courses` 3924）；Realtime 发布仍只有 `messages`，RLS 策略 24 条，public 函数 69 个，均与旧库一致（下面补应用 `202609160001` 后为 70 个）。Storage 与 Edge Functions 本来为空，未迁移。
+  - **授权被新库默认值重置，已修复**：导入后 `anon` 能执行几乎全部 public 函数（dump 的 `REVOKE ... FROM PUBLIC` 清不掉新库对 `anon`/`authenticated` 的单独授权）。已按 `schema.sql` 里的授权记录清空后逐项重放，并把 `postgres` 在 `public` 的函数与表默认授权改回旧库状态。复查：`anon` 只剩 `enabled_school_id_for_email_domain`，`authenticated` 可执行函数 47 个（补应用 `202609160001` 后为 48 个），表、列、序列权限与 dump 记录一致；`messages` 只有 `authenticated` 的 `select`。
+  - **Auth 后台项在新项目重配**：Before User Created Hook、自定义 SMTP、邮件模板、OTP 参数、URL 配置不随 dump 迁移。Hook 已用 `attacker@gmail.com`、`x@sub.wisc.edu`、`x@wisc.edu.evil.com` 实测，均返回 403；学校域名与 `schools.enabled` 随数据迁移（`wisc.edu`、`umich.edu`、`msu.edu` 均已启用）。所有用户因 JWT 密钥变化需重新登录一次。
+  - **前端已切换**：Vercel Production 与 Preview 的 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`（Config 类型，publishable key）已换成新项目，Development 环境没有这两个变量；生产 deployment 为 `dpl_J3VaZyb1VTobwhb2k6VTsPMywmET`（2026-09-25 01:24 UTC 在 Vercel 后台对生产部署执行 Redeploy 并取消构建缓存得到，没有发布新代码）。切换后登录收验证码、课程列表、发消息、加入课程、Realtime 冒烟通过，新项目日志确认这些请求（`/auth/v1/verify`、`send_conversation_message`、`/realtime/v1/websocket` 等）落在新库，聊天历史保留。回滚：把 Production 变量改回旧项目并重新部署；切换后新库里的写入不会回到旧库。
+  - **迁移历史表**：dump 不含 `supabase_migrations`，新库已用 `supabase migration repair` 登记仓库里全部 23 条迁移，`supabase db push --dry-run` 显示 "Remote database is up to date"。旧项目那条 `20260915051655` 记账行未带过来，是有意的。
+  - **`vercel.json` 增加 `regions: ["cle1"]`**（Cleveland，贴近 us-east-2）；此前草稿里的 `pdx1` 对应旧区域，且缺逗号导致 JSON 不合法。`git.deploymentEnabled.main = false` 保持不变。函数区域在下一次生产部署时生效。
+  - **仍待处理**：① 搬迁使用的两个数据库密码曾出现在会话记录里，需重置；② 旧项目的保留与删除时点；③ 旧库沿用至今的表级授权偏宽：`anon` 与 `authenticated` 对 `member_accounts`、`schools`、`school_email_domains` 有表级全部权限（含 `truncate`、`trigger`），实际写入被 RLS 挡住（三张表只有 `select` 策略），已原样迁移，尚未收紧，需先确认前端只读这三张表再用迁移收窄；④ 生产仍没有平台备份（新项目同为免费版），搬迁用的 dump 已按手册删除，含用户数据。
+- **Issue #29 的迁移曾漏应用，2026-09-25 已在新项目补上**：`202609160001_course_member_relationships.sql` 新增受限批量关系摘要，并修正 active 好友在拉黑状态下的身份优先级；前端课程成员、邮箱搜索与私聊失败展示已接入。2026-09-20 本地验证通过：74 个测试文件、457 项测试及构建、lint、类型检查。发布必须先应用 migration，再发布依赖该 RPC 的前端，并从目标 Supabase 重新生成 `src/types/database.ts`。**2026-09-25 核实**：线上前端已经在调用该 RPC，数据库却一直没有这条迁移（旧库 dump 里没有该函数），课程页成员关系请求返回 404；搬库当天在新项目补应用，两个函数均为 `SECURITY DEFINER`、`search_path` 为空、`anon` 无执行权，之后课程页请求恢复 200。`src/types/database.ts` 尚未从新项目重新生成，里面没有 `list_course_member_relationships`。
 - **Issue #30 与 #29 共用功能分支和后续 PR**：私聊请求 15 秒未返回时从“发送中”降级为可重试失败；重试沿用原 `clientMessageId`，迟到成功优先并忽略重复回执。上述完整验证同时覆盖 Issue #30；尚未发布。
 
 - **Vercel Git 集成已连接，生产分支是 `main`。** 当前生产 deployment 为 `dpl_GRDM8T2uzj4VqswkCnHT1JVfochf`，提交 `2b3cb4e`。此前“未连接”的记录已过时。

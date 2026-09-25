@@ -27,6 +27,7 @@
 | 延迟显示（网络 / 服务毫秒读数） | [STATUS](STATUS.md)「延迟显示」一行；两个读数各测什么见 `measure-latency.ts` 里的注释 | `src/features/latency/`；`src/app/api/ping/route.ts`；`src/app/layout.tsx`（挂载）；`src/app/profile/page.tsx`（开关） |
 | schema、RLS、函数权限 | [数据库说明](../supabase/README.md)、[新建项目手册](runbooks/new-supabase-project.md)及相关业务 ADR | `supabase/migrations/`；集成验证见 `phase-one-integration.test.ts`、`platform-admin.test.ts` 与 `admin-school-testing.test.ts`（自动加载全部 SQL 迁移） |
 | 环境、部署、收不到验证码 | 对应[操作手册](../README.md#操作手册)；需要当时证据再看[环境交接](handoffs/environment-and-deployment.md) | `.env.example`；`supabase/config.toml`；`supabase/templates/email-otp.html` |
+| 换 Supabase 项目或区域、搬迁数据 | [迁移手册](runbooks/migrate-supabase-project.md)；当前生产项目与搬迁证据见 [STATUS](STATUS.md) | `vercel.json`（函数区域）；`supabase/migrations/`（迁移历史登记） |
 
 ## 架构边界与已知陷阱
 
