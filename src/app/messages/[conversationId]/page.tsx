@@ -24,13 +24,13 @@ export default async function MessagePage({
 
   const { conversationId } = await params;
   const service = await createProductionDirectMessageService();
-  const conversationResult = await service.getConversation(conversationId);
+  // 会话信息与最近消息互不依赖，同时取。两者各自由数据库授权，任何一个没有加载成功
+  // 都是 404，页面不会渲染没有通过授权的内容。
+  const [conversationResult, messageResult] = await Promise.all([
+    service.getConversation(conversationId),
+    service.listMessages(conversationId, { direction: "before", limit: 50 }),
+  ]);
   if (conversationResult.status !== "loaded") notFound();
-
-  const messageResult = await service.listMessages(conversationId, {
-    direction: "before",
-    limit: 50,
-  });
   if (messageResult.status !== "loaded") notFound();
 
   return (

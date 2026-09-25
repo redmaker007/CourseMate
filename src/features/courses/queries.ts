@@ -214,30 +214,34 @@ async function resolveJoinedCourse(
   member: CurrentMember,
   courseId: string,
 ) {
-  const { data: membership, error: membershipError } = await supabase
-    .from("course_members")
-    .select("course_id")
-    .eq("course_id", courseId)
-    .eq("user_id", member.userId)
-    .maybeSingle();
-  if (membershipError) throw membershipError;
-  if (!membership) return null;
-
-  const { data: course, error: courseError } = await supabase
-    .from("courses")
-    .select("id, school_id, code, title, term")
-    .eq("id", courseId)
-    .eq("school_id", member.schoolId)
-    .maybeSingle();
-  if (courseError) throw courseError;
+  // 前三个查询互不依赖，同时发出；会话要等到 link 才知道查哪一行，放在后面。
+  // 判断顺序与原来逐个查询时一致：先看成员身份，再看课程，再看会话关联。
+  const [membershipResult, courseResult, linkResult] = await Promise.all([
+    supabase
+      .from("course_members")
+      .select("course_id")
+      .eq("course_id", courseId)
+      .eq("user_id", member.userId)
+      .maybeSingle(),
+    supabase
+      .from("courses")
+      .select("id, school_id, code, title, term")
+      .eq("id", courseId)
+      .eq("school_id", member.schoolId)
+      .maybeSingle(),
+    supabase
+      .from("course_conversations")
+      .select("conversation_id")
+      .eq("course_id", courseId)
+      .maybeSingle(),
+  ]);
+  if (membershipResult.error) throw membershipResult.error;
+  if (!membershipResult.data) return null;
+  if (courseResult.error) throw courseResult.error;
+  const course = courseResult.data;
   if (!course) return null;
-
-  const { data: link, error: linkError } = await supabase
-    .from("course_conversations")
-    .select("conversation_id")
-    .eq("course_id", courseId)
-    .maybeSingle();
-  if (linkError) throw linkError;
+  if (linkResult.error) throw linkResult.error;
+  const link = linkResult.data;
   if (!link) return null;
 
   const { data: conversation, error: conversationError } = await supabase
@@ -306,28 +310,38 @@ export async function getCourseRoom(
   const access = await resolveJoinedCourse(supabase, member, courseId);
   if (!access) return null;
 
-  const { data: memberRows, error: memberError } = await supabase
-    .from("conversation_members")
-    .select("user_id")
-    .eq("conversation_id", access.conversationId)
-    .order("joined_at");
-  if (memberError) throw memberError;
-  const userIds = (memberRows ?? []).map((row) => row.user_id);
-  const { data: profiles, error: profileError } = userIds.length
-    ? await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .in("id", userIds)
-    : { data: [], error: null };
-  if (profileError) throw profileError;
   const invokeRpc = supabase.rpc.bind(supabase) as unknown as FriendshipRpcClient["rpc"];
-  let relationships: CourseMemberRelationshipSummary[] | null = null;
-  try {
-    relationships = await createSupabaseFriendBackend({ rpc: invokeRpc })
-      .listCourseMemberRelationships(courseId);
-  } catch {
-    // 课程主体仍可查看，关系入口安全降级。
-  }
+  // 通过成员身份校验之后，名单、好友关系摘要、最近消息互不依赖，同时发出。
+  // 名单里的资料要等名单才知道查谁，所以两步放在同一路里。
+  const [{ userIds, profiles }, relationships, messages] = await Promise.all([
+    (async () => {
+      const { data: memberRows, error: memberError } = await supabase
+        .from("conversation_members")
+        .select("user_id")
+        .eq("conversation_id", access.conversationId)
+        .order("joined_at");
+      if (memberError) throw memberError;
+      const userIds = (memberRows ?? []).map((row) => row.user_id);
+      const { data: profiles, error: profileError } = userIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, display_name, avatar_url")
+            .in("id", userIds)
+        : { data: [], error: null };
+      if (profileError) throw profileError;
+      return { userIds, profiles };
+    })(),
+    (async (): Promise<CourseMemberRelationshipSummary[] | null> => {
+      try {
+        return await createSupabaseFriendBackend({ rpc: invokeRpc })
+          .listCourseMemberRelationships(courseId);
+      } catch {
+        // 课程主体仍可查看，关系入口安全降级。
+        return null;
+      }
+    })(),
+    messageViews(supabase, access.conversationId, { limit: 50 }),
+  ]);
   const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
   const relationshipById = new Map(
     (relationships ?? []).map((relationship) => [relationship.memberId, relationship]),
@@ -355,9 +369,6 @@ export async function getCourseRoom(
         ? null
         : relationship!.conversationId,
     };
-  });
-  const messages = await messageViews(supabase, access.conversationId, {
-    limit: 50,
   });
 
   return {
