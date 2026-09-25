@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentMember } from "@/features/auth/session";
 import { updateProfileAction } from "@/features/profile/actions";
+import { LatencyToggle } from "@/features/latency/components/latency-toggle";
 import { ProfileForm } from "@/features/profile/components/profile-form";
 import { getOwnProfile } from "@/features/profile/queries";
 
@@ -56,6 +57,19 @@ export default async function ProfilePage() {
           initialProfile={profile}
           submitLabel="保存修改"
         />
+
+        <section
+          aria-labelledby="display-preferences"
+          className="mt-8 border-t border-slate-200 pt-6"
+        >
+          <h2
+            className="mb-4 text-sm font-semibold text-slate-950"
+            id="display-preferences"
+          >
+            显示偏好
+          </h2>
+          <LatencyToggle />
+        </section>
 
         <Link
           className="mt-5 block text-center text-sm font-medium text-indigo-700 hover:text-indigo-950"
