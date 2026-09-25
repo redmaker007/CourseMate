@@ -104,6 +104,7 @@ CourseMate 登录验证码 / Sign-in code
 
 - **Authentication → Sign In / Providers → Email**：OTP Length = `6`，OTP Expiration = `600`
 - **Authentication → Rate Limits**：每小时邮件数默认 2，测试期调到 30 左右
+- **Authentication → Sessions → Access token expiry time**：设为 `900`（默认 3600）。代码本地验证令牌，这个值就是"别处退出登录后，令牌最长还能用多久"的上限，见 [ADR-0009](../adr/0009-verify-access-token-locally.md)。这一页里的 Time-box、Inactivity timeout、单会话限制需要 Pro，与此无关。
 
 ## 6. 开启学校
 

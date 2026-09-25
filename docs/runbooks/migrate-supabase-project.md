@@ -96,7 +96,7 @@ Realtime 表对不上时补 `alter publication supabase_realtime add table publi
 
 ## 6. 重配 Auth 后台项
 
-这些是项目设置，不在 dump 里，逐项按[新建项目手册](./new-supabase-project.md)第 2–5 步：**Before User Created Hook（最危险，配完必须用三类非法邮箱实测都返回 403）**、自定义 SMTP、`Magic Link` 与 `Confirm signup` 两个邮件模板、OTP 长度与有效期、限流，另外要设 Site URL 与 Redirect URLs。`schools.enabled` 是数据，已随 dump 迁移，不用重开。
+这些是项目设置，不在 dump 里，逐项按[新建项目手册](./new-supabase-project.md)第 2–5 步：**Before User Created Hook（最危险，配完必须用三类非法邮箱实测都返回 403）**、自定义 SMTP、`Magic Link` 与 `Confirm signup` 两个邮件模板、OTP 长度与有效期、限流、**Access token expiry time 设为 900 秒**（代码本地验证令牌，这个值是撤销窗口的上限，见 [ADR-0009](../adr/0009-verify-access-token-locally.md)），另外要设 Site URL 与 Redirect URLs。`schools.enabled` 是数据，已随 dump 迁移，不用重开。
 
 新项目的 JWT 密钥不同，**所有用户要重新登录一次**。
 
