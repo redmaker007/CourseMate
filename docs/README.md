@@ -15,7 +15,7 @@
 
 | 任务 | 首读文档 / 决策 | 代码入口 |
 |---|---|---|
-| OTP、登录、退出、学校准入 | [认证规格](specs/auth-email-otp.md)、[ADR-0001](adr/0001-separate-member-account-from-profile.md)；实测验收看 Issue #7 | `src/features/auth/`；`src/lib/supabase/`；`src/proxy.ts` |
+| OTP、登录、退出、学校准入 | [认证规格](specs/auth-email-otp.md)、[ADR-0001](adr/0001-separate-member-account-from-profile.md)；成员会话本地验签与令牌有效期见 [ADR-0009](adr/0009-verify-access-token-locally.md)；实测验收看 Issue #7 | `src/features/auth/`；`src/lib/supabase/`；`src/proxy.ts` |
 | 资料保存、首次登录卡住 | [ADR-0004](adr/0004-require-profile-onboarding-for-app-access.md)；权限事故见[课程整合交接](handoffs/course-catalog-integration.md)“新成员卡在 onboarding” | `src/features/profile/`；`src/app/onboarding/profile/` |
 | 搜课、加退课、课程消息 | [ADR-0007](adr/0007-lazy-course-conversation-creation.md)、[统一会话交接](handoffs/unified-conversation-core.md)；课程来源见[录入课程](runbooks/seed-courses.md) | `src/features/courses/`；`src/app/dashboard/`；`src/app/courses/`；`src/app/api/courses/` |
 | 好友、拉黑、私聊与可靠发送 | [好友页面](handoffs/friend-pages.md)、[第一阶段联调](handoffs/phase-one-integration.md)、[可靠发送验收](testing/issue-23-message-send.md) | `src/features/friends/`；`src/features/messages/`；`src/app/messages/` |
@@ -27,7 +27,7 @@
 | 延迟显示（网络 / 服务毫秒读数） | [STATUS](STATUS.md)「延迟显示」一行；两个读数各测什么见 `measure-latency.ts` 里的注释 | `src/features/latency/`；`src/app/api/ping/route.ts`；`src/app/layout.tsx`（挂载）；`src/app/profile/page.tsx`（开关） |
 | schema、RLS、函数权限 | [数据库说明](../supabase/README.md)、[新建项目手册](runbooks/new-supabase-project.md)及相关业务 ADR | `supabase/migrations/`；集成验证见 `phase-one-integration.test.ts`、`platform-admin.test.ts` 与 `admin-school-testing.test.ts`（自动加载全部 SQL 迁移） |
 | 环境、部署、收不到验证码 | 对应[操作手册](../README.md#操作手册)；需要当时证据再看[环境交接](handoffs/environment-and-deployment.md) | `.env.example`；`supabase/config.toml`；`supabase/templates/email-otp.html` |
-| 换 Supabase 项目或区域、搬迁数据 | [迁移手册](runbooks/migrate-supabase-project.md)；当前生产项目与搬迁证据见 [STATUS](STATUS.md) | `vercel.json`（函数区域）；`supabase/migrations/`（迁移历史登记） |
+| 换 Supabase 项目或区域、搬迁数据、页面变慢 | [迁移手册](runbooks/migrate-supabase-project.md)；当前生产项目见 [STATUS](STATUS.md)，当时的操作、证据与待办见[发布交接](handoffs/release-20260925.md) | `vercel.json`（函数区域）；`supabase/migrations/`（迁移历史登记） |
 
 ## 架构边界与已知陷阱
 

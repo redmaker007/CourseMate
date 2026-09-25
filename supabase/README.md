@@ -23,4 +23,6 @@
 - `service_role` 绕过 RLS，不入库、不进入日志或浏览器；身份与权限不能信任客户端输入。
 - 函数执行权显式从 `public, anon, authenticated` 收回，再按用途授权；内部辅助函数不授予客户端。
 - 调整表或列权限时核对应用读写，并运行覆盖完整迁移链路的集成测试；`course-catalog-integration.test.ts` 与 `platform-admin.test.ts` 包含此类验证。
+- 成员会话由 `auth.getClaims()` 本地验签加 `get_member_context` 一次读取成员账号组成；令牌有效期是撤销窗口的上限，Supabase 后台保持在 900 秒（[ADR-0009](../docs/adr/0009-verify-access-token-locally.md)）。
+- 新增迁移必须先于依赖它的前端发布：函数不存在时 proxy 会把所有请求当作未登录。
 - 生成类型位于 `src/types/database.ts`；临时类型及待重新生成状态只在当前状态页记录。
