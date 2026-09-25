@@ -14,6 +14,10 @@ npx vercel env add NEXT_PUBLIC_SUPABASE_URL production --value "<url>" --no-sens
 
 `EMAIL_OTP_CONTEXT_SECRET` 是服务端专用、运行时读取，保持 Secret 没问题。它**必须存在**，缺了会让发码 Server Action 直接崩。
 
+## 函数区域要贴近数据库区域
+
+`vercel.json` 的 `regions` 决定 Serverless 函数的运行区域，应和 Supabase 项目同区域，否则每次查询都跨区。当前数据库在 us-east-2（俄亥俄），对应 `cle1`（Cleveland）；Hobby 方案只能选一个区域。换数据库区域时同步改这里，下一次生产部署才会生效。
+
 ## Git 自动部署与数据库发布顺序
 
 2026-09-12 已通过 Vercel 项目 API 核实：项目连接了 GitHub，生产分支为 `main`。旧手册的“未连接”记录已经过时。合并通常会自动生产部署。

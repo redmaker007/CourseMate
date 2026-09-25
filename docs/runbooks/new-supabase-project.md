@@ -2,7 +2,7 @@
 
 > 适用于任何一个新的 Supabase 项目，包括将来的生产环境。
 >
-> 相关：[部署](./deploy.md) · [本地开发](./local-development.md) · [环境交接](../handoffs/environment-and-deployment.md)
+> 相关：[部署](./deploy.md) · [本地开发](./local-development.md) · [环境交接](../handoffs/environment-and-deployment.md) · 已有数据要整体搬过来时看[迁移 Supabase 项目](./migrate-supabase-project.md)（第 1 步换成导入 dump，第 2–7 步照做）
 
 ⚠️ **跑完 SQL 只完成了一半。** 下面 2–5 步都是后台配置，代码和 migration 里都看不到，漏掉任何一步系统都会以危险或无声的方式失败。
 
