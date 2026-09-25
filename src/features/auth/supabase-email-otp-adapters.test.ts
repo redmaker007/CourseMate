@@ -80,8 +80,8 @@ describe("Supabase email OTP adapters", () => {
     const adapter = createSupabaseMemberSession(
       asSupabaseClient({
         auth: {
-          getUser: async () => ({
-            data: { user: { id: "user-1", email: "Student@WISC.EDU" } },
+          getClaims: async () => ({
+            data: { claims: { sub: "user-1", email: "Student@WISC.EDU" } },
             error: null,
           }),
         },
@@ -107,8 +107,8 @@ describe("Supabase email OTP adapters", () => {
     const adapter = createSupabaseMemberSession(
       asSupabaseClient({
         auth: {
-          getUser: async () => ({
-            data: { user: { id: "user-1", email: "student@wisc.edu" } },
+          getClaims: async () => ({
+            data: { claims: { sub: "user-1", email: "student@wisc.edu" } },
             error: null,
           }),
         },
@@ -134,10 +134,8 @@ describe("Supabase email OTP adapters", () => {
     const adapter = createSupabaseMemberSession(
       asSupabaseClient({
         auth: {
-          getUser: async () => ({
-            data: { user: null },
-            error: { name: "AuthSessionMissingError" },
-          }),
+          // 没有会话时 getClaims 返回 data: null、error: null。
+          getClaims: async () => ({ data: null, error: null }),
         },
       }),
     );

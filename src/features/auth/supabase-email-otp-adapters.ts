@@ -111,16 +111,26 @@ export function createSupabaseMemberSessionReader(
 ) {
   const data: MemberSessionDataPort = {
     async getVerifiedUser() {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      // getClaims 用项目公钥在本地验证令牌的签名与有效期，不再为每个请求向 Auth
+      // 服务器往返一次。代价：令牌被撤销（如别处退出登录）要等它过期才失效，所以
+      // Supabase 的 JWT expiry 要保持较短。删除用户仍然立即生效——下面读取成员账号时
+      // 会查不到。
+      const { data, error } = await supabase.auth.getClaims();
 
-      if (userError?.name === "AuthSessionMissingError") return null;
-      if (userError) throw userError;
-      if (!user?.email) return null;
+      if (error?.name === "AuthSessionMissingError") return null;
+      if (error) throw error;
 
-      return { id: user.id, email: user.email };
+      // 没有会话时 data 为 null 而不是报错。
+      const claims = data?.claims;
+      if (
+        typeof claims?.sub !== "string" ||
+        typeof claims.email !== "string" ||
+        !claims.email
+      ) {
+        return null;
+      }
+
+      return { id: claims.sub, email: claims.email };
     },
 
     async getMemberFacts(emailDomain) {
