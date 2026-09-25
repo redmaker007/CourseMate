@@ -1220,6 +1220,16 @@ export type Database = {
           visible_unread: number
         }[]
       }
+      get_member_context: {
+        Args: { candidate_domain: string }
+        Returns: {
+          current_school_id: string
+          enabled_school_id: string
+          home_school_id: string
+          onboarding_complete: boolean
+          user_id: string
+        }[]
+      }
       get_own_profile: {
         Args: never
         Returns: {
@@ -1246,6 +1256,16 @@ export type Database = {
           conversation_id: string
           display_name: string
           member_id: string
+        }[]
+      }
+      list_course_member_relationships: {
+        Args: { target_course_id: string }
+        Returns: {
+          conversation_id: string
+          member_id: string
+          relationship_status: string
+          restriction_status: string
+          send_status: string
         }[]
       }
       list_direct_conversation_unread: {
