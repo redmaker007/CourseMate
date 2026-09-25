@@ -31,15 +31,6 @@ vi.mock("@supabase/ssr", () => ({
       };
     },
   ) => {
-    const query = {
-      select: () => query,
-      eq: () => query,
-      maybeSingle: async () => ({
-        data: supabaseBoundary.memberBinding,
-        error: null,
-      }),
-    };
-
     return {
       auth: {
         getUser: async () => {
@@ -67,8 +58,24 @@ vi.mock("@supabase/ssr", () => ({
           };
         },
       },
-      from: () => query,
-      rpc: async () => ({ data: "uw-madison", error: null }),
+      // 成员会话只经 get_member_context 一次读取；故意没有 from，任何单独的表查询都会失败。
+      rpc: async () => {
+        const binding = supabaseBoundary.memberBinding;
+        return {
+          data: binding
+            ? [
+                {
+                  user_id: binding.user_id,
+                  home_school_id: binding.school_id,
+                  enabled_school_id: "uw-madison",
+                  current_school_id: binding.school_id,
+                  onboarding_complete: true,
+                },
+              ]
+            : [],
+          error: null,
+        };
+      },
     };
   },
 }));

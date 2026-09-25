@@ -22,34 +22,27 @@ export type CurrentMember = {
  *
  * 出错时返回 null（fail closed），与 proxy 的处理保持一致——认证服务暂时
  * 不可用时宁可当作未登录，也不要放行。
+ *
+ * 一次页面渲染只做两次往返：auth.getUser 验证登录，再用一次 get_member_context
+ * 取回绑定、开放学校、当前学校与 onboarding 状态。
  */
 export async function getCurrentMember(): Promise<CurrentMember | null> {
   const supabase = await createClient();
 
   try {
-    const session = await createSupabaseMemberSessionReader(
+    const context = await createSupabaseMemberSessionReader(
       supabase,
-    ).getMemberSession();
-    if (!session) return null;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.email) return null;
-
-    const [onboarding, school] = await Promise.all([
-      supabase.rpc("has_completed_onboarding"),
-      supabase.rpc("current_school_id"),
-    ]);
-    if (onboarding.error || school.error || !school.data) return null;
-    const onboardingComplete = onboarding.data;
+    ).getMemberContext();
+    if (!context) return null;
 
     return {
-      ...session,
-      schoolId: school.data,
-      ...(school.data !== session.schoolId ? { homeSchoolId: session.schoolId } : {}),
-      email: user.email,
-      onboardingComplete: onboardingComplete === true,
+      userId: context.userId,
+      schoolId: context.currentSchoolId,
+      ...(context.currentSchoolId !== context.homeSchoolId
+        ? { homeSchoolId: context.homeSchoolId }
+        : {}),
+      email: context.email,
+      onboardingComplete: context.onboardingComplete,
     };
   } catch {
     return null;

@@ -123,26 +123,30 @@ export function createSupabaseMemberSessionReader(
       return { id: user.id, email: user.email };
     },
 
-    async getMemberBinding(userId) {
-      const { data, error } = await supabase
-        .from("member_accounts")
-        .select("user_id, school_id")
-        .eq("user_id", userId)
-        .maybeSingle();
+    async getMemberFacts(emailDomain) {
+      const { data, error } = await supabase.rpc("get_member_context", {
+        candidate_domain: emailDomain,
+      });
 
       if (error) throw error;
-      if (!data) return null;
-      return { userId: data.user_id, schoolId: data.school_id };
-    },
 
-    async getEnabledSchoolIdForDomain(domain) {
-      const { data: schoolId, error: domainError } = await supabase.rpc(
-        "enabled_school_id_for_email_domain",
-        { candidate_domain: domain },
-      );
+      const row = Array.isArray(data) ? data[0] : null;
+      // 没有成员账号时函数返回零行。形状不对的行也按没有处理，不放行。
+      if (
+        !row ||
+        typeof row.user_id !== "string" ||
+        typeof row.home_school_id !== "string"
+      ) {
+        return null;
+      }
 
-      if (domainError) throw domainError;
-      return schoolId;
+      return {
+        userId: row.user_id,
+        homeSchoolId: row.home_school_id,
+        enabledSchoolId: row.enabled_school_id ?? null,
+        currentSchoolId: row.current_school_id ?? null,
+        onboardingComplete: row.onboarding_complete === true,
+      };
     },
   };
 

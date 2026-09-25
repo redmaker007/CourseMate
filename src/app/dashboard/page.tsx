@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getPlatformRole } from "@/features/admin/queries";
 import { getEnabledSchools } from "@/features/auth/queries";
-import { getCurrentMember } from "@/features/auth/session";
+import { getCurrentMember, type CurrentMember } from "@/features/auth/session";
 import { CourseSearch } from "@/features/courses/components/course-search";
 import {
   getDashboardCourses,
@@ -17,6 +17,49 @@ import { Section } from "@/features/dashboard/components/section";
 import { createProductionDirectMessageService } from "@/features/messages/production-direct-message-service";
 
 export const dynamic = "force-dynamic";
+
+// 学校名只是展示用，取不到就退回学校 ID，不该拦住整个页面。
+async function loadSchoolName(schoolId: string) {
+  try {
+    const school = (await getEnabledSchools()).find(
+      (candidate) => candidate.id === schoolId,
+    );
+    return school ? school.nameZh : schoolId;
+  } catch {
+    return schoolId;
+  }
+}
+
+async function loadCourseData(member: CurrentMember, courseQuery: string) {
+  try {
+    const [courses, searchResults] = await Promise.all([
+      getDashboardCourses(member),
+      courseQuery
+        ? searchAvailableCourses(member, courseQuery)
+        : Promise.resolve([]),
+    ]);
+    return { courses, searchResults, unavailable: false };
+  } catch {
+    return {
+      courses: { current: [], archived: [] } as Awaited<
+        ReturnType<typeof getDashboardCourses>
+      >,
+      searchResults: [] as Awaited<ReturnType<typeof searchAvailableCourses>>,
+      unavailable: true,
+    };
+  }
+}
+
+// 未读数只是次要提示，取不到时大厅其余部分照常可用。
+async function loadDirectUnread() {
+  try {
+    const messageService = await createProductionDirectMessageService();
+    const unreadResult = await messageService.getUnreadCounts();
+    return unreadResult.status === "loaded" ? unreadResult.counts.visible : 0;
+  } catch {
+    return 0;
+  }
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -31,45 +74,20 @@ export default async function DashboardPage({
   const { signout, q, courseAction } = await searchParams;
   const courseQuery = typeof q === "string" ? q.trim() : "";
 
-  // 读不到身份时返回 null，只是不显示入口，不影响大厅本身。
-  const platformRole = await getPlatformRole();
-
-  let schoolName = member.schoolId;
-  try {
-    const school = (await getEnabledSchools()).find(
-      (candidate) => candidate.id === member.schoolId,
-    );
-    if (school) schoolName = school.nameZh;
-  } catch {
-    // 学校名只是展示用，取不到就退回学校 ID，不该拦住整个页面。
-  }
-
-  let courses = { current: [], archived: [] } as Awaited<
-    ReturnType<typeof getDashboardCourses>
-  >;
-  let searchResults = [] as Awaited<ReturnType<typeof searchAvailableCourses>>;
-  let courseDataUnavailable = false;
-  let directUnread = 0;
-  try {
-    [courses, searchResults] = await Promise.all([
-      getDashboardCourses(member),
-      courseQuery
-        ? searchAvailableCourses(member, courseQuery)
-        : Promise.resolve([]),
-    ]);
-  } catch {
-    courseDataUnavailable = true;
-  }
-
-  try {
-    const messageService = await createProductionDirectMessageService();
-    const unreadResult = await messageService.getUnreadCounts();
-    if (unreadResult.status === "loaded") {
-      directUnread = unreadResult.counts.visible;
-    }
-  } catch {
-    // Unread is a secondary hint; the rest of Dashboard remains usable.
-  }
+  // 四路数据互不依赖，同时发出：总耗时取决于最慢的一路，而不是四路相加。
+  // 各路自己处理失败并给出降级值，一路失败不会拖垮整页。
+  // 平台身份读不到时返回 null，只是不显示管理入口，不影响大厅本身。
+  const [
+    platformRole,
+    schoolName,
+    { courses, searchResults, unavailable: courseDataUnavailable },
+    directUnread,
+  ] = await Promise.all([
+    getPlatformRole(),
+    loadSchoolName(member.schoolId),
+    loadCourseData(member, courseQuery),
+    loadDirectUnread(),
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-50">
