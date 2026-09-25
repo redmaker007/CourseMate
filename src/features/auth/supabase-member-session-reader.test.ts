@@ -4,20 +4,26 @@ import { describe, expect, it, vi } from "vitest";
 import { createSupabaseMemberSessionReader } from "./supabase-email-otp-adapters";
 
 type Reply = { data: unknown; error: unknown };
+type Claims = { sub?: unknown; email?: unknown };
 
 function fakeSupabase({
-  user = { id: "user-1", email: "student@wisc.edu" } as {
-    id: string;
-    email?: string;
-  } | null,
-  userError = null as { name: string } | null,
+  claims = { sub: "user-1", email: "student@wisc.edu" } as Claims | null,
+  claimsError = null as unknown,
   rpc = { data: [], error: null } as Reply,
 } = {}) {
-  const getUser = vi.fn(async () => ({ data: { user }, error: userError }));
+  // 没有会话时 getClaims 返回 data: null、error: null，不是报错。
+  const getClaims = vi.fn(async () => ({
+    data: claims ? { claims } : null,
+    error: claimsError,
+  }));
+  const getUser = vi.fn();
   const rpcCall = vi.fn(async () => rpc);
   // 故意没有 from：校验路径不允许再走单独的表查询。
-  const client = { auth: { getUser }, rpc: rpcCall } as unknown as SupabaseClient;
-  return { client, getUser, rpc: rpcCall };
+  const client = {
+    auth: { getClaims, getUser },
+    rpc: rpcCall,
+  } as unknown as SupabaseClient;
+  return { client, getClaims, getUser, rpc: rpcCall };
 }
 
 const ROW = {
@@ -29,8 +35,8 @@ const ROW = {
 };
 
 describe("createSupabaseMemberSessionReader", () => {
-  it("用 get_member_context 一次取回全部事实，只发两次请求", async () => {
-    const { client, getUser, rpc } = fakeSupabase({
+  it("本地验证令牌，再用 get_member_context 一次取回全部事实，只有一次网络往返", async () => {
+    const { client, getClaims, getUser, rpc } = fakeSupabase({
       rpc: { data: [ROW], error: null },
     });
 
@@ -39,15 +45,16 @@ describe("createSupabaseMemberSessionReader", () => {
     ).getMemberSession();
 
     expect(session).toEqual({ userId: "user-1", schoolId: "uw-madison" });
-    expect(getUser).toHaveBeenCalledTimes(1);
+    expect(getClaims).toHaveBeenCalledTimes(1);
+    expect(getUser).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("get_member_context", {
       candidate_domain: "wisc.edu",
     });
   });
 
-  it("页面上下文同样只发两次请求", async () => {
-    const { client, getUser, rpc } = fakeSupabase({
+  it("页面上下文同样只验证一次令牌、只调用一次数据库函数", async () => {
+    const { client, getClaims, getUser, rpc } = fakeSupabase({
       rpc: { data: [ROW], error: null },
     });
 
@@ -62,14 +69,24 @@ describe("createSupabaseMemberSessionReader", () => {
       currentSchoolId: "uw-madison",
       onboardingComplete: true,
     });
-    expect(getUser).toHaveBeenCalledTimes(1);
+    expect(getClaims).toHaveBeenCalledTimes(1);
+    expect(getUser).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("没有登录会话时不访问数据库", async () => {
+    const { client, rpc } = fakeSupabase({ claims: null });
+
+    expect(
+      await createSupabaseMemberSessionReader(client).getMemberSession(),
+    ).toBeNull();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("会话缺失错误按未登录处理", async () => {
     const { client, rpc } = fakeSupabase({
-      user: null,
-      userError: { name: "AuthSessionMissingError" },
+      claims: null,
+      claimsError: { name: "AuthSessionMissingError" },
     });
 
     expect(
@@ -78,8 +95,14 @@ describe("createSupabaseMemberSessionReader", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("Auth 用户没有邮箱时按未登录处理", async () => {
-    const { client, rpc } = fakeSupabase({ user: { id: "user-1" } });
+  it.each([
+    ["没有邮箱", { sub: "user-1" }],
+    ["邮箱为空", { sub: "user-1", email: "" }],
+    ["邮箱不是字符串", { sub: "user-1", email: 42 }],
+    ["没有用户标识", { email: "student@wisc.edu" }],
+    ["用户标识不是字符串", { sub: 7, email: "student@wisc.edu" }],
+  ])("令牌声明不完整（%s）时按未登录处理，且不访问数据库", async (_label, claims) => {
+    const { client, rpc } = fakeSupabase({ claims });
 
     expect(
       await createSupabaseMemberSessionReader(client).getMemberSession(),
@@ -125,7 +148,7 @@ describe("createSupabaseMemberSessionReader", () => {
     ).toMatchObject({ onboardingComplete: false });
   });
 
-  it("函数调用出错、Auth 异常时向上抛出，由调用方 fail closed", async () => {
+  it("令牌无效、函数调用出错时向上抛出，由调用方 fail closed", async () => {
     const rpcFailure = fakeSupabase({
       rpc: { data: null, error: new Error("function not found") },
     });
@@ -133,12 +156,13 @@ describe("createSupabaseMemberSessionReader", () => {
       createSupabaseMemberSessionReader(rpcFailure.client).getMemberSession(),
     ).rejects.toThrow("function not found");
 
-    const authFailure = fakeSupabase({
-      user: null,
-      userError: new Error("auth unavailable") as unknown as { name: string },
+    const invalidToken = fakeSupabase({
+      claims: null,
+      claimsError: new Error("Invalid JWT signature"),
     });
     await expect(
-      createSupabaseMemberSessionReader(authFailure.client).getMemberSession(),
-    ).rejects.toThrow("auth unavailable");
+      createSupabaseMemberSessionReader(invalidToken.client).getMemberSession(),
+    ).rejects.toThrow("Invalid JWT signature");
+    expect(invalidToken.rpc).not.toHaveBeenCalled();
   });
 });

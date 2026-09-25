@@ -33,7 +33,11 @@ vi.mock("@supabase/ssr", () => ({
   ) => {
     return {
       auth: {
+        // 校验路径本地验证令牌；getUser 会多一次网络往返，不应再被调用。
         getUser: async () => {
+          throw new Error("proxy 不应调用 auth.getUser");
+        },
+        getClaims: async () => {
           supabaseBoundary.incomingCookies = options.cookies.getAll();
           options.cookies.setAll(
             [
@@ -50,10 +54,9 @@ vi.mock("@supabase/ssr", () => ({
               Pragma: "no-cache",
             },
           );
+          const user = supabaseBoundary.authUser;
           return {
-            data: {
-              user: supabaseBoundary.authUser,
-            },
+            data: user ? { claims: { sub: user.id, email: user.email } } : null,
             error: null,
           };
         },

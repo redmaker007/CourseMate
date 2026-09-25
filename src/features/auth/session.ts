@@ -23,8 +23,8 @@ export type CurrentMember = {
  * 出错时返回 null（fail closed），与 proxy 的处理保持一致——认证服务暂时
  * 不可用时宁可当作未登录，也不要放行。
  *
- * 一次页面渲染只做两次往返：auth.getUser 验证登录，再用一次 get_member_context
- * 取回绑定、开放学校、当前学校与 onboarding 状态。
+ * 一次页面渲染只做一次网络往返：auth.getClaims 在本地验证令牌，再用一次
+ * get_member_context 取回绑定、开放学校、当前学校与 onboarding 状态。
  */
 export async function getCurrentMember(): Promise<CurrentMember | null> {
   const supabase = await createClient();
