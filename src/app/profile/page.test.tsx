@@ -62,4 +62,21 @@ describe("Profile page flow", () => {
     expect(screen.getByLabelText("默认头像").textContent).toBe("小");
     expect(screen.getByTestId("profile-form").textContent).toBe("小明");
   });
+
+  it("资料页提供显示网络延迟的开关", async () => {
+    auth.getCurrentMember.mockResolvedValue({
+      userId: "member-1",
+      onboardingComplete: true,
+    });
+    profiles.getOwnProfile.mockResolvedValue({
+      displayName: "小明",
+      major: null,
+      gradYear: null,
+      avatarUrl: null,
+    });
+
+    render(await ProfilePage());
+
+    expect(screen.getByRole("checkbox", { name: /显示网络延迟/ })).toBeTruthy();
+  });
 });

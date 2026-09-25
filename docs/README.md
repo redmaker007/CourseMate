@@ -24,6 +24,7 @@
 | 管理员跨校测试、当前学校判断 | [ADR-0006](adr/0006-admin-cross-school-testing.md)、[管理手册](runbooks/platform-admin.md)「切换测试学校」 | `supabase/migrations/202609120002_admin_school_testing.sql`；`src/features/admin/school-test-actions.ts`；`src/features/auth/session.ts` |
 | xlsx 解析或导入脚本 | [录入课程](runbooks/seed-courses.md)；申请数据前读 [ADR-0002](adr/0002-do-not-reverse-engineer-university-course-search.md) | `scripts/course-catalog-parse.mts`；`scripts/import-course-catalog.mts`；`src/features/admin/components/catalog-import.tsx` |
 | 大厅与页面布局 | [协作约定](../CONTRIBUTING.md)、[路由交接](handoffs/frontend-routing-and-dashboard.md) | `src/app/**/page.tsx`；`src/features/*/components/` |
+| 延迟显示（网络 / 服务毫秒读数） | [STATUS](STATUS.md)「延迟显示」一行；两个读数各测什么见 `measure-latency.ts` 里的注释 | `src/features/latency/`；`src/app/api/ping/route.ts`；`src/app/layout.tsx`（挂载）；`src/app/profile/page.tsx`（开关） |
 | schema、RLS、函数权限 | [数据库说明](../supabase/README.md)、[新建项目手册](runbooks/new-supabase-project.md)及相关业务 ADR | `supabase/migrations/`；集成验证见 `phase-one-integration.test.ts`、`platform-admin.test.ts` 与 `admin-school-testing.test.ts`（自动加载全部 SQL 迁移） |
 | 环境、部署、收不到验证码 | 对应[操作手册](../README.md#操作手册)；需要当时证据再看[环境交接](handoffs/environment-and-deployment.md) | `.env.example`；`supabase/config.toml`；`supabase/templates/email-otp.html` |
 
