@@ -77,15 +77,6 @@ describe("Supabase email OTP adapters", () => {
   });
 
   it("只有 Auth 邮箱域名与成员学校绑定一致时才是有效成员会话", async () => {
-    const memberRow = {
-      data: { user_id: "user-1", school_id: "uw-madison" },
-      error: null,
-    };
-    const query = {
-      select: () => query,
-      eq: () => query,
-      maybeSingle: async () => memberRow,
-    };
     const adapter = createSupabaseMemberSession(
       asSupabaseClient({
         auth: {
@@ -94,8 +85,18 @@ describe("Supabase email OTP adapters", () => {
             error: null,
           }),
         },
-        from: () => query,
-        rpc: async () => ({ data: "uw-madison", error: null }),
+        rpc: async () => ({
+          data: [
+            {
+              user_id: "user-1",
+              home_school_id: "uw-madison",
+              enabled_school_id: "uw-madison",
+              current_school_id: "uw-madison",
+              onboarding_complete: true,
+            },
+          ],
+          error: null,
+        }),
       }),
     );
 
@@ -103,14 +104,6 @@ describe("Supabase email OTP adapters", () => {
   });
 
   it("学校绑定与 Auth 邮箱域名不一致时不是有效成员会话", async () => {
-    const query = {
-      select: () => query,
-      eq: () => query,
-      maybeSingle: async () => ({
-        data: { user_id: "user-1", school_id: "umich" },
-        error: null,
-      }),
-    };
     const adapter = createSupabaseMemberSession(
       asSupabaseClient({
         auth: {
@@ -119,8 +112,18 @@ describe("Supabase email OTP adapters", () => {
             error: null,
           }),
         },
-        from: () => query,
-        rpc: async () => ({ data: "uw-madison", error: null }),
+        rpc: async () => ({
+          data: [
+            {
+              user_id: "user-1",
+              home_school_id: "umich",
+              enabled_school_id: "uw-madison",
+              current_school_id: "umich",
+              onboarding_complete: true,
+            },
+          ],
+          error: null,
+        }),
       }),
     );
 

@@ -28,8 +28,16 @@ vi.mock("@/features/messages/production-direct-message-service", () => ({
   createProductionDirectMessageService: messageProduction.createService,
 }));
 vi.mock("@/features/dashboard/components/dashboard-header", () => ({
-  DashboardHeader: ({ adminHref }: { adminHref?: string }) => (
-    <div>Dashboard header{adminHref ? ` → ${adminHref}` : ""}</div>
+  DashboardHeader: ({
+    adminHref,
+    schoolName,
+  }: {
+    adminHref?: string;
+    schoolName: string;
+  }) => (
+    <div data-school={schoolName}>
+      Dashboard header{adminHref ? ` → ${adminHref}` : ""}
+    </div>
   ),
 }));
 vi.mock("@/features/dashboard/components/course-card", () => ({
@@ -104,6 +112,86 @@ describe("DashboardPage course flow", () => {
       "href",
       "http://localhost:3000/friends",
     );
+  });
+
+  it("四路数据同时发出，而不是一路等完再发下一路", { timeout: 1000 }, async () => {
+    // 每一路都要等到四路全部开始才会返回；若是串行发起，第一路永远等不到其余三路，
+    // 测试会因超时失败。
+    const started = new Set<string>();
+    let release!: () => void;
+    const allStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const begin = (name: string) => {
+      started.add(name);
+      if (started.size === 4) release();
+      return allStarted;
+    };
+    adminQueries.getPlatformRole.mockImplementation(async () => {
+      await begin("role");
+      return null;
+    });
+    authQueries.getEnabledSchools.mockImplementation(async () => {
+      await begin("schools");
+      return [];
+    });
+    courseQueries.getDashboardCourses.mockImplementation(async () => {
+      await begin("courses");
+      return { current: [], archived: [] };
+    });
+    messageProduction.createService.mockImplementation(async () => {
+      await begin("unread");
+      return messageService;
+    });
+
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+
+    expect([...started].sort()).toEqual(["courses", "role", "schools", "unread"]);
+  });
+
+  it("学校名取不到时退回学校 ID，其余内容照常显示", async () => {
+    authQueries.getEnabledSchools.mockRejectedValue(new Error("boom"));
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Dashboard header").getAttribute("data-school")).toBe(
+      "uw-madison",
+    );
+    expect(screen.getByText("Current course")).toBeTruthy();
+  });
+
+  it("拿到学校列表时显示学校中文名", async () => {
+    authQueries.getEnabledSchools.mockResolvedValue([
+      { id: "uw-madison", nameZh: "威斯康星大学麦迪逊分校" },
+    ]);
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Dashboard header").getAttribute("data-school")).toBe(
+      "威斯康星大学麦迪逊分校",
+    );
+  });
+
+  it("课程数据失败只提示不可用，不影响未读数与页头", async () => {
+    courseQueries.getDashboardCourses.mockRejectedValue(new Error("boom"));
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("课程数据暂时不可用，请稍后刷新。")).toBeTruthy();
+    expect(screen.queryByText("Current course")).toBeNull();
+    expect(screen.getByRole("link", { name: /2 条私聊未读/ })).toBeTruthy();
+  });
+
+  it("未读数失败时退回默认入口，课程照常显示", async () => {
+    messageProduction.createService.mockRejectedValue(new Error("boom"));
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("link", { name: /查看好友/ })).toBeTruthy();
+    expect(screen.getByText("Current course")).toBeTruthy();
+
+    cleanup();
+    messageProduction.createService.mockResolvedValue(messageService);
+    messageService.getUnreadCounts.mockResolvedValue({ status: "unavailable" });
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("link", { name: /查看好友/ })).toBeTruthy();
   });
 
   it("requires profile onboarding before loading course data", async () => {
