@@ -28,22 +28,22 @@
 
 以下策略在生产和完整迁移链中均为 `PERMISSIVE`，角色均为 `authenticated`。表中的条件来自生产 `pg_policies`；自动对照同时验证了 schema、表、策略名、模式、角色、命令、`qual` 与 `with_check`。
 
-| 表 / 策略 | 命令 | 生产条件 | 与 `main` 对照 | 结论 |
+| 表 / 策略 | 命令 | 生产条件 | `main` 完整迁移链条件 | 结论 |
 |---|---|---|---|---|
-| `behavior_reports.behavior_reports_select_own` | SELECT | `qual: (has_completed_onboarding() AND (reporter_id = auth.uid()))` | 全字段相同 | 无冲突—可以修改 |
-| `course_catalog.course_catalog_select_own_school` | SELECT | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | 全字段相同 | 无冲突—可以修改 |
-| `course_members.course_members_select` | SELECT | `qual: (has_completed_onboarding() AND ((user_id = auth.uid()) OR is_course_member(course_id)))` | 全字段相同 | 无冲突—可以修改 |
-| `course_members.course_members_insert_self` | INSERT | `with_check: (has_completed_onboarding() AND (user_id = auth.uid()) AND (EXISTS (SELECT 1 FROM courses c JOIN school_term_settings terms ON terms.school_id = c.school_id WHERE c.id = course_members.course_id AND c.school_id = current_school_id() AND c.term = terms.current_term)))` | 全字段相同 | 无冲突—可以修改 |
-| `course_members.course_members_delete_self` | DELETE | `qual: (has_completed_onboarding() AND (user_id = auth.uid()) AND (EXISTS (SELECT 1 FROM courses c JOIN school_term_settings terms ON terms.school_id = c.school_id WHERE c.id = course_members.course_id AND c.school_id = current_school_id() AND c.term = terms.current_term)))` | 全字段相同 | 无冲突—可以修改 |
-| `courses.courses_select_own_school` | SELECT | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | 全字段相同 | 无冲突—可以修改 |
-| `friend_preferences.friend_preferences_select_owner` | SELECT | `qual: (has_completed_onboarding() AND (owner_id = auth.uid()))` | 全字段相同 | 无冲突—可以修改 |
-| `friend_requests.friend_requests_select_participant` | SELECT | `qual: (has_completed_onboarding() AND ((auth.uid() = requester_id) OR (auth.uid() = recipient_id)))` | 全字段相同 | 无冲突—可以修改 |
-| `friendships.friendships_select_participant` | SELECT | `qual: (has_completed_onboarding() AND ((auth.uid() = pair_low) OR (auth.uid() = pair_high)))` | 全字段相同 | 无冲突—可以修改 |
-| `member_blocks.member_blocks_select_owner` | SELECT | `qual: (has_completed_onboarding() AND (blocker_id = auth.uid()))` | 全字段相同 | 无冲突—可以修改 |
-| `profiles.profiles_insert_self` | INSERT | `with_check: (id = auth.uid())` | 全字段相同 | 无冲突—可以修改 |
-| `profiles.profiles_select_self_or_classmate` | SELECT | `qual: ((id = auth.uid()) OR (has_completed_onboarding() AND shares_course_with(id)))` | 全字段相同 | 无冲突—可以修改 |
-| `profiles.profiles_update_self` | UPDATE | `qual: (id = auth.uid()); with_check: (id = auth.uid())` | 全字段相同 | 无冲突—可以修改 |
-| `school_term_settings.school_term_settings_select_own_school` | SELECT | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | 全字段相同 | 无冲突—可以修改 |
+| `behavior_reports.behavior_reports_select_own` | SELECT | `qual: (has_completed_onboarding() AND (reporter_id = auth.uid()))` | `qual: (has_completed_onboarding() AND (reporter_id = auth.uid()))` | 无冲突—可以修改 |
+| `course_catalog.course_catalog_select_own_school` | SELECT | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | 无冲突—可以修改 |
+| `course_members.course_members_select` | SELECT | `qual: (has_completed_onboarding() AND ((user_id = auth.uid()) OR is_course_member(course_id)))` | `qual: (has_completed_onboarding() AND ((user_id = auth.uid()) OR is_course_member(course_id)))` | 无冲突—可以修改 |
+| `course_members.course_members_insert_self` | INSERT | `with_check: (has_completed_onboarding() AND (user_id = auth.uid()) AND (EXISTS (SELECT 1 FROM courses c JOIN school_term_settings terms ON terms.school_id = c.school_id WHERE c.id = course_members.course_id AND c.school_id = current_school_id() AND c.term = terms.current_term)))` | `with_check: (has_completed_onboarding() AND (user_id = auth.uid()) AND (EXISTS (SELECT 1 FROM courses c JOIN school_term_settings terms ON terms.school_id = c.school_id WHERE c.id = course_members.course_id AND c.school_id = current_school_id() AND c.term = terms.current_term)))` | 无冲突—可以修改 |
+| `course_members.course_members_delete_self` | DELETE | `qual: (has_completed_onboarding() AND (user_id = auth.uid()) AND (EXISTS (SELECT 1 FROM courses c JOIN school_term_settings terms ON terms.school_id = c.school_id WHERE c.id = course_members.course_id AND c.school_id = current_school_id() AND c.term = terms.current_term)))` | `qual: (has_completed_onboarding() AND (user_id = auth.uid()) AND (EXISTS (SELECT 1 FROM courses c JOIN school_term_settings terms ON terms.school_id = c.school_id WHERE c.id = course_members.course_id AND c.school_id = current_school_id() AND c.term = terms.current_term)))` | 无冲突—可以修改 |
+| `courses.courses_select_own_school` | SELECT | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | 无冲突—可以修改 |
+| `friend_preferences.friend_preferences_select_owner` | SELECT | `qual: (has_completed_onboarding() AND (owner_id = auth.uid()))` | `qual: (has_completed_onboarding() AND (owner_id = auth.uid()))` | 无冲突—可以修改 |
+| `friend_requests.friend_requests_select_participant` | SELECT | `qual: (has_completed_onboarding() AND ((auth.uid() = requester_id) OR (auth.uid() = recipient_id)))` | `qual: (has_completed_onboarding() AND ((auth.uid() = requester_id) OR (auth.uid() = recipient_id)))` | 无冲突—可以修改 |
+| `friendships.friendships_select_participant` | SELECT | `qual: (has_completed_onboarding() AND ((auth.uid() = pair_low) OR (auth.uid() = pair_high)))` | `qual: (has_completed_onboarding() AND ((auth.uid() = pair_low) OR (auth.uid() = pair_high)))` | 无冲突—可以修改 |
+| `member_blocks.member_blocks_select_owner` | SELECT | `qual: (has_completed_onboarding() AND (blocker_id = auth.uid()))` | `qual: (has_completed_onboarding() AND (blocker_id = auth.uid()))` | 无冲突—可以修改 |
+| `profiles.profiles_insert_self` | INSERT | `with_check: (id = auth.uid())` | `with_check: (id = auth.uid())` | 无冲突—可以修改 |
+| `profiles.profiles_select_self_or_classmate` | SELECT | `qual: ((id = auth.uid()) OR (has_completed_onboarding() AND shares_course_with(id)))` | `qual: ((id = auth.uid()) OR (has_completed_onboarding() AND shares_course_with(id)))` | 无冲突—可以修改 |
+| `profiles.profiles_update_self` | UPDATE | `qual: (id = auth.uid()); with_check: (id = auth.uid())` | `qual: (id = auth.uid()); with_check: (id = auth.uid())` | 无冲突—可以修改 |
+| `school_term_settings.school_term_settings_select_own_school` | SELECT | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | `qual: (has_completed_onboarding() AND (school_id = current_school_id()))` | 无冲突—可以修改 |
 
 逐行函数 `is_course_member(course_id)` 与 `shares_course_with(id)` 在生产和迁移链中均保持原样；后续迁移不能把它们改成一次性固定值。
 
@@ -51,21 +51,21 @@
 
 “覆盖索引”要求有效、非部分索引的开头列与外键列顺序一致。主键或其他索引即使位于同一张表，只要不是从外键列开始，就不算覆盖。
 
-| 表 / 外键 | 外键列（按顺序） | 外键定义 | 生产覆盖索引 | 与 `main` 对照 | 结论 |
+| 表 / 外键 | 外键列（按顺序） | 生产外键定义 | `main` 完整迁移链外键定义 | 生产覆盖索引 | 结论 |
 |---|---|---|---|---|---|
-| `admin_audit_log.admin_audit_log_actor_id_fkey` | `actor_id` | `REFERENCES auth.users(id) ON DELETE SET NULL` | 无 | 相同 | 无冲突—可以修改 |
-| `admin_school_test_context.admin_school_test_context_school_id_fkey` | `school_id` | `REFERENCES schools(id) ON DELETE CASCADE` | 无 | 相同 | 无冲突—可以修改 |
-| `courses.courses_created_by_fkey` | `created_by` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 相同 | 无冲突—可以修改 |
-| `direct_conversations.direct_conversations_member_high_fkey` | `member_high` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 相同 | 无冲突—可以修改 |
-| `direct_message_cleanup_eligibility.direct_message_cleanup_eligibility_message_fkey` | `conversation_id, message_id` | `REFERENCES messages(conversation_id, id) ON DELETE CASCADE` | 无 | 相同 | 无冲突—可以修改 |
-| `friend_preferences.friend_preferences_owner_id_fkey` | `owner_id` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | 无 | 相同 | 无冲突—可以修改 |
-| `friend_rate_limit_buckets.friend_rate_limit_buckets_action_kind_fkey` | `action_kind` | `REFERENCES friend_rate_limit_config(action_kind)` | 无 | 相同 | 无冲突—可以修改 |
-| `friend_requests.friend_requests_recipient_id_fkey` | `recipient_id` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 相同 | 无冲突—可以修改 |
-| `friend_requests.friend_requests_requester_id_fkey` | `requester_id` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 相同 | 无冲突—可以修改 |
-| `friendships.friendships_pair_high_fkey` | `pair_high` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | 无 | 相同 | 无冲突—可以修改 |
-| `member_accounts.member_accounts_school_id_fkey` | `school_id` | `REFERENCES schools(id)` | 无 | 相同 | 无冲突—可以修改 |
-| `member_blocks.member_blocks_blocked_id_fkey` | `blocked_id` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | 无 | 相同 | 无冲突—可以修改 |
-| `platform_roles.platform_roles_granted_by_fkey` | `granted_by` | `REFERENCES auth.users(id) ON DELETE SET NULL` | 无 | 相同 | 无冲突—可以修改 |
+| `admin_audit_log.admin_audit_log_actor_id_fkey` | `actor_id` | `REFERENCES auth.users(id) ON DELETE SET NULL` | `REFERENCES auth.users(id) ON DELETE SET NULL` | 无 | 无冲突—可以修改 |
+| `admin_school_test_context.admin_school_test_context_school_id_fkey` | `school_id` | `REFERENCES schools(id) ON DELETE CASCADE` | `REFERENCES schools(id) ON DELETE CASCADE` | 无 | 无冲突—可以修改 |
+| `courses.courses_created_by_fkey` | `created_by` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 无冲突—可以修改 |
+| `direct_conversations.direct_conversations_member_high_fkey` | `member_high` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 无冲突—可以修改 |
+| `direct_message_cleanup_eligibility.direct_message_cleanup_eligibility_message_fkey` | `conversation_id, message_id` | `REFERENCES messages(conversation_id, id) ON DELETE CASCADE` | `REFERENCES messages(conversation_id, id) ON DELETE CASCADE` | 无 | 无冲突—可以修改 |
+| `friend_preferences.friend_preferences_owner_id_fkey` | `owner_id` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | 无 | 无冲突—可以修改 |
+| `friend_rate_limit_buckets.friend_rate_limit_buckets_action_kind_fkey` | `action_kind` | `REFERENCES friend_rate_limit_config(action_kind)` | `REFERENCES friend_rate_limit_config(action_kind)` | 无 | 无冲突—可以修改 |
+| `friend_requests.friend_requests_recipient_id_fkey` | `recipient_id` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 无冲突—可以修改 |
+| `friend_requests.friend_requests_requester_id_fkey` | `requester_id` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | `REFERENCES member_accounts(user_id) ON DELETE SET NULL` | 无 | 无冲突—可以修改 |
+| `friendships.friendships_pair_high_fkey` | `pair_high` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | 无 | 无冲突—可以修改 |
+| `member_accounts.member_accounts_school_id_fkey` | `school_id` | `REFERENCES schools(id)` | `REFERENCES schools(id)` | 无 | 无冲突—可以修改 |
+| `member_blocks.member_blocks_blocked_id_fkey` | `blocked_id` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | `REFERENCES member_accounts(user_id) ON DELETE CASCADE` | 无 | 无冲突—可以修改 |
+| `platform_roles.platform_roles_granted_by_fkey` | `granted_by` | `REFERENCES auth.users(id) ON DELETE SET NULL` | `REFERENCES auth.users(id) ON DELETE SET NULL` | 无 | 无冲突—可以修改 |
 
 组合外键 `direct_message_cleanup_eligibility_message_fkey` 的顺序已确认是 `(conversation_id, message_id)`。生产已有的清理批次索引不是从这组列开始，不能替代该外键索引。
 
@@ -81,62 +81,67 @@ Issue #41 开始前仍需按项目协作约定由 Danny 最终确认是否接受
 
 ```sql
 with
-target_policies(policyname) as (
+target_policies(schemaname, tablename, policyname) as (
   values
-    ('behavior_reports_select_own'),
-    ('course_catalog_select_own_school'),
-    ('course_members_select'),
-    ('course_members_insert_self'),
-    ('course_members_delete_self'),
-    ('courses_select_own_school'),
-    ('friend_preferences_select_owner'),
-    ('friend_requests_select_participant'),
-    ('friendships_select_participant'),
-    ('member_blocks_select_owner'),
-    ('profiles_insert_self'),
-    ('profiles_select_self_or_classmate'),
-    ('profiles_update_self'),
-    ('school_term_settings_select_own_school')
+    ('public', 'behavior_reports', 'behavior_reports_select_own'),
+    ('public', 'course_catalog', 'course_catalog_select_own_school'),
+    ('public', 'course_members', 'course_members_select'),
+    ('public', 'course_members', 'course_members_insert_self'),
+    ('public', 'course_members', 'course_members_delete_self'),
+    ('public', 'courses', 'courses_select_own_school'),
+    ('public', 'friend_preferences', 'friend_preferences_select_owner'),
+    ('public', 'friend_requests', 'friend_requests_select_participant'),
+    ('public', 'friendships', 'friendships_select_participant'),
+    ('public', 'member_blocks', 'member_blocks_select_owner'),
+    ('public', 'profiles', 'profiles_insert_self'),
+    ('public', 'profiles', 'profiles_select_self_or_classmate'),
+    ('public', 'profiles', 'profiles_update_self'),
+    ('public', 'school_term_settings', 'school_term_settings_select_own_school')
 ),
-target_constraints(conname) as (
+target_constraints(schemaname, tablename, conname) as (
   values
-    ('admin_audit_log_actor_id_fkey'),
-    ('admin_school_test_context_school_id_fkey'),
-    ('courses_created_by_fkey'),
-    ('direct_conversations_member_high_fkey'),
-    ('direct_message_cleanup_eligibility_message_fkey'),
-    ('friend_preferences_owner_id_fkey'),
-    ('friend_rate_limit_buckets_action_kind_fkey'),
-    ('friend_requests_recipient_id_fkey'),
-    ('friend_requests_requester_id_fkey'),
-    ('friendships_pair_high_fkey'),
-    ('member_accounts_school_id_fkey'),
-    ('member_blocks_blocked_id_fkey'),
-    ('platform_roles_granted_by_fkey')
+    ('public', 'admin_audit_log', 'admin_audit_log_actor_id_fkey'),
+    ('public', 'admin_school_test_context', 'admin_school_test_context_school_id_fkey'),
+    ('public', 'courses', 'courses_created_by_fkey'),
+    ('public', 'direct_conversations', 'direct_conversations_member_high_fkey'),
+    ('public', 'direct_message_cleanup_eligibility', 'direct_message_cleanup_eligibility_message_fkey'),
+    ('public', 'friend_preferences', 'friend_preferences_owner_id_fkey'),
+    ('public', 'friend_rate_limit_buckets', 'friend_rate_limit_buckets_action_kind_fkey'),
+    ('public', 'friend_requests', 'friend_requests_recipient_id_fkey'),
+    ('public', 'friend_requests', 'friend_requests_requester_id_fkey'),
+    ('public', 'friendships', 'friendships_pair_high_fkey'),
+    ('public', 'member_accounts', 'member_accounts_school_id_fkey'),
+    ('public', 'member_blocks', 'member_blocks_blocked_id_fkey'),
+    ('public', 'platform_roles', 'platform_roles_granted_by_fkey')
 )
 select
   'policy' as section,
-  policies.policyname as item,
+  targets.policyname as item,
   jsonb_build_object(
-    'schema', policies.schemaname,
-    'table', policies.tablename,
+    'exists', policies.policyname is not null,
+    'schema', targets.schemaname,
+    'table', targets.tablename,
     'permissive', policies.permissive,
     'roles', policies.roles,
     'command', policies.cmd,
     'qual', policies.qual,
     'with_check', policies.with_check
   ) as details
-from pg_policies policies
-join target_policies targets using (policyname)
+from target_policies targets
+left join pg_policies policies
+  on policies.schemaname = targets.schemaname
+ and policies.tablename = targets.tablename
+ and policies.policyname = targets.policyname
 
 union all
 
 select
   'foreign_key' as section,
-  constraints.conname as item,
+  targets.conname as item,
   jsonb_build_object(
-    'schema', namespaces.nspname,
-    'table', tables.relname,
+    'exists', constraints.oid is not null,
+    'schema', targets.schemaname,
+    'table', targets.tablename,
     'columns', (
       select jsonb_agg(attributes.attname order by keys.ordinality)
       from unnest(constraints.conkey)
@@ -158,10 +163,15 @@ select
         and indexes.indisvalid
     ), '[]'::jsonb)
   ) as details
-from pg_constraint constraints
-join target_constraints targets using (conname)
-join pg_class tables on tables.oid = constraints.conrelid
-join pg_namespace namespaces on namespaces.oid = tables.relnamespace
+from target_constraints targets
+left join pg_namespace namespaces
+  on namespaces.nspname = targets.schemaname
+left join pg_class tables
+  on tables.relnamespace = namespaces.oid
+ and tables.relname = targets.tablename
+left join pg_constraint constraints
+  on constraints.conrelid = tables.oid
+ and constraints.conname = targets.conname
 
 order by section, item;
 ```
