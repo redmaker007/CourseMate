@@ -53,6 +53,8 @@ function refreshMessageSurfaces(conversationId: string) {
   revalidatePath("/dashboard");
   revalidatePath("/friends");
   revalidatePath("/friends/filtered");
+  // 左栏的会话列表和未读数在 (inbox) 共享 layout 里
+  revalidatePath("/(member)/(inbox)", "layout");
 }
 
 export async function sendDirectMessageAction(

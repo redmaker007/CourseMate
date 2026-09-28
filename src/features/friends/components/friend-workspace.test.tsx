@@ -8,11 +8,58 @@ import type {
   FriendListItem,
   FriendRequestView,
 } from "../friendship-service";
+import type {
+  FriendMutationAction,
+  FriendSearchAction,
+} from "../friend-action-state";
+import type { ReportAction } from "@/features/reporting/components/report-form";
+import { FriendSearch } from "./friend-discovery";
+import { FilteredFriendList } from "./friend-workspace";
 import {
-  FilteredFriendList,
-  FriendWorkspace,
-} from "./friend-workspace";
-import { FriendNoteForm } from "./friend-relationship-management";
+  FriendCard,
+  FriendNoteForm,
+  RequestHistory,
+} from "./friend-relationship-management";
+
+// 好友功能拆到了「消息与好友」的不同右栏页面里（添加好友、新的朋友、好友详情）。
+// 这里把同样的组件拼在一起，继续覆盖它们原有的行为。
+function FriendWorkspace({
+  friends,
+  mutationAction,
+  reportAction,
+  requests,
+  searchAction,
+  unreadByConversation = {},
+}: {
+  friends: FriendListItem[];
+  mutationAction: FriendMutationAction;
+  reportAction: ReportAction;
+  requests: FriendRequestView[];
+  searchAction: FriendSearchAction;
+  unreadByConversation?: Record<string, number>;
+}) {
+  return (
+    <>
+      <FriendSearch
+        mutationAction={mutationAction}
+        reportAction={reportAction}
+        searchAction={searchAction}
+      />
+      <RequestHistory action={mutationAction} reportAction={reportAction} requests={requests} />
+      <ul>
+        {friends.map((friend) => (
+          <FriendCard
+            action={mutationAction}
+            friend={friend}
+            key={friend.memberId}
+            reportAction={reportAction}
+            unreadCount={unreadByConversation[friend.conversationId]}
+          />
+        ))}
+      </ul>
+    </>
+  );
+}
 
 const action = vi.fn(async () => ({ status: "saved", message: "已保存" }));
 const searchAction = vi.fn(async () => ({

@@ -5,108 +5,16 @@ import Link from "next/link";
 import type {
   BlockedMemberListItem,
   FriendListItem,
-  FriendRequestView,
 } from "../friendship-service";
-import type {
-  FriendMutationAction,
-  FriendSearchAction,
-} from "../friend-action-state";
-import { FriendSearch } from "./friend-discovery";
+import type { FriendMutationAction } from "../friend-action-state";
 import {
   ActionForm,
   FriendCard,
-  RequestHistory,
 } from "./friend-relationship-management";
 import {
   ReportForm,
   type ReportAction,
 } from "@/features/reporting/components/report-form";
-
-function FriendList({
-  action,
-  friends,
-  reportAction,
-  unreadByConversation,
-}: {
-  action: FriendMutationAction;
-  friends: FriendListItem[];
-  reportAction: ReportAction;
-  unreadByConversation: Record<string, number>;
-}) {
-  return (
-    <section className="rounded-xl border border-line bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold text-ink">好友与私聊</h2>
-          <p className="mt-1 text-sm text-muted">
-            备注只对你可见，共同课程按当前学期动态计算。
-          </p>
-        </div>
-        <Link
-          className="text-sm font-semibold text-accent"
-          href="/friends/filtered"
-        >
-          查看屏蔽与拉黑
-        </Link>
-      </div>
-      {friends.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">暂无普通列表中的好友。</p>
-      ) : (
-        <ul className="mt-4 space-y-3">
-          {friends.map((friend) => (
-            <FriendCard
-              action={action}
-              friend={friend}
-              key={friend.memberId}
-              reportAction={reportAction}
-              unreadCount={unreadByConversation[friend.conversationId]}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-export function FriendWorkspace({
-  friends,
-  mutationAction,
-  reportAction,
-  requests,
-  searchAction,
-  unreadByConversation = {},
-}: {
-  friends: FriendListItem[];
-  mutationAction: FriendMutationAction;
-  reportAction: ReportAction;
-  requests: FriendRequestView[];
-  searchAction: FriendSearchAction;
-  unreadByConversation?: Record<string, number>;
-}) {
-  return (
-    // 好友列表（带私聊未读）是「消息」页的主体，放在前面；手机上也最先看到。
-    <div className="grid gap-5 lg:grid-cols-2">
-      <FriendList
-        action={mutationAction}
-        friends={friends}
-        reportAction={reportAction}
-        unreadByConversation={unreadByConversation}
-      />
-      <div className="space-y-5">
-        <FriendSearch
-          mutationAction={mutationAction}
-          reportAction={reportAction}
-          searchAction={searchAction}
-        />
-        <RequestHistory
-          action={mutationAction}
-          reportAction={reportAction}
-          requests={requests}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function FilteredFriendList({
   blockedMembers,

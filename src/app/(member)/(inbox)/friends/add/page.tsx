@@ -1,10 +1,10 @@
 import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getCurrentMember } from "@/features/auth/session";
 import { friendMutationAction } from "@/features/friends/actions";
 import { CourseMemberRequestPanel } from "@/features/friends/components/friend-discovery";
+import { InboxPaneHeader } from "@/features/friends/components/inbox-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -24,14 +24,11 @@ export default async function AddCourseMemberFriendPage({
   if (!memberId || !UUID_PATTERN.test(memberId)) redirect("/friends");
 
   return (
-    <main className="min-h-full bg-canvas px-5 py-12">
+    <>
       <SchoolTestBanner member={member} />
-      <section className="mx-auto w-full max-w-lg rounded-xl border border-line bg-card p-7 shadow-sm">
-        <Link className="text-sm font-semibold text-accent" href="/friends">
-          返回好友页
-        </Link>
-        <h1 className="mt-4 text-2xl font-bold text-ink">向课程成员发送好友申请</h1>
-        <p className="mt-2 text-sm text-muted">
+      <InboxPaneHeader title="向课程成员发送好友申请" />
+      <section className="mx-auto w-full max-w-lg px-4 py-5 md:px-6">
+        <p className="text-sm text-muted">
           这里只提交课程成员 ID，不会公开或猜测对方邮箱。
         </p>
         <CourseMemberRequestPanel
@@ -39,6 +36,6 @@ export default async function AddCourseMemberFriendPage({
           mutationAction={friendMutationAction}
         />
       </section>
-    </main>
+    </>
   );
 }

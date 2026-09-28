@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, SendHorizontal } from "lucide-react";
+import { ChevronLeft, Info, SendHorizontal } from "lucide-react";
 import Link from "next/link";
 import {
   startTransition,
@@ -46,6 +46,7 @@ export function ChatWorkspace({
   initialMessages,
   markReadAction,
   otherDisplayName,
+  otherMemberId = null,
   reportAction,
   sendAction,
   sendStatus,
@@ -60,6 +61,8 @@ export function ChatWorkspace({
     throughMessageId: string,
   ) => Promise<string>;
   otherDisplayName: string;
+  /** 对方成员 ID，用于头像颜色和「好友详情」入口；读不到时为 null。 */
+  otherMemberId?: string | null;
   reportAction: ReportAction;
   sendAction: MutationAction;
   sendStatus: "allowed" | "blocked" | "readonly";
@@ -174,20 +177,31 @@ export function ChatWorkspace({
   return (
     <main className="flex min-h-0 flex-1 flex-col bg-canvas">
       <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-card px-3 md:px-4">
+        {/* 桌面端左栏一直在，只有手机端需要返回列表 */}
         <Link
           aria-label="返回好友"
-          className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-ink"
+          className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-ink md:hidden"
           href="/friends"
         >
           <ChevronLeft size={18} strokeWidth={1.75} />
         </Link>
-        <Avatar id={null} name={otherDisplayName} size={28} />
+        <Avatar id={otherMemberId} name={otherDisplayName} size={28} />
         <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
           {otherDisplayName}
         </h1>
         <span className="ml-auto shrink-0 text-xs text-muted">
           {sync.connected ? "实时连接" : "正在同步"}
         </span>
+        {otherMemberId ? (
+          <Link
+            aria-label="好友详情"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-ink"
+            href={`/friends/${otherMemberId}`}
+            title="好友详情"
+          >
+            <Info size={16} strokeWidth={1.75} />
+          </Link>
+        ) : null}
       </header>
 
       {restriction ? (

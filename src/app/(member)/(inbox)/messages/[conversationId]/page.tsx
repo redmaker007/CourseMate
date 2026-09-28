@@ -44,6 +44,7 @@ export default async function MessagePage({
       initialMessages={messageResult.messages}
       markReadAction={markDirectMessageReadAction}
       otherDisplayName={conversationResult.conversation.otherDisplayName}
+      otherMemberId={conversationResult.conversation.otherMemberId}
       reportAction={submitBehaviorReportAction}
       sendAction={sendDirectMessageAction}
       sendStatus={conversationResult.conversation.sendStatus}
