@@ -51,6 +51,7 @@ function LatencyReadout() {
   return (
     <div
       aria-live="off"
+      data-latency-badge=""
       className="pointer-events-none fixed bottom-0 left-0 z-50 flex select-none gap-2.5 rounded-tr-lg bg-slate-900/80 px-2 py-0.5 font-mono text-[11px] leading-4 text-slate-200 backdrop-blur"
     >
       {reading === null ? (

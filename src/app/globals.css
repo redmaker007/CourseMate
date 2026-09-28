@@ -1,26 +1,116 @@
 @import "tailwindcss";
 
+/*
+ * 设计变量来自 Figma Make 原型（CourseMate_Figma 的 src/index.css），变量名保持一致，
+ * 方便对照设计稿搬页面。组件里用下方 @theme 映射出来的工具类，例如
+ * bg-canvas / bg-card / border-line / text-ink / text-muted / bg-brand。
+ *
+ * 深色主题的变量已经备好，但要等所有页面都改用这些变量后才开放切换；
+ * 在那之前 <html> 不会带 .dark，页面固定为浅色。
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-soft: #eef2ff;
+
+  --bg: #f8f9fb;
+  --panel: #f3f4f6;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --text: #111827;
+  --muted: #6b7280;
+  --rail: #e5e7eb;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --success: #059669;
+  --success-soft: #d1fae5;
+
+  --chat-bg: #f8f9fb;
+  --bubble-me: #4f46e5;
+  --bubble-other: #ffffff;
+  --chat-meta: #9ca3af;
+  --bar: #ffffff;
+
+  --send: #4f46e5;
+  --badge: #ef4444;
+  --online: #22c55e;
+
+  /* 已加入课程按顺序取色；课程块 = 18% 透明度底色 + 3px 实色左边框 */
+  --course-0: #6366f1;
+  --course-1: #38bdf8;
+  --course-2: #34d399;
+  --course-3: #fbbf24;
+  --course-4: #fb7185;
+  --course-5: #a78bfa;
+  --course-6: #2dd4bf;
+  --course-7: #fb923c;
+
+  /* 导航外壳尺寸，延迟读数等固定元素据此避让 */
+  --rail-width: 72px;
+  --tab-bar-height: calc(56px + env(safe-area-inset-bottom));
+}
+
+.dark {
+  --bg: #16171a;
+  --panel: #1c1d21;
+  --card: #232428;
+  --border: #33353b;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --rail: #0f1012;
+  --accent: #4c8df6;
+  --accent-soft: rgba(76, 141, 246, 0.16);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.14);
+  --brand-soft: rgba(79, 70, 229, 0.18);
+
+  --chat-bg: #16171a;
+  --bubble-other: #232428;
+  --chat-meta: #7a7f8a;
+  --bar: #1c1d21;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-canvas: var(--bg);
+  --color-panel: var(--panel);
+  --color-card: var(--card);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-rail: var(--rail);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-chat: var(--chat-bg);
+  --color-bubble-me: var(--bubble-me);
+  --color-bubble-other: var(--bubble-other);
+  --color-chat-meta: var(--chat-meta);
+  --color-bar: var(--bar);
+  --color-badge: var(--badge);
+  --color-online: var(--online);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter), "PingFang SC", "Microsoft YaHei",
+    "Noto Sans SC", system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* 在导航外壳里时，左下角的延迟读数让开左侧导航栏和手机底栏 */
+@media (min-width: 768px) {
+  body:has([data-app-shell]) [data-latency-badge] {
+    left: var(--rail-width);
+  }
+}
+@media (max-width: 767px) {
+  body:has([data-app-shell]) [data-latency-badge] {
+    bottom: var(--tab-bar-height);
+  }
 }
