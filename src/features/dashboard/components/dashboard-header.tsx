@@ -1,3 +1,4 @@
+import { LogOut, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 type DashboardHeaderProps = {
@@ -9,6 +10,10 @@ type DashboardHeaderProps = {
   adminHref?: string;
 };
 
+/**
+ * 大厅顶部工具条。好友、个人资料的入口已经在导航外壳里，这里只留学校与账号信息、
+ * 退出登录；管理入口在桌面导航栏里也有，这里只在手机端显示。
+ */
 export function DashboardHeader({
   email,
   schoolName,
@@ -16,51 +21,39 @@ export function DashboardHeader({
   adminHref,
 }: DashboardHeaderProps) {
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-4">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">
-            CourseMate
-          </p>
-          <p className="mt-1 truncate text-sm text-slate-600">
-            <span className="font-medium text-slate-900">{schoolName}</span>
-            <span aria-hidden="true" className="mx-2 text-slate-300">
-              ·
-            </span>
-            {email}
-          </p>
-        </div>
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-card px-4 py-3 md:px-6">
+      <div className="min-w-0">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand">
+          CourseMate
+        </p>
+        <p className="mt-0.5 truncate text-sm text-muted">
+          <span className="font-medium text-ink">{schoolName}</span>
+          <span aria-hidden="true" className="mx-2 text-line">
+            ·
+          </span>
+          {email}
+        </p>
+      </div>
 
-        <div className="flex items-center gap-2">
-          {adminHref ? (
-            <Link
-              className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100"
-              href={adminHref}
-            >
-              管理
-            </Link>
-          ) : null}
+      <div className="flex items-center gap-2">
+        {adminHref ? (
           <Link
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-            href="/friends"
+            className="flex h-8 items-center gap-1 rounded-lg border border-line px-3 text-xs font-medium text-ink transition hover:bg-panel md:hidden"
+            href={adminHref}
           >
-            好友
+            <ShieldCheck size={14} strokeWidth={1.75} />
+            管理
           </Link>
-          <Link
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-            href="/profile"
+        ) : null}
+        <form action={signOutAction}>
+          <button
+            className="flex h-8 items-center gap-1 rounded-lg border border-line px-3 text-xs font-medium text-muted transition hover:bg-panel hover:text-ink"
+            type="submit"
           >
-            个人资料
-          </Link>
-          <form action={signOutAction}>
-            <button
-              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-              type="submit"
-            >
-              退出登录
-            </button>
-          </form>
-        </div>
+            <LogOut size={14} strokeWidth={1.75} />
+            退出登录
+          </button>
+        </form>
       </div>
     </header>
   );
