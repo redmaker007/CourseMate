@@ -6,6 +6,7 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import {
   ChatMessageRow,
   shouldShowTimeDivider,
+  submitOnEnter,
   TimeDivider,
 } from "@/components/ui/chat";
 import { useMessageSend } from "@/features/messages/use-message-send";
@@ -186,7 +187,8 @@ export function CourseChat({
               id="course-message-body"
               maxLength={4000}
               name="body"
-              placeholder="发送纯文字消息……"
+              onKeyDown={submitOnEnter}
+              placeholder="发送消息，Enter 发送，Shift+Enter 换行"
               required
               rows={1}
             />

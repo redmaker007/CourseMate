@@ -40,6 +40,23 @@ export function Avatar({
   );
 }
 
+/**
+ * 输入框的回车发送：Enter 发送，Shift+Enter 换行。
+ *
+ * 中文输入法选词时按的回车只用来确认候选词，不能当成发送（isComposing，
+ * 部分浏览器在这时报 keyCode 229）。发送按钮不可用时（例如正在发送、内容超长）
+ * 也不发送，和点按钮的行为保持一致。requestSubmit 会先走表单自带的校验。
+ */
+export function submitOnEnter(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+  if (event.key !== "Enter" || event.shiftKey) return;
+  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  const form = event.currentTarget.form;
+  const submit = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+  if (!form || submit?.disabled) return;
+  form.requestSubmit();
+}
+
 /** 两条消息间隔超过 5 分钟（或是第一条）时显示时间分隔。 */
 export function shouldShowTimeDivider(previous: string | undefined, current: string): boolean {
   if (!previous) return true;
