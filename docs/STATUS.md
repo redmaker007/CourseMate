@@ -1,6 +1,6 @@
 # 当前状态
 
-核对日期：2026-09-25（生产数据库搬迁与性能优化发布）。代码基线：`main` 的 `64b0904`（PR #37、#38 合并后），生产版本与该提交一致。
+核对日期：2026-09-27（RLS 策略提速与外键索引上线）。代码基线：`main` 的 `7896191`（PR #42 合并后）；生产前端仍是 `64b0904`，#42 只改数据库，不需要重新发布前端。
 本页区分代码基线与生产状态；生产状态以下方带日期的条目为准，其中 2026-09-25 的搬迁条目是当前生产数据库的起点。当时的操作、证据与待办清单见[发布交接](handoffs/release-20260925.md)。
 
 ## 代码已实现
@@ -33,6 +33,11 @@
   - **私聊页行为变化**：会话没授权时，消息接口现在也会被同时调用一次；两个接口各自由数据库授权，页面只在两者都成功时才渲染，否则 404。
   - **效果（日志，单次抽样）**：课程页一次加载在 Supabase 侧的调用，从迁移当天旧代码的约 1.4s（几乎全串行）降到约 0.21s，且没有 `/auth/v1/user`；部署后 `get_member_context` 155 次全部 200、无 4xx（唯一一次 409 是资料保存"先 insert 再 update"的预期行为）；`jwks.json` 拉取 8 次（每个新函数实例首次一次）。#37 之后的「服务」读数没有记录。
   - **尚未做**：在 `get_member_context` 里检查令牌的 `session_id` 是否还在 `auth.sessions`，恢复"退出登录立即失效"（见 ADR-0009，加入封号或强制下线功能时应当做）；管理页 `requireStaff` 等其他串行取数。好友页本来就是并行，发课程消息不经过会话解析，都不需要改。详见[发布交接](handoffs/release-20260925.md)。
+- **RLS 策略提速与外键索引已上生产（2026-09-27，PR #42，关闭 #40、#41）**：迁移 `202609260001_rls_initplan_and_fk_indexes.sql` 把 14 条策略里不随行变化的 `auth.uid()`、`has_completed_onboarding()`、`current_school_id()` 包成 `(select ...)`，每次查询只算一次；逐行函数 `is_course_member(course_id)`、`shares_course_with(id)` 不变。另外给 13 个外键补了索引。
+  - **应用前**：本地在 PR 分支上跑 `npm test`（84 个文件、567 项）、build、lint、typecheck，全部通过；只读核对生产 14 条策略的原定义与仓库迁移一致，原定义已留作回滚依据。
+  - **应用方式**：由 redmaker 在 Studio SQL Editor 手工执行。注意本地 `supabase/.temp/project-ref` 仍指向旧项目 `cqrlxcxcgrcoamqnjkwu`，`--linked` 的 CLI 命令会打到旧库，使用前先 `supabase link` 到新项目。
+  - **应用后核对**：14 条策略在 `pg_policies` 中都已是 `( SELECT ... )` 形式，角色（`authenticated`）与命令不变，其余条件一字不差；13 个索引都在 `pg_indexes` 里。Performance Advisor 显示 `auth_rls_initplan` 11 → 0、`unindexed_foreign_keys` 13 → 0。Unused Index 从 5 条增加到 18 条，多出的正好是 13 个新索引（刚建还没被用过），按约定不删；两条 Multiple Permissive Policies 保留，另开任务讨论。
+  - **仍待处理**：① 迁移历史表还没有登记 `202609260001`（手工执行不会自动记账），需补一行 `insert into supabase_migrations.schema_migrations (version, name) values ('202609260001', 'rls_initplan_and_fk_indexes');`；② 测试组冒烟：课程大厅、加入与退出课程、好友页、个人资料；③ 没有测量上线前后的延迟变化。
 - **Issue #29 的迁移曾漏应用，2026-09-25 已在新项目补上**：`202609160001_course_member_relationships.sql` 新增受限批量关系摘要，并修正 active 好友在拉黑状态下的身份优先级；前端课程成员、邮箱搜索与私聊失败展示已接入。2026-09-20 本地验证通过：74 个测试文件、457 项测试及构建、lint、类型检查。发布必须先应用 migration，再发布依赖该 RPC 的前端，并从目标 Supabase 重新生成 `src/types/database.ts`。**2026-09-25 核实**：线上前端已经在调用该 RPC，数据库却一直没有这条迁移（旧库 dump 里没有该函数），课程页成员关系请求返回 404；搬库当天在新项目补应用，两个函数均为 `SECURITY DEFINER`、`search_path` 为空、`anon` 无执行权，之后课程页请求恢复 200。`src/types/database.ts` 已在 2026-09-25 随成员会话合并读取的改动从新项目重新生成，补上了此前缺少的 `list_course_member_relationships`。
 - **Issue #30 与 #29 共用功能分支和后续 PR**：私聊请求 15 秒未返回时从“发送中”降级为可重试失败；重试沿用原 `clientMessageId`，迟到成功优先并忽略重复回执。上述完整验证同时覆盖 Issue #30；尚未发布。
 
