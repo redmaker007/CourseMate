@@ -78,7 +78,7 @@ export function TimeDivider({ iso }: { iso: string }) {
 
 /**
  * 一条消息：头像 + （别人的消息带昵称）+ 气泡。自己的消息靠右。
- * footer 用于放「发送中 / 发送失败 · 重试」这类状态。
+ * footer 用于放「发送中 / 发送失败 · 重试」、举报这类气泡下方的内容。
  */
 export function ChatMessageRow({
   own,
@@ -92,7 +92,8 @@ export function ChatMessageRow({
   own: boolean;
   senderId: string | null;
   senderName: string;
-  body: string;
+  /** 气泡内容：纯文本，或经过安全处理的富文本（例如带链接的私聊消息）。 */
+  body: ReactNode;
   dimmed?: boolean;
   footer?: ReactNode;
 } & React.LiHTMLAttributes<HTMLLIElement>) {
@@ -105,7 +106,7 @@ export function ChatMessageRow({
             {senderName}
           </span>
         ) : null}
-        <p
+        <div
           className={`whitespace-pre-wrap break-words px-3 py-2 text-[15px] leading-[22px] [overflow-wrap:anywhere] ${
             own
               ? "rounded-[6px_6px_2px_6px] bg-bubble-me text-white"
@@ -113,7 +114,7 @@ export function ChatMessageRow({
           } ${dimmed ? "opacity-70" : ""}`}
         >
           {body}
-        </p>
+        </div>
         {footer}
       </div>
     </li>

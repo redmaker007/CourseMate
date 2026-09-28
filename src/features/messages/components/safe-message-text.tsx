@@ -24,7 +24,7 @@ export function SafeMessageText({ text }: { text: string }) {
     content.push(
       href ? (
         <a
-          className="break-all font-medium text-indigo-700 underline"
+          className="break-all font-medium underline underline-offset-2"
           href={href}
           key={`${index}:${label}`}
           rel="noopener noreferrer"

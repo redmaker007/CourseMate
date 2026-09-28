@@ -64,49 +64,36 @@ export async function renderFriendsPage(filtered: boolean) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-8">
+    <main className="min-h-full bg-canvas">
       <SchoolTestBanner member={member} />
-      <div className="mx-auto max-w-6xl space-y-5">
-        <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          {filtered ? (
-            <>
-              <Link className="text-sm font-semibold text-indigo-700" href="/friends">
-                返回好友页
-              </Link>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-                屏蔽与拉黑
-              </h1>
-              <p className="mt-2 text-sm text-slate-600">
-                屏蔽仅影响你的显示偏好；拉黑是双方都能感知的联系限制。
-              </p>
-            </>
-          ) : (
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">
-                  CourseMate
-                </p>
-                <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-                  好友与申请
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                  通过同校邮箱精确查找成员，管理申请、私有备注与联系限制。
-                </p>
-              </div>
-              <Link className="text-sm font-semibold text-indigo-700" href="/dashboard">
-                返回 Dashboard
-              </Link>
-            </div>
-          )}
-          {unavailable ? (
-            <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {filtered
-                ? "过滤列表暂时无法加载，请稍后刷新。"
-                : "部分好友数据暂时无法加载，请稍后刷新。"}
+      <header className="border-b border-line bg-card px-4 py-3 md:px-6">
+        {filtered ? (
+          <>
+            <Link className="text-xs font-medium text-accent" href="/friends">
+              ← 返回好友页
+            </Link>
+            <h1 className="mt-1 text-lg font-bold text-ink">屏蔽与拉黑</h1>
+            <p className="mt-0.5 text-xs text-muted">
+              屏蔽仅影响你的显示偏好；拉黑是双方都能感知的联系限制。
             </p>
-          ) : null}
-        </header>
-
+          </>
+        ) : (
+          <>
+            <h1 className="text-lg font-bold text-ink">消息与好友</h1>
+            <p className="mt-0.5 text-xs text-muted">
+              通过同校邮箱精确查找成员，管理申请、私有备注与联系限制。
+            </p>
+          </>
+        )}
+        {unavailable ? (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {filtered
+              ? "过滤列表暂时无法加载，请稍后刷新。"
+              : "部分好友数据暂时无法加载，请稍后刷新。"}
+          </p>
+        ) : null}
+      </header>
+      <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 md:px-6">
         {filtered ? (
           <FilteredFriendList
             blockedMembers={blockedMembers}

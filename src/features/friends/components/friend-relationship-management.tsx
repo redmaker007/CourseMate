@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { Avatar } from "@/components/ui/chat";
+
 import {
   initialFriendActionState,
   type FriendActionState,
@@ -49,7 +51,7 @@ export function ActionFeedback({ state }: { state: FriendActionState }) {
   return (
     <p
       aria-live="polite"
-      className={`mt-2 text-xs ${successful ? "text-emerald-700" : "text-amber-700"}`}
+      className={`mt-2 text-xs ${successful ? "text-success" : "text-amber-700"}`}
       role="status"
     >
       {state.message}
@@ -78,7 +80,7 @@ export function ActionForm({
         <input key={name} name={name} type="hidden" value={value} />
       ))}
       <button
-        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-panel disabled:opacity-50"
         disabled={pending}
         type="submit"
       >
@@ -91,13 +93,13 @@ export function ActionForm({
 
 export function CourseChips({ courses }: { courses: SharedCourseView[] }) {
   if (courses.length === 0) {
-    return <p className="text-xs text-slate-500">当前学期没有共同课程</p>;
+    return <p className="text-xs text-muted">当前学期没有共同课程</p>;
   }
   return (
     <ul aria-label="当前共同课程" className="flex flex-wrap gap-2">
       {courses.map((course) => (
         <li
-          className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+          className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-accent"
           key={course.id}
         >
           {course.code} · {course.title}
@@ -124,36 +126,36 @@ export function RequestHistory({
   requests: FriendRequestView[];
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-950">好友申请与历史</h2>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="rounded-xl border border-line bg-card p-4">
+      <h2 className="text-lg font-bold text-ink">好友申请与历史</h2>
+      <p className="mt-1 text-sm text-muted">
         申请不可撤回；处理后和过期记录仍会保留。
       </p>
       {requests.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">暂时没有好友申请。</p>
+        <p className="mt-4 text-sm text-muted">暂时没有好友申请。</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {requests.map((request) => (
             <li
-              className="rounded-2xl border border-slate-200 p-4"
+              className="rounded-xl border border-line bg-card p-4"
               key={request.requestId}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="font-semibold text-slate-950">
+                  <p className="font-semibold text-ink">
                     {request.displayName}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted">
                     {request.direction === "incoming"
                       ? "收到的申请"
                       : "发出的申请"}
                   </p>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                <span className="rounded-full bg-panel px-2.5 py-1 text-xs font-semibold text-ink">
                   {REQUEST_STATUS[request.status]}
                 </span>
               </div>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
+              <p className="mt-3 whitespace-pre-wrap text-sm text-ink">
                 {request.message}
               </p>
               {request.direction === "incoming" ? (
@@ -202,18 +204,18 @@ export function FriendNoteForm({
   const length = Array.from(note.trim()).length;
   const tooLong = length > 15;
   return (
-    <div className="mt-4 rounded-xl bg-slate-50 p-3">
+    <div className="mt-4 rounded-xl bg-panel p-3">
       <form action={formAction}>
         <input name="intent" type="hidden" value="note" />
         <input name="memberId" type="hidden" value={friend.memberId} />
-        <label className="block text-xs font-medium text-slate-700">
+        <label className="block text-xs font-medium text-ink">
           <span className="sr-only">
             给{friend.effectiveName}设置私有备注
           </span>
           私有备注
           <input
             aria-label={`给${friend.effectiveName}设置私有备注`}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"
             name="note"
             onChange={(event) => setNote(event.target.value)}
             placeholder={`当前显示：${friend.effectiveName}`}
@@ -223,13 +225,13 @@ export function FriendNoteForm({
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <span
             className={
-              tooLong ? "text-xs text-rose-700" : "text-xs text-slate-500"
+              tooLong ? "text-xs text-badge" : "text-xs text-muted"
             }
           >
             {length}/15
           </span>
           <button
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
             disabled={pending || tooLong}
             type="submit"
           >
@@ -237,7 +239,7 @@ export function FriendNoteForm({
           </button>
         </div>
         {tooLong ? (
-          <p className="mt-1 text-xs text-rose-700">备注最多 15 个字符。</p>
+          <p className="mt-1 text-xs text-badge">备注最多 15 个字符。</p>
         ) : null}
         <ActionFeedback state={state} />
       </form>
@@ -264,28 +266,31 @@ export function FriendCard({
 }) {
   const unblockAllowed = canUnblock(friend.blockStatus);
   return (
-    <li className="rounded-2xl border border-slate-200 p-4">
+    <li className="rounded-xl border border-line bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-slate-950">{friend.effectiveName}</h3>
+        <div className="flex min-w-0 items-start gap-2.5">
+          <Avatar id={friend.memberId} name={friend.effectiveName} size={40} />
+          <div className="min-w-0">
+          <h3 className="font-semibold text-ink">{friend.effectiveName}</h3>
           {friend.effectiveName !== friend.displayName ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               显示名称：{friend.displayName}
             </p>
           ) : null}
           {friend.sendStatus === "blocked" ? (
-            <p className="mt-1 text-xs font-semibold text-rose-700">
+            <p className="mt-1 text-xs font-semibold text-badge">
               {blockStatusLabel(friend.blockStatus)}，双方不能发送消息。
             </p>
           ) : null}
           {unreadCount > 0 ? (
-            <p className="mt-1 text-xs font-bold text-indigo-700">
+            <p className="mt-1 inline-block rounded-full bg-badge px-2 py-0.5 text-[11px] font-bold text-white">
               {unreadCount} 条未读
             </p>
           ) : null}
+          </div>
         </div>
         <Link
-          className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"
+          className="rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white"
           href={`/messages/${friend.conversationId}`}
         >
           打开会话
@@ -311,7 +316,7 @@ export function FriendCard({
             }}
             label={friend.hidden ? "解除屏蔽" : "屏蔽"}
           />
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-muted">
             屏蔽只影响你的列表，对方不会知道。
           </p>
         </div>
@@ -326,7 +331,7 @@ export function FriendCard({
               label={unblockAllowed ? "解除我设置的拉黑" : "拉黑"}
             />
           )}
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-muted">
             拉黑后双方都不能发送消息。
           </p>
         </div>
@@ -336,7 +341,7 @@ export function FriendCard({
             fields={{ intent: "remove", memberId: friend.memberId }}
             label="删除好友"
           />
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-muted">
             只解除关系，不会替对方删除历史。
           </p>
         </div>
