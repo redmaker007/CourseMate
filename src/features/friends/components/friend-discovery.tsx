@@ -115,7 +115,7 @@ function DiscoveryResult({
         <FriendRequestForm action={action} memberId={member.memberId} />
       ) : null}
       {member.relationship === "outgoing_request" ? (
-        <p className="mt-3 text-sm text-amber-700">申请已经发出，等待对方处理。</p>
+        <p className="mt-3 text-sm text-warn">申请已经发出，等待对方处理。</p>
       ) : null}
       {member.relationship === "incoming_request" && member.incomingRequestId ? (
         <div className="mt-3">
@@ -201,7 +201,7 @@ export function FriendSearch({
       {state.status !== "idle" && state.status !== "found" ? (
         <p
           aria-live="polite"
-          className="mt-3 text-sm text-amber-700"
+          className="mt-3 text-sm text-warn"
           role="status"
         >
           {state.message}

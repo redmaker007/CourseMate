@@ -13,15 +13,15 @@ export type AdminAction = (
 ) => Promise<AdminActionState>;
 
 export const inputClassName =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-100";
+  "w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 disabled:bg-panel";
 
 const BUTTON_TONES = {
   primary:
-    "rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300",
+    "rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40",
   danger:
-    "rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300",
+    "rounded-lg bg-badge px-4 py-2 text-sm font-semibold text-white transition hover:bg-badge disabled:cursor-not-allowed disabled:opacity-40",
   quiet:
-    "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50",
+    "rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50",
 } as const;
 
 type AdminFormProps = {
@@ -69,8 +69,8 @@ export function AdminForm({
           aria-live="polite"
           className={`${inline ? "basis-full" : ""} rounded-lg border px-3 py-2 text-sm ${
             state.status === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
+              ? "border-success/30 bg-success-soft text-success"
+              : "border-badge/30 bg-badge/10 text-badge"
           }`}
           role="status"
         >
@@ -103,7 +103,7 @@ export function TextField({
   const id = useId();
   return (
     <div className="min-w-0 flex-1 space-y-1">
-      <label className="block text-xs font-medium text-slate-600" htmlFor={id}>
+      <label className="block text-xs font-medium text-muted" htmlFor={id}>
         {label}
       </label>
       <input
@@ -134,7 +134,7 @@ export function SchoolSelect({
   const id = useId();
   return (
     <div className="min-w-0 flex-1 space-y-1">
-      <label className="block text-xs font-medium text-slate-600" htmlFor={id}>
+      <label className="block text-xs font-medium text-muted" htmlFor={id}>
         {label}
       </label>
       <select

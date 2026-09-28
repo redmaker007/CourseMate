@@ -19,7 +19,7 @@ function MemberRelationshipAction({ member }: { member: CourseMemberView }) {
     return <span className="mt-1 block text-xs text-muted">我</span>;
   }
   if (member.relationshipStatus === "unavailable") {
-    return <span className="mt-1 block text-xs text-amber-700">关系状态暂不可用</span>;
+    return <span className="mt-1 block text-xs text-warn">关系状态暂不可用</span>;
   }
   if (member.relationshipStatus === "friend") {
     if (!member.conversationId) {
@@ -90,7 +90,7 @@ export default async function CoursePage({
           <span className="ml-2 font-normal text-muted">{room.course.title}</span>
         </h1>
         {room.course.archived ? (
-          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+          <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">
             已归档
           </span>
         ) : null}

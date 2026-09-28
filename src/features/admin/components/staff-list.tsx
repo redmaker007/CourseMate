@@ -15,17 +15,17 @@ export function StaffList({ staff, owner }: StaffListProps) {
       <ul className="space-y-2">
         {staff.map((person) => (
           <li
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card bg-card px-4 py-3"
             key={person.userId}
           >
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-medium text-ink">
                 {person.displayName ?? "未填写名称"}
-                <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-accent">
                   {PLATFORM_ROLE_LABELS[person.role]}
                 </span>
               </p>
-              <p className="mt-0.5 truncate text-xs text-slate-500">
+              <p className="mt-0.5 truncate text-xs text-muted">
                 {person.email}
               </p>
             </div>
@@ -58,13 +58,13 @@ export function StaffList({ staff, owner }: StaffListProps) {
               type="email"
             />
           </AdminForm>
-          <p className="text-xs leading-5 text-slate-500">
+          <p className="text-xs leading-5 text-muted">
             对方需要先用学校邮箱登录一次。管理员能录课、切换学期、查看操作记录；
             不能改学校和域名，也不能任命别人。
           </p>
         </div>
       ) : (
-        <p className="text-xs text-slate-500">任命与撤销管理员只有所有者能操作。</p>
+        <p className="text-xs text-muted">任命与撤销管理员只有所有者能操作。</p>
       )}
     </div>
   );

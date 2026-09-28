@@ -51,7 +51,7 @@ export function ActionFeedback({ state }: { state: FriendActionState }) {
   return (
     <p
       aria-live="polite"
-      className={`mt-2 text-xs ${successful ? "text-success" : "text-amber-700"}`}
+      className={`mt-2 text-xs ${successful ? "text-success" : "text-warn"}`}
       role="status"
     >
       {state.message}

@@ -42,12 +42,12 @@ export function ProfileForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
           <label
-            className="block text-sm font-medium text-slate-700"
+            className="block text-sm font-medium text-ink"
             htmlFor="displayName"
           >
             显示名称
           </label>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-muted">
             {Array.from(displayName).length}/15
           </span>
         </div>
@@ -58,7 +58,7 @@ export function ProfileForm({
           aria-invalid={Boolean(state.fieldErrors?.displayName)}
           autoComplete="nickname"
           autoFocus
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="w-full h-12 rounded-xl border border-line bg-canvas px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30"
           defaultValue={initialProfile.displayName}
           disabled={pending}
           id="displayName"
@@ -68,11 +68,11 @@ export function ProfileForm({
           required
         />
         {state.fieldErrors?.displayName ? (
-          <p className="text-sm text-rose-700" id="displayName-error">
+          <p className="text-sm text-badge" id="displayName-error">
             {state.fieldErrors.displayName}
           </p>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             可以与别人重复，中文字符按一个字符计算。
           </p>
         )}
@@ -80,7 +80,7 @@ export function ProfileForm({
 
       <div className="space-y-2">
         <label
-          className="block text-sm font-medium text-slate-700"
+          className="block text-sm font-medium text-ink"
           htmlFor="major"
         >
           专业（选填）
@@ -88,7 +88,7 @@ export function ProfileForm({
         <input
           aria-describedby={state.fieldErrors?.major ? "major-error" : undefined}
           aria-invalid={Boolean(state.fieldErrors?.major)}
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="w-full h-12 rounded-xl border border-line bg-canvas px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30"
           defaultValue={initialProfile.major ?? ""}
           disabled={pending}
           id="major"
@@ -96,7 +96,7 @@ export function ProfileForm({
           name="major"
         />
         {state.fieldErrors?.major ? (
-          <p className="text-sm text-rose-700" id="major-error">
+          <p className="text-sm text-badge" id="major-error">
             {state.fieldErrors.major}
           </p>
         ) : null}
@@ -104,7 +104,7 @@ export function ProfileForm({
 
       <div className="space-y-2">
         <label
-          className="block text-sm font-medium text-slate-700"
+          className="block text-sm font-medium text-ink"
           htmlFor="gradYear"
         >
           毕业年份（选填）
@@ -114,7 +114,7 @@ export function ProfileForm({
             state.fieldErrors?.gradYear ? "gradYear-error" : undefined
           }
           aria-invalid={Boolean(state.fieldErrors?.gradYear)}
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="w-full h-12 rounded-xl border border-line bg-canvas px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30"
           defaultValue={initialProfile.gradYear ?? ""}
           disabled={pending}
           id="gradYear"
@@ -125,14 +125,14 @@ export function ProfileForm({
           type="number"
         />
         {state.fieldErrors?.gradYear ? (
-          <p className="text-sm text-rose-700" id="gradYear-error">
+          <p className="text-sm text-badge" id="gradYear-error">
             {state.fieldErrors.gradYear}
           </p>
         ) : null}
       </div>
 
       <button
-        className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="w-full h-12 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
         disabled={pending}
         type="submit"
       >
@@ -144,8 +144,8 @@ export function ProfileForm({
           aria-live="polite"
           className={`rounded-xl border px-4 py-3 text-sm ${
             state.status === "saved"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
+              ? "border-success/30 bg-success-soft text-success"
+              : "border-badge/30 bg-badge/10 text-badge"
           }`}
           role="status"
         >

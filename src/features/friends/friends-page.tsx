@@ -86,7 +86,7 @@ export async function renderFriendsPage(filtered: boolean) {
           </>
         )}
         {unavailable ? (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
             {filtered
               ? "过滤列表暂时无法加载，请稍后刷新。"
               : "部分好友数据暂时无法加载，请稍后刷新。"}

@@ -191,7 +191,7 @@ export function ChatWorkspace({
       </header>
 
       {restriction ? (
-        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        <p className="shrink-0 border-b border-warn/30 bg-warn-soft px-4 py-2 text-sm text-warn">
           {restriction}
         </p>
       ) : null}

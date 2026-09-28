@@ -28,7 +28,7 @@ export function CourseCard({ course, colorIndex }: CourseCardProps) {
           </span>
           <span className="shrink-0 text-xs text-muted">{course.term}</span>
           {course.archived ? (
-            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+            <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">
               已归档
             </span>
           ) : null}

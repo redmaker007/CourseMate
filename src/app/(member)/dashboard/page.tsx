@@ -105,7 +105,7 @@ export default async function DashboardPage({
           ) : null}
 
           {courseDataUnavailable ? (
-            <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn">
               课程数据暂时不可用，请稍后刷新。
             </div>
           ) : null}
