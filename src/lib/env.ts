@@ -30,6 +30,13 @@ export const env = {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     );
   },
+  /** Google Cloud Vision OCR，仅服务端读取，不能使用 NEXT_PUBLIC_ 前缀。 */
+  get googleCloudVisionApiKey() {
+    return required(
+      "GOOGLE_CLOUD_VISION_API_KEY",
+      process.env.GOOGLE_CLOUD_VISION_API_KEY,
+    );
+  },
   /** 站点公开地址，用于拼邮箱验证的回调链接。本地是 http://localhost:3000 */
   get siteUrl() {
     return (

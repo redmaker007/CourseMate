@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { joinCourseAction } from "../actions";
 import type { CourseSearchItem } from "../queries";
+import { CourseImageRecognition } from "./course-image-recognition";
 
 const MATCH_LABELS = {
   exact_code: "课号精确匹配",
@@ -19,7 +20,8 @@ export function CourseSearch({
 }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-slate-950">搜索课程</h2>
+      <CourseImageRecognition />
+      <h2 className="mt-5 text-lg font-semibold text-slate-950">搜索课程</h2>
       <form className="mt-4 flex flex-col gap-3 sm:flex-row" method="get">
         <label className="sr-only" htmlFor="course-query">
           课程代码或名称
