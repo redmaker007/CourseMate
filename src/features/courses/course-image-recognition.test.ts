@@ -130,6 +130,57 @@ describe("course image recognizer", () => {
     expect(detectText).not.toHaveBeenCalled();
   });
 
+  it("拒绝超大文件、伪造 MIME 和超像素图片", async () => {
+    const dependencies = {
+      loadCurrentCourses: vi.fn(),
+      consumeQuota: vi.fn(),
+      detectText: vi.fn(),
+    };
+    const recognize = createCourseImageRecognizer(dependencies);
+    const validPng = await pngFile();
+    const tooManyPixels = await sharp({
+      create: {
+        width: 5_001,
+        height: 5_000,
+        channels: 3,
+        background: "white",
+      },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    const frames = await Promise.all(
+      ["red", "blue"].map((background) =>
+        sharp({
+          create: { width: 2, height: 2, channels: 3, background },
+        })
+          .png()
+          .toBuffer(),
+      ),
+    );
+    const animatedWebp = await sharp(frames, { join: { animated: true } })
+      .webp()
+      .toBuffer();
+
+    const invalidFiles = [
+      new File([new Uint8Array(3 * 1024 * 1024 + 1)], "large.png", {
+        type: "image/png",
+      }),
+      new File([await validPng.arrayBuffer()], "forged.jpg", {
+        type: "image/jpeg",
+      }),
+      new File([tooManyPixels], "too-many-pixels.png", { type: "image/png" }),
+      new File([animatedWebp], "animated.webp", { type: "image/webp" }),
+    ];
+    for (const file of invalidFiles) {
+      await expect(recognize(MEMBER, file)).resolves.toEqual({
+        status: "invalid_image",
+      });
+    }
+    expect(dependencies.loadCurrentCourses).not.toHaveBeenCalled();
+    expect(dependencies.consumeQuota).not.toHaveBeenCalled();
+    expect(dependencies.detectText).not.toHaveBeenCalled();
+  });
+
   it("没有当前学期时不消费额度，额度用完时不调用 OCR", async () => {
     const consumeQuota = vi.fn();
     const detectText = vi.fn();

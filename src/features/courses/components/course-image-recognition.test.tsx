@@ -53,7 +53,7 @@ describe("CourseImageRecognition", () => {
 
     await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
     const close = screen.getByRole("button", { name: "关闭识别结果" });
-    expect(document.activeElement).toBe(close);
+    await waitFor(() => expect(document.activeElement).toBe(close));
     fireEvent.keyDown(window, { key: "Tab" });
     expect(document.activeElement).toBe(close);
     expect(screen.getByText("CS 540")).toBeTruthy();

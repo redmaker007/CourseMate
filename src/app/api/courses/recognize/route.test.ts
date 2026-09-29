@@ -78,6 +78,18 @@ describe("course image recognition route", () => {
     expect(recognition.recognizeCourseImage).not.toHaveBeenCalled();
   });
 
+  it("在解析 multipart 前拒绝超出总请求上限的正文", async () => {
+    auth.getCurrentMember.mockResolvedValue(MEMBER);
+    const oversized = new Request("http://localhost/api/courses/recognize", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      body: new Uint8Array(3 * 1024 * 1024 + 64 * 1024 + 1),
+    });
+
+    expect((await POST(oversized)).status).toBe(400);
+    expect(recognition.recognizeCourseImage).not.toHaveBeenCalled();
+  });
+
   it("为额度、图片和临时服务错误返回安全状态码", async () => {
     auth.getCurrentMember.mockResolvedValue(MEMBER);
 

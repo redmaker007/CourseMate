@@ -2,16 +2,13 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-type Candidate = {
-  courseId: string;
-  code: string;
-  title: string;
-  context: "uncertain";
-  defaultSelected: false;
-};
+import {
+  requestCourseImageRecognition,
+  type CourseImageCandidate,
+} from "../course-image-recognition-client";
 
 type DialogState = {
-  candidates: Candidate[];
+  candidates: CourseImageCandidate[];
   message?: string;
 };
 
@@ -85,18 +82,10 @@ export function CourseImageRecognition() {
     const slowTimer = window.setTimeout(() => setSlow(true), 8_000);
     const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const body = new FormData();
-      body.set("image", file);
-      const response = await fetch("/api/courses/recognize", {
-        method: "POST",
-        body,
-        signal: controller.signal,
-      });
-      const result = (await response.json()) as {
-        status: string;
-        candidates?: Candidate[];
-        retryAfterSeconds?: number;
-      };
+      const result = await requestCourseImageRecognition(
+        file,
+        controller.signal,
+      );
       if (result.status === "recognized") {
         setDialog({ candidates: result.candidates ?? [] });
       } else if (result.status === "no_text") {

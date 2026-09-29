@@ -3,6 +3,44 @@ import { NextResponse } from "next/server";
 import { getCurrentMember } from "@/features/auth/session";
 import { recognizeCourseImage } from "@/features/courses/production-course-image-recognition";
 
+const MAX_REQUEST_BYTES = 3 * 1024 * 1024 + 64 * 1024;
+
+async function readBoundedFormData(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) return null;
+
+  const contentLength = request.headers.get("content-length");
+  if (contentLength) {
+    const declaredBytes = Number(contentLength);
+    if (
+      !Number.isFinite(declaredBytes) ||
+      declaredBytes < 0 ||
+      declaredBytes > MAX_REQUEST_BYTES
+    ) {
+      return null;
+    }
+  }
+  if (!request.body) return null;
+
+  const chunks: Uint8Array[] = [];
+  const reader = request.body.getReader();
+  let receivedBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    receivedBytes += value.byteLength;
+    if (receivedBytes > MAX_REQUEST_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+
+  return new Response(Buffer.concat(chunks), {
+    headers: { "content-type": contentType },
+  }).formData();
+}
+
 export async function POST(request: Request) {
   const member = await getCurrentMember();
   if (!member) {
@@ -17,7 +55,7 @@ export async function POST(request: Request) {
 
   let image: FormDataEntryValue | null;
   try {
-    image = (await request.formData()).get("image");
+    image = (await readBoundedFormData(request))?.get("image") ?? null;
   } catch {
     image = null;
   }

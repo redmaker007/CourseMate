@@ -11,8 +11,7 @@ let database: PGlite;
 
 async function consume(userId = MEMBER) {
   await database.exec(
-    `set role authenticated;
-     select set_config('request.jwt.claim.sub', '${userId}', false);`,
+    "set role service_role;",
   );
   try {
     return (
@@ -20,7 +19,8 @@ async function consume(userId = MEMBER) {
         result_status: string;
         retry_after_seconds: number;
       }>(
-        "select result_status, retry_after_seconds from public.consume_course_recognition_quota()",
+        `select result_status, retry_after_seconds
+         from public.consume_course_recognition_quota('${userId}'::uuid)`,
       )
     ).rows;
   } finally {
@@ -132,8 +132,9 @@ describe("consume_course_recognition_quota", () => {
     const [privileges] = (
       await database.query(`
         select
-          has_function_privilege('anon', 'public.consume_course_recognition_quota()', 'execute') as anon_execute,
-          has_function_privilege('authenticated', 'public.consume_course_recognition_quota()', 'execute') as authenticated_execute,
+          has_function_privilege('anon', 'public.consume_course_recognition_quota(uuid)', 'execute') as anon_execute,
+          has_function_privilege('authenticated', 'public.consume_course_recognition_quota(uuid)', 'execute') as authenticated_execute,
+          has_function_privilege('service_role', 'public.consume_course_recognition_quota(uuid)', 'execute') as service_execute,
           has_table_privilege('anon', 'public.course_recognition_attempts', 'select') as anon_select,
           has_table_privilege('authenticated', 'public.course_recognition_attempts', 'select') as authenticated_select
       `)
@@ -141,9 +142,29 @@ describe("consume_course_recognition_quota", () => {
 
     expect(privileges).toEqual({
       anon_execute: false,
-      authenticated_execute: true,
+      authenticated_execute: false,
+      service_execute: true,
       anon_select: false,
       authenticated_select: false,
     });
+  });
+
+  it("保留并发额度所需的事务级全站锁", async () => {
+    const [definition] = (
+      await database.query<{ definition: string }>(`
+        select pg_get_functiondef(
+          'public.consume_course_recognition_quota(uuid)'::regprocedure
+        ) as definition
+      `)
+    ).rows;
+
+    // PGlite 只有单连接；这里锁定并发不变量的实现护栏，真实 PostgreSQL 部署前再做双连接验收。
+    const sql = definition.definition.toLowerCase();
+    const lock = sql.indexOf("pg_advisory_xact_lock");
+    expect(lock).toBeGreaterThan(-1);
+    expect(lock).toBeLessThan(sql.indexOf("into monthly_count"));
+    expect(lock).toBeLessThan(
+      sql.indexOf("insert into public.course_recognition_attempts"),
+    );
   });
 });

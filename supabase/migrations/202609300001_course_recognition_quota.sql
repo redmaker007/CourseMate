@@ -16,7 +16,7 @@ alter table public.course_recognition_attempts enable row level security;
 revoke all on table public.course_recognition_attempts from public, anon, authenticated;
 revoke all on sequence public.course_recognition_attempts_id_seq from public, anon, authenticated;
 
-create or replace function public.consume_course_recognition_quota()
+create or replace function public.consume_course_recognition_quota(actor_id uuid)
 returns table (
   result_status text,
   retry_after_seconds integer
@@ -26,13 +26,19 @@ security definer
 set search_path = ''
 as $$
 declare
-  actor uuid := auth.uid();
+  actor uuid := actor_id;
   checked_at timestamptz;
   oldest_personal_attempt timestamptz;
   personal_count integer;
   monthly_count integer;
 begin
-  if actor is null or not public.has_completed_onboarding() then
+  if actor is null or not exists (
+    select 1
+    from public.member_accounts account
+    join public.profiles profile on profile.id = account.user_id
+    where account.user_id = actor
+      and char_length(trim(profile.display_name)) between 1 and 15
+  ) then
     return query select 'onboarding_required'::text, 0;
     return;
   end if;
@@ -91,7 +97,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.consume_course_recognition_quota()
-  from public, anon;
-grant execute on function public.consume_course_recognition_quota()
-  to authenticated;
+revoke execute on function public.consume_course_recognition_quota(uuid)
+  from public, anon, authenticated;
+grant execute on function public.consume_course_recognition_quota(uuid)
+  to service_role;

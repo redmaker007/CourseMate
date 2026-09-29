@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
 import type { CurrentMember } from "@/features/auth/session";
 import { env } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -22,6 +24,11 @@ type VisionResponse = {
 
 export async function recognizeCourseImage(member: CurrentMember, file: File) {
   const supabase = await createClient();
+  const internalSupabase = createSupabaseClient(
+    env.supabaseUrl,
+    env.supabaseServiceRoleKey,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
   const recognize = createCourseImageRecognizer({
     async loadCurrentCourses(currentMember) {
       const { data: setting, error: termError } = await supabase
@@ -60,10 +67,13 @@ export async function recognizeCourseImage(member: CurrentMember, file: File) {
       }
     },
     async consumeQuota() {
-      const invoke = supabase.rpc.bind(supabase) as unknown as (
+      const invoke = internalSupabase.rpc.bind(internalSupabase) as unknown as (
         name: "consume_course_recognition_quota",
+        args: { actor_id: string },
       ) => Promise<{ data: QuotaRow[] | null; error: { message: string } | null }>;
-      const { data, error } = await invoke("consume_course_recognition_quota");
+      const { data, error } = await invoke("consume_course_recognition_quota", {
+        actor_id: member.userId,
+      });
       if (error) throw error;
       const row = data?.[0];
       if (!row) throw new Error("课程识别额度没有返回结果");

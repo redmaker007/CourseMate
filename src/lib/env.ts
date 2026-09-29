@@ -37,6 +37,13 @@ export const env = {
       process.env.GOOGLE_CLOUD_VISION_API_KEY,
     );
   },
+  /** 仅供服务端调用内部 RPC；此密钥绕过 RLS，绝不能进入客户端 bundle。 */
+  get supabaseServiceRoleKey() {
+    return required(
+      "SUPABASE_SERVICE_ROLE_KEY",
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    );
+  },
   /** 站点公开地址，用于拼邮箱验证的回调链接。本地是 http://localhost:3000 */
   get siteUrl() {
     return (
