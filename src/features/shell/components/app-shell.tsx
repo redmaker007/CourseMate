@@ -11,7 +11,7 @@ import { MobileTabBar } from "./mobile-tab-bar";
  */
 export function AppShell({ data, children }: { data: ShellData; children: ReactNode }) {
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-canvas" data-app-shell="">
+    <div className="flex h-dvh w-full overflow-hidden bg-canvas pt-[env(safe-area-inset-top)]" data-app-shell="">
       <div className="hidden shrink-0 md:block">
         <AppRail {...data} />
       </div>
