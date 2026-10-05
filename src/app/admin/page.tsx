@@ -85,7 +85,9 @@ export default async function AdminPage() {
                 当前学校：{member.schoolId} · 邮箱归属：{member.homeSchoolId ?? member.schoolId}
               </p>
               <AdminForm action={setTestSchoolAction} submitLabel="进入测试学校" pendingLabel="切换中…">
+                {/* 排除当前学校：下拉默认选中第一项，恰好是当前所在学校时点「进入」什么都不会发生。返回本校用页面顶部横幅的按钮。 */}
                 <SchoolSelect schools={schoolOptions.filter((option) =>
+                  option.id !== member.schoolId &&
                   overview.schools.some((school) => school.id === option.id && school.enabled)
                 )} />
               </AdminForm>
