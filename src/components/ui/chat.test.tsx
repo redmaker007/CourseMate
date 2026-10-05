@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   avatarColorFor,
   ChatMessageRow,
   formatChatTime,
   shouldShowTimeDivider,
+  submitOnEnter,
 } from "./chat";
 
 afterEach(cleanup);
@@ -64,5 +65,43 @@ describe("ChatMessageRow", () => {
     );
     expect(screen.queryByText("Alice")).toBeNull();
     expect(screen.getByText("hi")).toBeTruthy();
+  });
+});
+
+describe("submitOnEnter", () => {
+  function renderForm({ disabled = false } = {}) {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <textarea aria-label="消息" defaultValue="hi" onKeyDown={submitOnEnter} />
+        <button disabled={disabled} type="submit">发送</button>
+      </form>,
+    );
+    return { onSubmit, input: screen.getByRole("textbox", { name: "消息" }) };
+  }
+
+  it("Enter 提交表单", () => {
+    const { onSubmit, input } = renderForm();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("Shift+Enter 只换行，不提交", () => {
+    const { onSubmit, input } = renderForm();
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("输入法选词时的回车不提交", () => {
+    const { onSubmit, input } = renderForm();
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("发送按钮不可用时不提交", () => {
+    const { onSubmit, input } = renderForm({ disabled: true });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

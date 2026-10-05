@@ -16,6 +16,7 @@ import {
   Avatar,
   ChatMessageRow,
   shouldShowTimeDivider,
+  submitOnEnter,
   TimeDivider,
 } from "@/components/ui/chat";
 
@@ -190,7 +191,7 @@ export function ChatWorkspace({
       </header>
 
       {restriction ? (
-        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        <p className="shrink-0 border-b border-warn/30 bg-warn-soft px-4 py-2 text-sm text-warn">
           {restriction}
         </p>
       ) : null}
@@ -285,7 +286,8 @@ export function ChatWorkspace({
               maxLength={8000}
               name="body"
               onChange={(event) => setBody(event.target.value)}
-              placeholder="输入消息"
+              onKeyDown={submitOnEnter}
+              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
               rows={1}
               value={body}
             />

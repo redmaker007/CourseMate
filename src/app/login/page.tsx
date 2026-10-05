@@ -57,7 +57,7 @@ export default async function LoginPage({
         </div>
 
         {schoolsUnavailable || schools.length === 0 ? (
-          <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="mb-5 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn">
             学校列表暂时不可用，请稍后刷新重试。
           </p>
         ) : null}

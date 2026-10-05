@@ -5,8 +5,9 @@
  * 方便对照设计稿搬页面。组件里用下方 @theme 映射出来的工具类，例如
  * bg-canvas / bg-card / border-line / text-ink / text-muted / bg-brand。
  *
- * 深色主题的变量已经备好，但要等所有页面都改用这些变量后才开放切换；
- * 在那之前 <html> 不会带 .dark，页面固定为浅色。
+ * 主题由 <html data-theme> 决定（见 src/features/theme/）：
+ * light / dark 是用户手动选的；system 跟随系统设置。服务端按 cookie 直接输出，
+ * 首屏不会先闪一下浅色。深色变量写了两份（手动深色 + 系统深色），改动时两处一起改。
  */
 :root {
   --brand: #4f46e5;
@@ -24,6 +25,8 @@
   --accent-soft: #dbeafe;
   --success: #059669;
   --success-soft: #d1fae5;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
 
   --chat-bg: #f8f9fb;
   --bubble-me: #4f46e5;
@@ -50,7 +53,8 @@
   --tab-bar-height: calc(56px + env(safe-area-inset-bottom));
 }
 
-.dark {
+/* 手动选了深色 */
+:root[data-theme="dark"] {
   --bg: #16171a;
   --panel: #1c1d21;
   --card: #232428;
@@ -62,12 +66,41 @@
   --accent-soft: rgba(76, 141, 246, 0.16);
   --success: #34d399;
   --success-soft: rgba(52, 211, 153, 0.14);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.12);
   --brand-soft: rgba(79, 70, 229, 0.18);
 
   --chat-bg: #16171a;
   --bubble-other: #232428;
   --chat-meta: #7a7f8a;
   --bar: #1c1d21;
+  color-scheme: dark;
+}
+
+/* 跟随系统，且系统是深色 */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --bg: #16171a;
+    --panel: #1c1d21;
+    --card: #232428;
+    --border: #33353b;
+    --text: #f3f4f6;
+    --muted: #9ca3af;
+    --rail: #0f1012;
+    --accent: #4c8df6;
+    --accent-soft: rgba(76, 141, 246, 0.16);
+    --success: #34d399;
+    --success-soft: rgba(52, 211, 153, 0.14);
+    --warn: #fbbf24;
+    --warn-soft: rgba(251, 191, 36, 0.12);
+    --brand-soft: rgba(79, 70, 229, 0.18);
+
+    --chat-bg: #16171a;
+    --bubble-other: #232428;
+    --chat-meta: #7a7f8a;
+    --bar: #1c1d21;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
@@ -85,6 +118,8 @@
   --color-accent-soft: var(--accent-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
   --color-chat: var(--chat-bg);
   --color-bubble-me: var(--bubble-me);
   --color-bubble-other: var(--bubble-other);

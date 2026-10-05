@@ -12,6 +12,7 @@ import {
   shortCourseCode,
 } from "@/features/shell/navigation";
 import type { ShellData } from "@/features/shell/queries";
+import { ThemeQuickToggle } from "@/features/theme/components/theme-toggle";
 
 type RailTileProps = {
   href: string;
@@ -119,6 +120,8 @@ export function AppRail({ courses, directUnread, showAdmin }: ShellData) {
       </RailTile>
 
       <div className="flex-1" />
+
+      <ThemeQuickToggle />
 
       {showAdmin ? (
         <Link

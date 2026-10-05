@@ -46,26 +46,26 @@ export default async function AdminPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-full bg-canvas">
       <SchoolTestBanner member={member} />
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-line bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
               CourseMate 管理
             </p>
-            <p className="mt-1 truncate text-sm text-slate-600">
-              <span className="font-medium text-slate-900">
+            <p className="mt-1 truncate text-sm text-muted">
+              <span className="font-medium text-ink">
                 {PLATFORM_ROLE_LABELS[role]}
               </span>
-              <span aria-hidden="true" className="mx-2 text-slate-300">
+              <span aria-hidden="true" className="mx-2 text-muted">
                 ·
               </span>
               {member.email}
             </p>
           </div>
           <Link
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+            className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:border-line hover:bg-panel"
             href="/dashboard"
           >
             返回大厅
@@ -81,7 +81,7 @@ export default async function AdminPage() {
               title="切换测试学校"
               description="使用自己的账号测试课程、好友和私聊。操作会写入当前环境，已有选课和聊天记录会保留。"
             >
-              <p className="mb-3 text-sm text-slate-600">
+              <p className="mb-3 text-sm text-muted">
                 当前学校：{member.schoolId} · 邮箱归属：{member.homeSchoolId ?? member.schoolId}
               </p>
               <AdminForm action={setTestSchoolAction} submitLabel="进入测试学校" pendingLabel="切换中…">
@@ -102,8 +102,8 @@ export default async function AdminPage() {
               </ul>
 
               {owner ? (
-                <div className="mt-5 space-y-2 rounded-2xl border border-dashed border-slate-300 p-4">
-                  <h3 className="text-sm font-medium text-slate-800">
+                <div className="mt-5 space-y-2 rounded-2xl border border-dashed border-line p-4">
+                  <h3 className="text-sm font-medium text-ink">
                     新增学校，或修改已有学校的名称
                   </h3>
                   <AdminForm action={saveSchoolAction} submitLabel="保存学校">
@@ -148,11 +148,11 @@ export default async function AdminPage() {
                     schools={schoolOptions}
                   />
 
-                  <div className="space-y-2 border-t border-slate-100 pt-5">
-                    <h3 className="text-sm font-medium text-slate-800">
+                  <div className="space-y-2 border-t border-line pt-5">
+                    <h3 className="text-sm font-medium text-ink">
                       新增或修改单门课
                     </h3>
-                    <p className="text-xs leading-5 text-slate-500">
+                    <p className="text-xs leading-5 text-muted">
                       课号相同就是修改：会同时更新目录和当前学期的课程名称。
                     </p>
                     <AdminForm
@@ -179,11 +179,11 @@ export default async function AdminPage() {
                     </AdminForm>
                   </div>
 
-                  <div className="space-y-2 border-t border-slate-100 pt-5">
-                    <h3 className="text-sm font-medium text-slate-800">
+                  <div className="space-y-2 border-t border-line pt-5">
+                    <h3 className="text-sm font-medium text-ink">
                       重新生成当前学期课程
                     </h3>
-                    <p className="text-xs leading-5 text-slate-500">
+                    <p className="text-xs leading-5 text-muted">
                       按目录补建当前学期缺少的课程，已有的课不受影响。一般不需要手动点，
                       导入课表和切换学期时都会自动执行。
                     </p>
@@ -197,7 +197,7 @@ export default async function AdminPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-600">还没有任何学校。</p>
+                <p className="text-sm text-muted">还没有任何学校。</p>
               )}
             </Section>
 
@@ -218,7 +218,7 @@ export default async function AdminPage() {
             </Section>
           </>
         ) : (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          <div className="rounded-2xl border border-warn/30 bg-warn-soft px-5 py-4 text-sm text-warn">
             管理数据暂时不可用，请稍后刷新。
           </div>
         )}

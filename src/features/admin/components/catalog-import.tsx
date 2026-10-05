@@ -159,7 +159,7 @@ export function CatalogImport({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <label
-            className="block text-xs font-medium text-slate-600"
+            className="block text-xs font-medium text-muted"
             htmlFor={schoolFieldId}
           >
             写入哪所学校
@@ -183,14 +183,14 @@ export function CatalogImport({
         </div>
         <div className="space-y-1">
           <label
-            className="block text-xs font-medium text-slate-600"
+            className="block text-xs font-medium text-muted"
             htmlFor={fileFieldId}
           >
             官方课表（.xlsx）
           </label>
           <input
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
+            className="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-panel file:px-3 file:py-2 file:text-sm file:font-medium"
             disabled={busy}
             id={fileFieldId}
             onChange={handleFile}
@@ -200,7 +200,7 @@ export function CatalogImport({
       </div>
 
       {status.kind === "parsing" ? (
-        <p className="text-sm text-slate-600" role="status">
+        <p className="text-sm text-muted" role="status">
           正在读取课表…
         </p>
       ) : null}
@@ -208,8 +208,8 @@ export function CatalogImport({
       {loaded ? <ImportReport {...loaded} /> : null}
 
       {loaded ? (
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <label className="flex items-start gap-2 text-sm text-slate-700">
+        <div className="space-y-3 rounded-xl border border-line bg-card bg-card p-4">
+          <label className="flex items-start gap-2 text-sm text-ink">
             <input
               checked={confirmed}
               className="mt-1"
@@ -223,7 +223,7 @@ export function CatalogImport({
             </span>
           </label>
           <button
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!confirmed || !importable || busy}
             onClick={handleImport}
             type="button"
@@ -237,7 +237,7 @@ export function CatalogImport({
 
       {status.kind === "done" ? (
         <p
-          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="rounded-lg border border-success/30 bg-success-soft px-3 py-2 text-sm text-success"
           role="status"
         >
           {status.message}
@@ -245,7 +245,7 @@ export function CatalogImport({
       ) : null}
       {status.kind === "failed" ? (
         <p
-          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+          className="rounded-lg border border-badge/30 bg-badge/10 px-3 py-2 text-sm text-badge"
           role="alert"
         >
           {status.message}
@@ -262,10 +262,10 @@ function ImportReport({ fileName, report }: Loaded) {
     report.issues.length === 0;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+    <div className="space-y-3 rounded-xl border border-line bg-card bg-panel p-4 text-sm">
       <div>
-        <p className="font-medium text-slate-900">{fileName}</p>
-        <p className="mt-1 text-slate-700">
+        <p className="font-medium text-ink">{fileName}</p>
+        <p className="mt-1 text-ink">
           索引页 {report.subjects.length} 个学科 · 解析成功 {report.parsedCount} 行 ·
           去重后 {report.records.length} 门课
         </p>
@@ -308,7 +308,7 @@ function ImportReport({ fileName, report }: Loaded) {
         />
       ) : null}
       {clean ? (
-        <p className="text-emerald-700">
+        <p className="text-success">
           每个院系的课程数都与索引页一致，没有无法解析的行。
         </p>
       ) : null}
@@ -317,9 +317,9 @@ function ImportReport({ fileName, report }: Loaded) {
 }
 
 const ISSUE_TONES = {
-  error: "border-rose-200 bg-rose-50 text-rose-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  neutral: "border-slate-200 bg-white text-slate-700",
+  error: "border-badge/30 bg-badge/10 text-badge",
+  warning: "border-warn/30 bg-warn-soft text-warn",
+  neutral: "border-line bg-card text-ink",
 } as const;
 
 function IssueList({
