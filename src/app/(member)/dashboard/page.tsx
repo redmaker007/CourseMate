@@ -76,7 +76,7 @@ export default async function DashboardPage({
   ]);
 
   return (
-    <div className="flex min-h-full flex-col bg-canvas md:h-full">
+    <div className="page-enter flex min-h-full shrink-0 flex-col bg-canvas md:h-full">
       <SchoolTestBanner member={member} />
       <DashboardHeader
         adminHref={platformRole ? "/admin" : undefined}

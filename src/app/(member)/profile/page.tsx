@@ -25,7 +25,7 @@ export default async function ProfilePage() {
   if (!profile) redirect("/onboarding/profile");
 
   return (
-    <main className="min-h-full bg-canvas">
+    <main className="page-enter min-h-full shrink-0 bg-canvas">
       <SchoolTestBanner member={member} />
       <header className="border-b border-line bg-card px-4 py-3 md:px-6">
         <h1 className="text-lg font-bold text-ink">我的</h1>
