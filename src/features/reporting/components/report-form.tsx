@@ -46,7 +46,7 @@ export function ReportForm({
   if (!open) {
     return (
       <button
-        className="text-xs font-semibold text-rose-700 underline"
+        className="text-[11px] text-muted underline-offset-2 hover:text-badge hover:underline"
         onClick={() => setOpen(true)}
         type="button"
       >
@@ -59,7 +59,7 @@ export function ReportForm({
     <form
       action={formAction}
       aria-label={label}
-      className="mt-2 space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-slate-900"
+      className="mt-2 space-y-2 rounded-xl border border-badge/30 bg-badge/10 p-3 text-ink"
       role="form"
     >
       <input name="targetType" type="hidden" value={targetType} />
@@ -68,7 +68,7 @@ export function ReportForm({
         举报原因
         <select
           aria-label="Reason"
-          className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+          className="mt-1 block w-full rounded-lg border border-line bg-card px-2 py-1.5"
           name="reason"
           onChange={(event) => setReason(event.target.value)}
           value={reason}
@@ -82,7 +82,7 @@ export function ReportForm({
         补充说明（可选）
         <textarea
           aria-label="Details"
-          className="mt-1 min-h-20 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+          className="mt-1 min-h-20 w-full rounded-lg border border-line bg-card px-2 py-1.5"
           maxLength={2000}
           name="details"
           onChange={(event) => setDetails(event.target.value)}
@@ -91,12 +91,12 @@ export function ReportForm({
         />
       </label>
       <div className="flex items-center justify-between gap-2">
-        <span className={length > 1000 ? "text-xs text-rose-700" : "text-xs text-slate-500"}>
+        <span className={length > 1000 ? "text-xs text-badge" : "text-xs text-muted"}>
           {length}/1000
         </span>
         <div className="flex gap-2">
           <button
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold"
+            className="rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold"
             onClick={() => setOpen(false)}
             type="button"
           >
@@ -104,7 +104,7 @@ export function ReportForm({
           </button>
           <button
             aria-label="Submit report"
-            className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-badge px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
             disabled={pending || invalid}
             type="submit"
           >
@@ -113,7 +113,7 @@ export function ReportForm({
         </div>
       </div>
       {state.status !== "idle" ? (
-        <p aria-live="polite" className="text-xs text-slate-700" role="status">
+        <p aria-live="polite" className="text-xs text-ink" role="status">
           {state.message}
         </p>
       ) : null}

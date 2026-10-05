@@ -39,10 +39,10 @@ function FriendRequestForm({
     <form action={formAction} className="mt-4 space-y-2">
       <input name="intent" type="hidden" value="request" />
       <input name="memberId" type="hidden" value={memberId} />
-      <label className="block text-sm font-medium text-slate-800">
+      <label className="block text-sm font-medium text-ink">
         申请附言
         <textarea
-          className="mt-1 min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+          className="mt-1 min-h-24 w-full rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-brand"
           name="message"
           onChange={(event) => setMessage(event.target.value)}
           required
@@ -52,13 +52,13 @@ function FriendRequestForm({
       <div className="flex items-center justify-between gap-3">
         <span
           className={
-            length > 300 ? "text-xs text-rose-700" : "text-xs text-slate-500"
+            length > 300 ? "text-xs text-badge" : "text-xs text-muted"
           }
         >
           {length}/300
         </span>
         <button
-          className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           disabled={pending || invalid}
           type="submit"
         >
@@ -66,7 +66,7 @@ function FriendRequestForm({
         </button>
       </div>
       {length > 300 ? (
-        <p className="text-xs text-rose-700">申请附言最多 300 个字符。</p>
+        <p className="text-xs text-badge">申请附言最多 300 个字符。</p>
       ) : null}
       <ActionFeedback state={state} />
     </form>
@@ -93,10 +93,10 @@ function DiscoveryResult({
   reportAction: ReportAction;
 }) {
   return (
-    <article className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <h3 className="font-semibold text-slate-950">{member.displayName}</h3>
+    <article className="mt-4 rounded-xl border border-line bg-card bg-panel p-4">
+      <h3 className="font-semibold text-ink">{member.displayName}</h3>
       {member.major || member.gradYear ? (
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-1 text-xs text-muted">
           {[member.major, member.gradYear ? `${member.gradYear} 届` : null]
             .filter(Boolean)
             .join(" · ")}
@@ -119,7 +119,7 @@ function DiscoveryResult({
       ) : null}
       {member.relationship === "incoming_request" && member.incomingRequestId ? (
         <div className="mt-3">
-          <p className="mb-2 text-sm text-indigo-700">
+          <p className="mb-2 text-sm text-accent">
             对方已经申请你，可以直接处理收到的申请。
           </p>
           <ActionForm
@@ -130,11 +130,11 @@ function DiscoveryResult({
         </div>
       ) : null}
       {member.relationship === "friend" ? (
-        <p className="mt-3 text-sm text-emerald-700">你们已经是好友。</p>
+        <p className="mt-3 text-sm text-success">你们已经是好友。</p>
       ) : null}
       {member.relationship === "blocked" ? (
         <div className="mt-3">
-          <p className="mb-2 text-sm text-rose-700">
+          <p className="mb-2 text-sm text-badge">
             {blockStatusLabel(member.blockStatus)}，无法发送申请或消息。
           </p>
           {canUnblock(member.blockStatus) ? (
@@ -168,9 +168,9 @@ export function FriendSearch({
     if (state.status !== "idle") formRef.current?.reset();
   }, [state]);
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-950">按完整邮箱查找</h2>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="rounded-xl border border-line bg-card p-4">
+      <h2 className="text-lg font-bold text-ink">按完整邮箱查找</h2>
+      <p className="mt-1 text-sm text-muted">
         只会精确匹配同校成员；邮箱不会出现在 URL、结果或浏览器存储中。
       </p>
       <form
@@ -183,7 +183,7 @@ export function FriendSearch({
         </label>
         <input
           autoComplete="off"
-          className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500"
+          className="min-w-0 flex-1 rounded-xl border border-line px-4 py-2.5 text-sm outline-none focus:border-brand"
           id="friend-email"
           name="email"
           placeholder="name@school.edu"
@@ -191,7 +191,7 @@ export function FriendSearch({
           type="email"
         />
         <button
-          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           disabled={pending}
           type="submit"
         >

@@ -1,14 +1,23 @@
 "use client";
 
+import { ChevronLeft, SendHorizontal } from "lucide-react";
 import Link from "next/link";
 import {
   startTransition,
   useActionState,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
+
+import {
+  Avatar,
+  ChatMessageRow,
+  shouldShowTimeDivider,
+  TimeDivider,
+} from "@/components/ui/chat";
 
 import type { DirectMessage } from "../direct-message-service";
 import {
@@ -143,169 +152,222 @@ export function ChatWorkspace({
         ? "当前好友关系或学校权限不允许发送新消息，历史仍可查看。"
         : null;
 
+  // 新消息到来时，只有原本就停在底部附近才跟着滚到底；加载更早消息时保持位置。
+  const scrollRef = useRef<HTMLElement>(null);
+  const stickToBottom = useRef(true);
+  const itemCount = sync.messages.length + visibleAttempts.length;
+  useLayoutEffect(() => {
+    const list = scrollRef.current;
+    if (list && stickToBottom.current) list.scrollTop = list.scrollHeight;
+  }, [itemCount]);
+  const loadOlderKeepingPosition = async () => {
+    const list = scrollRef.current;
+    const distanceFromBottom = list ? list.scrollHeight - list.scrollTop : 0;
+    stickToBottom.current = false;
+    await sync.loadOlder();
+    requestAnimationFrame(() => {
+      if (list) list.scrollTop = list.scrollHeight - distanceFromBottom;
+    });
+  };
+
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <header className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
-          <div>
-            <Link className="text-xs font-semibold text-indigo-700" href="/friends">
-              返回好友
-            </Link>
-            <h1 className="mt-1 text-xl font-bold text-slate-950">
-              {otherDisplayName}
-            </h1>
-          </div>
-          <span className="text-xs text-slate-500">
-            {sync.connected ? "实时连接" : "正在同步"}
-          </span>
-        </header>
-
-        {restriction ? (
-          <p className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
-            {restriction}
-          </p>
-        ) : null}
-
-        <section
-          aria-label="消息记录"
-          className="flex-1 space-y-3 overflow-y-auto px-5 py-5"
+    <main className="flex min-h-0 flex-1 flex-col bg-canvas">
+      <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-card px-3 md:px-4">
+        <Link
+          aria-label="返回好友"
+          className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-ink"
+          href="/friends"
         >
-          {sync.hasOlderMessages ? (
-            <button
-              className="mx-auto block rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
-              disabled={sync.loadingOlder}
-              onClick={() => void sync.loadOlder()}
-              type="button"
-            >
-              {sync.loadingOlder ? "加载中…" : "加载更早消息"}
-            </button>
-          ) : null}
-          {sync.messages.length === 0 && visibleAttempts.length === 0 ? (
-            <p className="py-12 text-center text-sm text-slate-500">
-              清除位置之后还没有消息。
-            </p>
-          ) : (
-            <ol className="space-y-3">
-              {sync.messages.map((message) => {
-                const own = message.senderId === currentUserId;
-                return (
-                  <li
-                    className={`flex ${own ? "justify-end" : "justify-start"}`}
-                    key={message.id}
-                  >
-                    <article
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                        own
-                          ? "bg-indigo-600 text-white"
-                          : "bg-slate-100 text-slate-900"
-                      }`}
-                    >
-                      <p className={`mb-1 text-xs ${own ? "text-indigo-100" : "text-slate-500"}`}>
-                        {own ? "我" : message.senderDisplayName}
-                      </p>
-                      <SafeMessageText text={message.body} />
-                      <time className={`mt-1 block text-[11px] ${own ? "text-indigo-100" : "text-slate-500"}`}>
-                        {message.createdAt}
-                      </time>
-                      {!own && message.senderId ? (
-                        <ReportForm
-                          action={reportAction}
-                          label="举报消息"
-                          targetId={message.id}
-                          targetType="message"
-                        />
-                      ) : null}
-                    </article>
-                  </li>
-                );
-              })}
-              {visibleAttempts.map((attempt) => (
-                <li className="flex justify-end" data-client-message-id={attempt.clientMessageId} key={attempt.clientMessageId}>
-                  <article className="max-w-[85%] rounded-2xl bg-indigo-600 px-4 py-3 text-sm text-white opacity-75">
-                    <p className="mb-1 text-xs text-indigo-100">
+          <ChevronLeft size={18} strokeWidth={1.75} />
+        </Link>
+        <Avatar id={null} name={otherDisplayName} size={28} />
+        <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
+          {otherDisplayName}
+        </h1>
+        <span className="ml-auto shrink-0 text-xs text-muted">
+          {sync.connected ? "实时连接" : "正在同步"}
+        </span>
+      </header>
+
+      {restriction ? (
+        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          {restriction}
+        </p>
+      ) : null}
+
+      <section
+        aria-label="消息记录"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-chat px-4 py-3"
+        onScroll={(event) => {
+          const list = event.currentTarget;
+          stickToBottom.current =
+            list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+        }}
+        ref={scrollRef}
+      >
+        {sync.hasOlderMessages ? (
+          <button
+            className="mx-auto mb-2 block rounded-full border border-line bg-card px-4 py-1 text-xs font-medium text-muted hover:text-ink disabled:opacity-50"
+            disabled={sync.loadingOlder}
+            onClick={() => void loadOlderKeepingPosition()}
+            type="button"
+          >
+            {sync.loadingOlder ? "加载中…" : "加载更早消息"}
+          </button>
+        ) : null}
+        {sync.messages.length === 0 && visibleAttempts.length === 0 ? (
+          <p className="m-auto py-12 text-center text-sm text-muted">
+            清除位置之后还没有消息。
+          </p>
+        ) : (
+          <ol className="flex flex-col">
+            {sync.messages.map((message, index) => (
+              <DirectMessageItem
+                key={message.id}
+                message={message}
+                own={message.senderId === currentUserId}
+                previousAt={sync.messages[index - 1]?.createdAt}
+                reportAction={reportAction}
+              />
+            ))}
+            {visibleAttempts.map((attempt) => (
+              <ChatMessageRow
+                body={<SafeMessageText text={attempt.body} />}
+                data-client-message-id={attempt.clientMessageId}
+                dimmed
+                footer={
+                  <span className="mt-0.5 flex items-center gap-2 text-xs text-chat-meta">
+                    <span>
                       {attempt.status === "failed" ? (
-                        <span aria-label="发送失败" className="mr-1 font-bold text-rose-300" role="img">
+                        <span aria-label="发送失败" className="mr-1 font-bold text-badge" role="img">
                           !
                         </span>
                       ) : null}
                       我 · {attempt.status === "sending" ? "发送中" : "发送失败"}
-                    </p>
-                    <SafeMessageText text={attempt.body} />
+                    </span>
                     {attempt.retryable ? (
                       <button
-                        className="mt-2 text-xs font-semibold text-white underline"
+                        className="font-semibold text-badge underline"
                         onClick={() => retry(attempt.clientMessageId)}
                         type="button"
                       >
                         重试
                       </button>
                     ) : null}
-                  </article>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
+                  </span>
+                }
+                key={attempt.clientMessageId}
+                own
+                senderId={currentUserId}
+                senderName="我"
+              />
+            ))}
+          </ol>
+        )}
+      </section>
 
-        <footer className="border-t border-slate-200 p-4">
-          {latestMessageId ? (
-            <form action={clearFormAction} className="mb-3 flex items-center justify-between gap-3">
-              <input name="conversationId" type="hidden" value={conversationId} />
-              <input name="throughMessageId" type="hidden" value={latestMessageId} />
-              <button
-                className="text-xs font-semibold text-slate-600 underline disabled:opacity-50"
-                disabled={clearing}
-                type="submit"
-              >
-                清除我的历史
-              </button>
-              {clearState.status !== "idle" ? (
-                <span aria-live="polite" className="text-xs text-slate-500">
-                  {clearState.message}
-                </span>
-              ) : null}
-            </form>
-          ) : null}
-          <form
-            className="space-y-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              sendFormAction(new FormData(event.currentTarget));
-            }}
-          >
-            <input name="conversationId" type="hidden" value={conversationId} />
-            <label className="sr-only" htmlFor="direct-message-body">消息</label>
+      <footer className="shrink-0 border-t border-line bg-bar px-3 py-2.5">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            stickToBottom.current = true;
+            sendFormAction(new FormData(event.currentTarget));
+          }}
+        >
+          <input name="conversationId" type="hidden" value={conversationId} />
+          <label className="sr-only" htmlFor="direct-message-body">消息</label>
+          <div className="flex items-end gap-2">
             <textarea
               aria-label="消息"
-              className="min-h-24 w-full resize-y rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 disabled:bg-slate-100"
+              className="max-h-40 min-h-10 min-w-0 flex-1 resize-y rounded-lg border border-line bg-canvas px-3 py-2 text-sm leading-[22px] text-ink outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30 disabled:opacity-50"
               disabled={sendStatus !== "allowed"}
               id="direct-message-body"
               maxLength={8000}
               name="body"
               onChange={(event) => setBody(event.target.value)}
               placeholder="输入消息"
+              rows={1}
               value={body}
             />
-            <div className="flex items-center justify-between gap-3">
-              <span className={bodyLength > 4000 ? "text-xs text-rose-700" : "text-xs text-slate-500"}>
-                {bodyLength}/4000
-              </span>
+            <button
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-sm font-medium text-white transition hover:bg-brand-hover disabled:opacity-40"
+              disabled={sending || bodyInvalid || sendStatus !== "allowed"}
+              type="submit"
+            >
+              <SendHorizontal size={15} strokeWidth={1.75} />
+              {sending ? "发送中…" : "发送"}
+            </button>
+          </div>
+          {sendState.status !== "idle" ? (
+            <p aria-live="polite" className="mt-1.5 text-xs text-muted">
+              {sendState.message}
+            </p>
+          ) : null}
+        </form>
+        <div className="mt-1.5 flex items-center justify-between gap-3">
+          {latestMessageId ? (
+            <form action={clearFormAction} className="flex min-w-0 items-center gap-3">
+              <input name="conversationId" type="hidden" value={conversationId} />
+              <input name="throughMessageId" type="hidden" value={latestMessageId} />
               <button
-                className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                disabled={sending || bodyInvalid || sendStatus !== "allowed"}
+                className="shrink-0 text-xs text-muted underline hover:text-ink disabled:opacity-50"
+                disabled={clearing}
                 type="submit"
               >
-                {sending ? "发送中…" : "发送"}
+                清除我的历史
               </button>
-            </div>
-            {sendState.status !== "idle" ? (
-              <p aria-live="polite" className="text-sm text-slate-600">
-                {sendState.message}
-              </p>
-            ) : null}
-          </form>
-        </footer>
-      </div>
+              {clearState.status !== "idle" ? (
+                <span aria-live="polite" className="truncate text-xs text-muted">
+                  {clearState.message}
+                </span>
+              ) : null}
+            </form>
+          ) : (
+            <span />
+          )}
+          <span className={bodyLength > 4000 ? "text-xs text-badge" : "text-xs text-muted"}>
+            {bodyLength}/4000
+          </span>
+        </div>
+      </footer>
     </main>
+  );
+}
+
+function DirectMessageItem({
+  message,
+  own,
+  previousAt,
+  reportAction,
+}: {
+  message: DirectMessage;
+  own: boolean;
+  previousAt?: string;
+  reportAction: ReportAction;
+}) {
+  return (
+    <>
+      {shouldShowTimeDivider(previousAt, message.createdAt) ? (
+        <TimeDivider iso={message.createdAt} />
+      ) : null}
+      <ChatMessageRow
+        body={<SafeMessageText text={message.body} />}
+        footer={
+          !own && message.senderId ? (
+            <div className="mt-0.5 text-xs text-chat-meta">
+              <ReportForm
+                action={reportAction}
+                label="举报消息"
+                targetId={message.id}
+                targetType="message"
+              />
+            </div>
+          ) : null
+        }
+        own={own}
+        senderId={message.senderId}
+        senderName={own ? "我" : message.senderDisplayName}
+      />
+    </>
   );
 }
