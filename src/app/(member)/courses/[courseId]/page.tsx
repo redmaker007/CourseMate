@@ -75,7 +75,7 @@ export default async function CoursePage({
   const leaveAction = leaveCourseAction.bind(null, room.course.id);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-canvas">
+    <div className="page-enter flex h-full min-h-0 flex-col bg-canvas">
       <SchoolTestBanner member={member} />
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-card px-3 md:px-4">
         <Link
