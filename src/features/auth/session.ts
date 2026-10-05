@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createClient } from "@/lib/supabase/server";
 
 import { createSupabaseMemberSessionReader } from "./supabase-email-otp-adapters";
@@ -25,8 +27,11 @@ export type CurrentMember = {
  *
  * 一次页面渲染只做一次网络往返：auth.getClaims 在本地验证令牌，再用一次
  * get_member_context 取回绑定、开放学校、当前学校与 onboarding 状态。
+ *
+ * 用 React cache 包一层：同一次请求里导航外壳（layout）和页面各调一次，
+ * 只真正查一次。cache 只在单次服务端请求内有效，不会跨请求复用会话。
  */
-export async function getCurrentMember(): Promise<CurrentMember | null> {
+export const getCurrentMember = cache(async function getCurrentMember(): Promise<CurrentMember | null> {
   const supabase = await createClient();
 
   try {
@@ -47,4 +52,4 @@ export async function getCurrentMember(): Promise<CurrentMember | null> {
   } catch {
     return null;
   }
-}
+});
