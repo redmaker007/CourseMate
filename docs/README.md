@@ -26,6 +26,7 @@
 | 大厅与页面布局 | [协作约定](../CONTRIBUTING.md)、[路由交接](handoffs/frontend-routing-and-dashboard.md) | `src/app/**/page.tsx`；`src/features/*/components/`；导航外壳：`src/app/(member)/layout.tsx`、`src/features/shell/`；设计变量：`src/app/globals.css` |
 | 外观与深色模式 | 设计变量与深浅色两套取值在 `globals.css` 顶部注释；主题存 cookie、服务端直接输出 | `src/features/theme/`；`src/app/layout.tsx`（读 cookie）；`src/app/globals.css`；切换入口在导航栏底部和「我的」页 |
 | 延迟显示（网络 / 服务毫秒读数） | [STATUS](STATUS.md)「延迟显示」一行；两个读数各测什么见 `measure-latency.ts` 里的注释 | `src/features/latency/`；`src/app/api/ping/route.ts`；`src/app/layout.tsx`（挂载）；`src/app/(member)/profile/page.tsx`（开关） |
+| 网页推送（私聊、好友申请通知） | [ADR-0010](adr/0010-web-push-via-restricted-rpc.md)、[推送运维手册](runbooks/web-push.md) | `src/features/push/`；`public/sw.js`；`supabase/migrations/202610040001_web_push.sql` |
 | schema、RLS、函数权限 | [数据库说明](../supabase/README.md)、[新建项目手册](runbooks/new-supabase-project.md)及相关业务 ADR | `supabase/migrations/`；集成验证见 `phase-one-integration.test.ts`、`platform-admin.test.ts` 与 `admin-school-testing.test.ts`（自动加载全部 SQL 迁移） |
 | 环境、部署、收不到验证码 | 对应[操作手册](../README.md#操作手册)；需要当时证据再看[环境交接](handoffs/environment-and-deployment.md) | `.env.example`；`supabase/config.toml`；`supabase/templates/email-otp.html` |
 | 换 Supabase 项目或区域、搬迁数据、页面变慢 | [迁移手册](runbooks/migrate-supabase-project.md)；当前生产项目见 [STATUS](STATUS.md)，当时的操作、证据与待办见[发布交接](handoffs/release-20260925.md) | `vercel.json`（函数区域）；`supabase/migrations/`（迁移历史登记） |

@@ -8,9 +8,11 @@ const service = vi.hoisted(() => ({
 }));
 const production = vi.hoisted(() => ({ createService: vi.fn() }));
 const cache = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
+const push = vi.hoisted(() => ({ scheduleDirectMessagePush: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => cache);
+vi.mock("@/features/push/schedule", () => push);
 vi.mock("@/features/auth/session", () => auth);
 vi.mock("./production-direct-message-service", () => ({
   createProductionDirectMessageService: production.createService,
@@ -67,6 +69,21 @@ describe("direct message server actions", () => {
     expect(cache.revalidatePath).toHaveBeenCalledWith(
       `/messages/${CONVERSATION_ID}`,
     );
+  });
+
+  it("schedules a push for the saved message only after a successful send", async () => {
+    service.sendMessage.mockResolvedValueOnce({ status: "sent", message: SAVED_MESSAGE });
+    const form = new FormData();
+    form.set("conversationId", CONVERSATION_ID);
+    form.set("clientMessageId", CLIENT_MESSAGE_ID);
+    form.set("body", "hello");
+    await sendDirectMessageAction(initialDirectMessageActionState, form);
+    expect(push.scheduleDirectMessagePush).toHaveBeenCalledWith("42", CONVERSATION_ID);
+
+    push.scheduleDirectMessagePush.mockClear();
+    service.sendMessage.mockResolvedValueOnce({ status: "not_allowed" });
+    await sendDirectMessageAction(initialDirectMessageActionState, form);
+    expect(push.scheduleDirectMessagePush).not.toHaveBeenCalled();
   });
 
   it("does not trust read or clear identifiers supplied by the browser", async () => {

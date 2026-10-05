@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentMember } from "@/features/auth/session";
+import { scheduleFriendRequestPush } from "@/features/push/schedule";
 
 import type {
   FriendActionState,
@@ -243,6 +244,10 @@ export async function friendMutationAction(
       message: messageFor(intent, result.status),
       ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
     };
+    if (intent === "request" && result.status === "sent") {
+      const sentRequestId = (rawResult as { requestId?: unknown } | null)?.requestId;
+      if (typeof sentRequestId === "string") scheduleFriendRequestPush(sentRequestId);
+    }
     if (isSuccessful(result.status)) {
       revalidatePath("/friends");
       revalidatePath("/friends/filtered");
