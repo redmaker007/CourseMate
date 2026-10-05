@@ -1203,6 +1203,19 @@ export type Database = {
         Args: { target_member_id: string }
         Returns: string
       }
+      get_dashboard_courses: {
+        Args: { target_school: string }
+        Returns: {
+          archived: boolean
+          code: string
+          conversation_id: string
+          course_id: string
+          member_count: number
+          school_id: string
+          term: string
+          title: string
+        }[]
+      }
       get_direct_conversation_view: {
         Args: { target_conversation_id: string }
         Returns: {

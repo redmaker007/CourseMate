@@ -133,77 +133,25 @@ async function loadDashboardCourses(
   member: CurrentMember,
 ): Promise<{ current: CourseListItem[]; archived: CourseListItem[] }> {
   const supabase = await createClient();
-  const configuredTerm = await currentTerm(supabase, member.schoolId);
-  if (!configuredTerm) return { current: [], archived: [] };
-
-  const { data: memberships, error: membershipError } = await supabase
-    .from("course_members")
-    .select("course_id")
-    .eq("user_id", member.userId);
-  if (membershipError) throw membershipError;
-  const courseIds = (memberships ?? []).map((row) => row.course_id);
-  if (courseIds.length === 0) return { current: [], archived: [] };
-
-  const [{ data: courses, error: courseError }, { data: links, error: linkError }] =
-    await Promise.all([
-      supabase
-        .from("courses")
-        .select("id, school_id, code, title, term")
-        .eq("school_id", member.schoolId)
-        .in("id", courseIds),
-      supabase
-        .from("course_conversations")
-        .select("course_id, conversation_id")
-        .in("course_id", courseIds),
-    ]);
-  if (courseError) throw courseError;
-  if (linkError) throw linkError;
-
-  const conversationIds = (links ?? []).map((row) => row.conversation_id);
-  if (conversationIds.length === 0) return { current: [], archived: [] };
-  const [{ data: conversations, error: conversationError }, { data: memberRows, error: countError }] =
-    await Promise.all([
-      supabase
-        .from("conversations")
-        .select("id, archived_at")
-        .in("id", conversationIds),
-      supabase
-        .from("conversation_members")
-        .select("conversation_id")
-        .in("conversation_id", conversationIds),
-    ]);
-  if (conversationError) throw conversationError;
-  if (countError) throw countError;
-
-  const linkByCourse = new Map(
-    (links ?? []).map((row) => [row.course_id, row.conversation_id]),
-  );
-  const archiveByConversation = new Map(
-    (conversations ?? []).map((row) => [row.id, row.archived_at]),
-  );
-  const countByConversation = new Map<string, number>();
-  for (const row of memberRows ?? []) {
-    countByConversation.set(
-      row.conversation_id,
-      (countByConversation.get(row.conversation_id) ?? 0) + 1,
-    );
-  }
-
-  const all = (courses ?? []).flatMap((row) => {
-    const conversationId = linkByCourse.get(row.id);
-    if (!conversationId) return [];
-    const archived =
-      row.term !== configuredTerm ||
-      archiveByConversation.get(conversationId) !== null;
-    return [
-      {
-        ...catalogEntry(row),
-        conversationId,
-        archived,
-        memberCount: countByConversation.get(conversationId) ?? 0,
-      },
-    ];
+  // 当前学期、我的课程、会话关联、归档与成员数四轮串行请求合并成一次数据库调用，
+  // 见 202610050001_dashboard_courses_rpc.sql。函数按调用者的 RLS 读取，可见范围不变。
+  const { data, error } = await supabase.rpc("get_dashboard_courses", {
+    target_school: member.schoolId,
   });
+  if (error) throw error;
+
+  const all = (data ?? []).map((row) => ({
+    ...catalogEntry({
+      id: row.course_id,
+      school_id: row.school_id,
+      code: row.code,
+      title: row.title,
+      term: row.term,
+    }),
+    conversationId: row.conversation_id,
+    archived: row.archived,
+    memberCount: row.member_count,
+  }));
   all.sort((left, right) => left.code.localeCompare(right.code));
   return {
     current: all.filter((course) => !course.archived),
