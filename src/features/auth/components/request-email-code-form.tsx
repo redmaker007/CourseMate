@@ -18,18 +18,18 @@ import {
 
 function messageTone(status: RequestEmailCodeActionState["status"]) {
   if (status === "code_sent" || status === "already_signed_in") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    return "border-success/30 bg-success-soft text-success";
   }
-  return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-badge/30 bg-badge/10 text-badge";
 }
 
 function verificationMessageTone(
   status: VerifyEmailCodeActionState["status"],
 ) {
   if (status === "signed_in" || status === "already_signed_in") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    return "border-success/30 bg-success-soft text-success";
   }
-  return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-badge/30 bg-badge/10 text-badge";
 }
 
 type CodeSentState = Extract<
@@ -68,13 +68,13 @@ function VerifyCodeForm({
       />
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="code">
+        <label className="block text-sm font-medium text-ink" htmlFor="code">
           6 位验证码
         </label>
         <input
           autoComplete="one-time-code"
           autoFocus
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl tracking-[0.35em] text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="w-full h-14 rounded-xl border-2 border-line bg-canvas px-4 text-center text-2xl font-bold tracking-[0.35em] text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30"
           disabled={pending}
           id="code"
           inputMode="numeric"
@@ -87,7 +87,7 @@ function VerifyCodeForm({
       </div>
 
       <button
-        className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="w-full h-12 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
         disabled={pending}
         type="submit"
       >
@@ -138,7 +138,7 @@ function ResendCodeForm({
       <input name="schoolId" type="hidden" value={schoolId} />
       <input name="email" type="hidden" value={email} />
       <button
-        className="w-full px-4 py-2 text-sm font-medium text-indigo-700 transition hover:text-indigo-950 disabled:cursor-not-allowed disabled:text-slate-400"
+        className="w-full px-4 py-2 text-sm font-medium text-accent transition hover:opacity-80 disabled:cursor-not-allowed disabled:text-muted"
         disabled={!countdown.canResend || pending}
         type="submit"
       >
@@ -172,12 +172,12 @@ function VerificationStep({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-        <p className="text-sm text-indigo-700">邮件服务已接受发送请求</p>
-        <p className="mt-1 break-all font-medium text-indigo-950">
+      <div className="rounded-xl border border-brand/20 bg-brand-soft px-4 py-3">
+        <p className="text-sm text-brand">邮件服务已接受发送请求</p>
+        <p className="mt-1 break-all font-medium text-ink">
           {activeState.email}
         </p>
-        <p className="mt-2 text-sm text-indigo-700">
+        <p className="mt-2 text-sm text-muted">
           请检查收件箱和垃圾邮件。邮件是否最终送达由邮件服务商决定。
         </p>
       </div>
@@ -197,7 +197,7 @@ function VerificationStep({
       />
 
       <button
-        className="w-full px-4 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+        className="w-full px-4 py-2 text-sm font-medium text-accent transition hover:opacity-80"
         disabled={resendPending}
         onClick={onEditEmail}
         type="button"
@@ -270,11 +270,11 @@ export function RequestEmailCodeForm({
       className="space-y-5"
     >
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="schoolId">
+        <label className="block text-sm font-medium text-ink" htmlFor="schoolId">
           学校
         </label>
         <select
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="w-full h-12 rounded-xl border border-line bg-canvas px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30 disabled:opacity-50"
           defaultValue=""
           disabled={pending || schools.length === 0}
           id="schoolId"
@@ -294,12 +294,12 @@ export function RequestEmailCodeForm({
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="email">
+        <label className="block text-sm font-medium text-ink" htmlFor="email">
           学校邮箱
         </label>
         <input
           autoComplete="email"
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          className="w-full h-12 rounded-xl border border-line bg-canvas px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30 disabled:opacity-50"
           disabled={pending || schools.length === 0}
           id="email"
           inputMode="email"
@@ -308,11 +308,11 @@ export function RequestEmailCodeForm({
           required
           type="email"
         />
-        <p className="text-sm text-slate-500">{emailHint}</p>
+        <p className="text-xs text-muted">{emailHint}</p>
       </div>
 
       <button
-        className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="w-full h-12 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
         disabled={pending || schools.length === 0}
         type="submit"
       >

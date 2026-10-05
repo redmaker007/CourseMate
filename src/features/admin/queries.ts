@@ -1,6 +1,7 @@
 import "server-only";
 
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 import { getCurrentMember, type CurrentMember } from "@/features/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -47,8 +48,10 @@ export type AdminOverview = {
 /**
  * 当前成员的平台身份。读不到就当作没有身份（fail closed）：宁可让管理员暂时
  * 进不去，也不要放行。
+ *
+ * 同一次请求里导航外壳和页面都会读，用 React cache 只查一次。
  */
-export async function getPlatformRole(): Promise<PlatformRole | null> {
+export const getPlatformRole = cache(async function getPlatformRole(): Promise<PlatformRole | null> {
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("current_platform_role");
@@ -57,7 +60,7 @@ export async function getPlatformRole(): Promise<PlatformRole | null> {
   } catch {
     return null;
   }
-}
+});
 
 /**
  * 管理页的门禁。没有身份的人看到的是 404 而不是 403——不告诉他们这个页面存在。

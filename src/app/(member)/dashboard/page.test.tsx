@@ -10,8 +10,6 @@ const courseQueries = vi.hoisted(() => ({
   getDashboardCourses: vi.fn(),
   searchAvailableCourses: vi.fn(),
 }));
-const messageService = vi.hoisted(() => ({ getUnreadCounts: vi.fn() }));
-const messageProduction = vi.hoisted(() => ({ createService: vi.fn() }));
 const navigation = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
@@ -24,9 +22,6 @@ vi.mock("@/features/auth/session", () => auth);
 vi.mock("@/features/admin/queries", () => adminQueries);
 vi.mock("@/features/auth/queries", () => authQueries);
 vi.mock("@/features/courses/queries", () => courseQueries);
-vi.mock("@/features/messages/production-direct-message-service", () => ({
-  createProductionDirectMessageService: messageProduction.createService,
-}));
 vi.mock("@/features/dashboard/components/dashboard-header", () => ({
   DashboardHeader: ({
     adminHref,
@@ -71,11 +66,6 @@ describe("DashboardPage course flow", () => {
     courseQueries.searchAvailableCourses.mockResolvedValue([
       { id: "search", title: "Search result" },
     ]);
-    messageProduction.createService.mockResolvedValue(messageService);
-    messageService.getUnreadCounts.mockResolvedValue({
-      status: "loaded",
-      counts: { visible: 2, hidden: 7 },
-    });
   });
 
   afterEach(() => cleanup());
@@ -90,10 +80,6 @@ describe("DashboardPage course flow", () => {
     expect(screen.getByText("Current course")).toBeTruthy();
     expect(screen.getByText("Archived course")).toBeTruthy();
     expect(screen.getByText("search:TEST00:Search result")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /2 条私聊未读/ })).toHaveProperty(
-      "href",
-      "http://localhost:3000/friends",
-    );
     expect(courseQueries.searchAvailableCourses).toHaveBeenCalledWith(
       MEMBER,
       "TEST00",
@@ -108,14 +94,10 @@ describe("DashboardPage course flow", () => {
     adminQueries.getPlatformRole.mockResolvedValue("admin");
     render(await DashboardPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByText("Dashboard header → /admin")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /2 条私聊未读/ })).toHaveProperty(
-      "href",
-      "http://localhost:3000/friends",
-    );
   });
 
-  it("四路数据同时发出，而不是一路等完再发下一路", { timeout: 1000 }, async () => {
-    // 每一路都要等到四路全部开始才会返回；若是串行发起，第一路永远等不到其余三路，
+  it("三路数据同时发出，而不是一路等完再发下一路", { timeout: 1000 }, async () => {
+    // 每一路都要等到三路全部开始才会返回；若是串行发起，第一路永远等不到其余两路，
     // 测试会因超时失败。
     const started = new Set<string>();
     let release!: () => void;
@@ -124,7 +106,7 @@ describe("DashboardPage course flow", () => {
     });
     const begin = (name: string) => {
       started.add(name);
-      if (started.size === 4) release();
+      if (started.size === 3) release();
       return allStarted;
     };
     adminQueries.getPlatformRole.mockImplementation(async () => {
@@ -139,14 +121,10 @@ describe("DashboardPage course flow", () => {
       await begin("courses");
       return { current: [], archived: [] };
     });
-    messageProduction.createService.mockImplementation(async () => {
-      await begin("unread");
-      return messageService;
-    });
 
     render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
-    expect([...started].sort()).toEqual(["courses", "role", "schools", "unread"]);
+    expect([...started].sort()).toEqual(["courses", "role", "schools"]);
   });
 
   it("学校名取不到时退回学校 ID，其余内容照常显示", async () => {
@@ -170,28 +148,20 @@ describe("DashboardPage course flow", () => {
     );
   });
 
-  it("课程数据失败只提示不可用，不影响未读数与页头", async () => {
+  it("课程数据失败只提示不可用，不影响页头", async () => {
     courseQueries.getDashboardCourses.mockRejectedValue(new Error("boom"));
     render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("课程数据暂时不可用，请稍后刷新。")).toBeTruthy();
     expect(screen.queryByText("Current course")).toBeNull();
-    expect(screen.getByRole("link", { name: /2 条私聊未读/ })).toBeTruthy();
+    expect(screen.getByText("Dashboard header")).toBeTruthy();
   });
 
-  it("未读数失败时退回默认入口，课程照常显示", async () => {
-    messageProduction.createService.mockRejectedValue(new Error("boom"));
+  it("没有当前学期课程时提示去搜索", async () => {
+    courseQueries.getDashboardCourses.mockResolvedValue({ current: [], archived: [] });
     render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByRole("link", { name: /查看好友/ })).toBeTruthy();
-    expect(screen.getByText("Current course")).toBeTruthy();
-
-    cleanup();
-    messageProduction.createService.mockResolvedValue(messageService);
-    messageService.getUnreadCounts.mockResolvedValue({ status: "unavailable" });
-    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.getByRole("link", { name: /查看好友/ })).toBeTruthy();
+    expect(screen.getByText(/你本学期的课程，加入对应的班级群聊/)).toBeTruthy();
   });
 
   it("requires profile onboarding before loading course data", async () => {

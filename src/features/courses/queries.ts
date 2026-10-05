@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import type { CurrentMember } from "@/features/auth/session";
 import type { CourseMemberRelationshipSummary } from "@/features/friends/friendship-service";
 import {
@@ -127,7 +129,7 @@ export async function searchAvailableCourses(
   }));
 }
 
-export async function getDashboardCourses(
+async function loadDashboardCourses(
   member: CurrentMember,
 ): Promise<{ current: CourseListItem[]; archived: CourseListItem[] }> {
   const supabase = await createClient();
@@ -413,3 +415,9 @@ export async function getCourseMessagesBefore(
   });
   return { messages, hasMore: messages.length === 50 };
 }
+
+/**
+ * 当前成员已加入的课程，分当前学期与归档。同一次请求里导航外壳和大厅页都会读，
+ * 用 React cache 只查一次（layout 与页面拿到的是同一个 member 对象）。
+ */
+export const getDashboardCourses = cache(loadDashboardCourses);
