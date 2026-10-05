@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 
+import { PwaRegister } from "@/features/pwa/components/pwa-register";
 import { LatencyBadge } from "@/features/latency/components/latency-badge";
 import { parseThemePreference, THEME_COOKIE } from "@/features/theme/theme-preference";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         {children}
         <LatencyBadge />
+        <PwaRegister />
       </body>
     </html>
   );

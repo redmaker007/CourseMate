@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>CourseMate 离线</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f8f9fb; --text: #111827; --muted: #6b7280; --brand: #4f46e5; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #16171a; --text: #f3f4f6; --muted: #9ca3af; } }
+    body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); color: var(--text); text-align: center; padding: 24px;
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    button { height: 44px; padding: 0 24px; border: 0; border-radius: 12px; background: var(--brand);
+      color: #fff; font-size: 16px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>网络好像断了</h1>
+    <p>连上网络后点下面的按钮重新加载。</p>
+    <button type="button" onclick="location.reload()">重新加载</button>
+  </main>
+</body>
+</html>

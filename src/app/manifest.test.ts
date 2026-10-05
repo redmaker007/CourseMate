@@ -24,6 +24,8 @@ describe("web app manifest", () => {
   it("proxy 不拦截 manifest，未登录的浏览器也能取到", () => {
     const matcher = new RegExp(`^${config.matcher[0]}$`);
     expect(matcher.test("/manifest.webmanifest")).toBe(false);
+    expect(matcher.test("/sw.js")).toBe(false);
+    expect(matcher.test("/offline.html")).toBe(false);
     expect(matcher.test("/dashboard")).toBe(true);
   });
 });

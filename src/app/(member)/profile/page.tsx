@@ -9,6 +9,7 @@ import { LatencyToggle } from "@/features/latency/components/latency-toggle";
 import { updateProfileAction } from "@/features/profile/actions";
 import { ProfileForm } from "@/features/profile/components/profile-form";
 import { getOwnProfile } from "@/features/profile/queries";
+import { InstallCard } from "@/features/pwa/components/install-card";
 import { ThemeSelector } from "@/features/theme/components/theme-toggle";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +77,8 @@ export default async function ProfilePage() {
           <ThemeSelector />
           <LatencyToggle />
         </section>
+
+        <InstallCard />
 
         <form action={signOutAndReturnToLoginAction}>
           <button
