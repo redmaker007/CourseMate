@@ -1,6 +1,6 @@
 # 当前状态
 
-核对日期：2026-09-27（RLS 策略提速与外键索引上线）。代码基线：`main` 的 `7896191`（PR #42 合并后）；生产前端仍是 `64b0904`，#42 只改数据库，不需要重新发布前端。
+核对日期：2026-10-04（Figma 新界面与 PWA 上线，网页推送代码已合并但关闭）。代码基线：`main` 的 `d0ec175`（PR #57 合并后）；生产前端是 `main` 的 `d68f54e`（PR #56 合并后手动发布，`dpl` 对应 `course-mate-ffba2jzto`），不含 #57；上一版 `course-mate-8al81vxhb`（`main` `f6bf06d`）可作回滚目标。
 本页区分代码基线与生产状态；生产状态以下方带日期的条目为准，其中 2026-09-25 的搬迁条目是当前生产数据库的起点。当时的操作、证据与待办清单见[发布交接](handoffs/release-20260925.md)。
 
 ## 代码已实现
@@ -14,6 +14,10 @@
 | 举报与清理 | 行为举报、不可变证据、举报消息保留；双方清除满 720 小时后的受控物理清理，默认 dry-run |
 | 平台管理 | `/admin`、所有者与管理员、学校域名、课表导入、学期切换与审计；管理员跨校测试（课程、好友与私聊按当前学校判断，见 [ADR-0006](adr/0006-admin-cross-school-testing.md)） |
 | 延迟显示 | 个人资料页「显示偏好」开关（只存本机浏览器，不进数据库）；开启后页面左下角显示两个毫秒读数：**网络**（HEAD 静态图标，不经函数与数据库）与**服务**（GET `/api/ping`，含 proxy 的登录校验与 Supabase 往返）。每 15 秒测一次，标签页在后台时暂停，换页立即重测；未登录时只显示网络读数 |
+
+| 新界面 | Figma 原型的 6 页（登录、大厅、课程群聊、消息与好友两栏、我的）已移植，含导航外壳（桌面左栏、手机底栏）与深色模式（PR #44–#49，已上线） |
+| PWA | `manifest`、图标、`viewport-fit=cover` 与安全区、Service Worker（只提供可安装条件和断网离线页，不缓存页面与接口）、「我的」页的「安装到手机」卡片（PR #55、#56，已上线；真机验收进行中） |
+| 网页推送 | 私聊与好友申请通知：订阅表、只授权 `service_role` 的认领函数、发送器、开关（PR #57，已合并，**生产关闭**：迁移未应用、四个环境变量未配、前端未发布；见 [ADR-0010](adr/0010-web-push-via-restricted-rpc.md)、[启用手册](runbooks/web-push.md)） |
 
 学习搭子、笔记共享尚未开发；举报证据已实现不代表内容审核后台已交付。
 
@@ -61,6 +65,17 @@
 - 分支保护、Code Owners 强制审核与协作者后台权限仍需按实际设置核实；试点学校、定位与双语方案待决定。
 
 2026-09-12 在 `codex/admin-school-testing` 上实际运行：73 个测试文件、444 项测试及构建、lint、类型检查依次通过。PR #24 整合的验证范围见[整合交接](handoffs/pr24-integration.md)，跨校测试见[跨校测试交接](handoffs/admin-school-testing.md)。历史交接里的测试数字和线上状态仅代表当时。
+
+## 下一步（2026-10-04 列出，按建议顺序）
+
+1. **PWA 真机验收**：Android Chrome 与 iPhone Safari 各走一遍安装、独立窗口、断网离线页、刘海屏底栏、键盘弹出时聊天输入框、退出再登录；临时图标（靛蓝底白色 C）换成设计提供的正式图标。
+2. **Figma 界面登录后走查**：用真实验证码把各页点一遍（两栏「消息与好友」、深色模式、课程群聊回车发送）。「最后一条消息预览与时间」需要新增数据库函数，并遵守清除历史与拉黑规则，涉及权限，先出方案再做。
+3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——应用迁移 `202610040001`、补登记迁移历史、重新生成 `src/types/database.ts`；本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
+4. **丹尼的课程截图识别（`feature/issue-50-course-image-recognition`，Issues #50–54）**：先开 PR 并由另一位协作者审核；`SUPABASE_SERVICE_ROLE_KEY` 的读取位置统一到 `src/lib/server-env.ts`（他放在 `src/lib/env.ts`），与推送共用；确认学生选课截图发给 Google 的隐私说明；#54（真实截图基准与发布保护，`needs-info`）缺样本；发布顺序是先应用迁移 `202609300001`、再配 `GOOGLE_CLOUD_VISION_API_KEY`、最后发前端。
+5. **App 原生壳（Capacitor）按需**：PWA 已覆盖两端「添加到主屏幕」。只有要上架应用商店时才做；Android 在 Windows 即可，iOS 需要 Mac 或云构建，外加 Apple 开发者账号（99 美元/年），并且审核要求有推送等原生能力、隐私政策与账号删除入口。
+6. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
+7. **此前遗留**（仍然有效）：迁移 `202609260001` 登记到迁移历史表；测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份；本地 `supabase/.temp/project-ref` 仍指向旧项目；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
+8. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
 
 ## 如何更新
 
