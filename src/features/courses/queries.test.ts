@@ -143,13 +143,37 @@ function barrier(count: number) {
   };
 }
 
+const ROOM = {
+  course: COURSE,
+  conversation_id: "conv-1",
+  archived: false,
+  members: [
+    { user_id: "me", display_name: "ME", avatar_url: null },
+    { user_id: "bob", display_name: "BOB", avatar_url: null },
+    { user_id: "cara", display_name: "CARA", avatar_url: null },
+  ],
+  messages: [
+    { id: 1, sender_id: "me", sender_name: "ME", body: "first", created_at: "t1", client_message_id: null },
+    { id: 2, sender_id: "bob", sender_name: "BOB", body: "second", created_at: "t2", client_message_id: null },
+  ],
+};
+
+/** getCourseRoom 只调用两个 RPC：get_course_room 与好友关系摘要。 */
+function roomRpc(
+  room: () => Result | Promise<Result> = () => ok(ROOM),
+  relationships: () => Result | Promise<Result> = () => ok(RELATIONSHIPS),
+) {
+  return (name: string) =>
+    name === "get_course_room" ? room() : relationships();
+}
+
 describe("getCourseRoom", () => {
   beforeEach(() => {
     db.client = undefined;
   });
 
   it("组装课程、成员（含好友关系）与最近消息", async () => {
-    fakeSupabase();
+    fakeSupabase({}, roomRpc());
 
     const room = await getCourseRoom(MEMBER, "course-1");
 
@@ -215,51 +239,73 @@ describe("getCourseRoom", () => {
     });
   });
 
-  it("不是课程成员时返回 null，且不读取名单、关系与消息", async () => {
-    const { started } = fakeSupabase({ course_members: () => ok(null) });
-
-    await expect(getCourseRoom(MEMBER, "course-1")).resolves.toBeNull();
-
-    expect(started).not.toContain("conversation_members");
-    expect(started).not.toContain("messages");
-    expect(started).not.toContain("rpc:list_course_member_relationships");
-  });
-
-  it("成员身份判断优先：不是成员时，即使课程查询出错也返回 null 而不是抛出", async () => {
-    fakeSupabase({
-      course_members: () => ok(null),
-      courses: () => failure("courses unavailable"),
+  it("只发出两个数据库调用，且把课程、学校和消息条数传给函数", async () => {
+    const calls: { name: string; args: unknown }[] = [];
+    const { started } = fakeSupabase({}, (name, args) => {
+      calls.push({ name, args });
+      return roomRpc()(name);
     });
 
+    await getCourseRoom(MEMBER, "course-1");
+
+    expect([...started].sort()).toEqual([
+      "rpc:get_course_room",
+      "rpc:list_course_member_relationships",
+    ]);
+    expect(calls.find((call) => call.name === "get_course_room")?.args).toEqual({
+      target_course: "course-1",
+      target_school: "uw-madison",
+      message_limit: 50,
+    });
+  });
+
+  it("课程主体与好友关系摘要同时发出", { timeout: 1000 }, async () => {
+    const gate = barrier(2);
+    fakeSupabase(
+      {},
+      roomRpc(
+        async () => {
+          await gate.wait("room");
+          return ok(ROOM);
+        },
+        async () => {
+          await gate.wait("relationships");
+          return ok([]);
+        },
+      ),
+    );
+
+    await getCourseRoom(MEMBER, "course-1");
+
+    expect([...gate.names].sort()).toEqual(["relationships", "room"]);
+  });
+
+  it("函数返回空（不是成员、课程不在当前学校、没有会话关联等）时返回 null", async () => {
+    fakeSupabase({}, roomRpc(() => ok(null)));
+
     await expect(getCourseRoom(MEMBER, "course-1")).resolves.toBeNull();
   });
 
-  it.each([
-    ["课程不在当前学校", { courses: () => ok(null) }],
-    ["课程没有会话关联", { course_conversations: () => ok(null) }],
-    ["会话记录不存在", { conversations: () => ok(null) }],
-  ] as const)("%s时返回 null", async (_label, overrides) => {
-    fakeSupabase(overrides);
+  it("不是成员时即使好友关系摘要出错也返回 null 而不是抛出", async () => {
+    fakeSupabase(
+      {},
+      roomRpc(
+        () => ok(null),
+        () => failure("rpc unavailable"),
+      ),
+    );
 
     await expect(getCourseRoom(MEMBER, "course-1")).resolves.toBeNull();
   });
 
-  it.each([
-    ["成员身份", { course_members: () => failure("boom") }],
-    ["课程", { courses: () => failure("boom") }],
-    ["会话关联", { course_conversations: () => failure("boom") }],
-    ["会话", { conversations: () => failure("boom") }],
-    ["成员名单", { conversation_members: () => failure("boom") }],
-    ["成员资料", { profiles: () => failure("boom") }],
-    ["最近消息", { messages: () => failure("boom") }],
-  ] as const)("%s查询出错时向上抛出", async (_label, overrides) => {
-    fakeSupabase(overrides);
+  it("课程函数出错时向上抛出", async () => {
+    fakeSupabase({}, roomRpc(() => failure("boom")));
 
     await expect(getCourseRoom(MEMBER, "course-1")).rejects.toThrow("boom");
   });
 
   it("好友关系摘要不可用时课程主体照常显示，关系入口降级", async () => {
-    fakeSupabase({}, () => failure("rpc unavailable"));
+    fakeSupabase({}, roomRpc(() => ok(ROOM), () => failure("rpc unavailable")));
 
     const room = await getCourseRoom(MEMBER, "course-1");
 
@@ -271,66 +317,54 @@ describe("getCourseRoom", () => {
     ]);
   });
 
-  it("成员身份、课程、会话关联三个查询同时发出，会话在其后", { timeout: 1000 }, async () => {
-    const gate = barrier(3);
-    const { started } = fakeSupabase({
-      course_members: async () => {
-        await gate.wait("membership");
-        return ok({ course_id: "course-1" });
-      },
-      courses: async () => {
-        await gate.wait("course");
-        return ok(COURSE);
-      },
-      course_conversations: async () => {
-        await gate.wait("link");
-        return ok({ conversation_id: "conv-1" });
-      },
-    });
-
-    await getCourseRoom(MEMBER, "course-1");
-
-    expect([...gate.names].sort()).toEqual(["course", "link", "membership"]);
-    expect(started.indexOf("conversations")).toBeGreaterThan(
-      started.indexOf("course_conversations"),
-    );
-  });
-
-  it("通过成员校验后，名单、好友关系摘要、最近消息同时发出", { timeout: 1000 }, async () => {
-    const gate = barrier(3);
+  it("读不到昵称或发送者已注销时沿用原来的兜底文案", async () => {
     fakeSupabase(
-      {
-        conversation_members: async () => {
-          await gate.wait("roster");
-          return ok([{ user_id: "me" }, { user_id: "bob" }]);
-        },
-        messages: async () => {
-          await gate.wait("messages");
-          return ok([]);
-        },
-      },
-      async () => {
-        await gate.wait("relationships");
-        return ok([]);
-      },
+      {},
+      roomRpc(() =>
+        ok({
+          ...ROOM,
+          members: [
+            { user_id: "me", display_name: null, avatar_url: null },
+            { user_id: "bob", display_name: "BOB", avatar_url: "a.png" },
+          ],
+          messages: [
+            { id: "7", sender_id: "bob", sender_name: null, body: "x", created_at: "t", client_message_id: "c1" },
+            { id: "8", sender_id: null, sender_name: null, body: "y", created_at: "t", client_message_id: null },
+          ],
+        }),
+      ),
     );
 
-    await getCourseRoom(MEMBER, "course-1");
+    const room = await getCourseRoom(MEMBER, "course-1");
 
-    expect([...gate.names].sort()).toEqual(["messages", "relationships", "roster"]);
+    expect(room?.members.map((member) => [member.displayName, member.avatarUrl])).toEqual([
+      ["成员", null],
+      ["BOB", "a.png"],
+    ]);
+    expect(room?.messages.map((message) => [message.id, message.senderName, message.clientMessageId])).toEqual([
+      ["7", "成员", "c1"],
+      ["8", "已注销用户", null],
+    ]);
   });
 
-  it("成员资料仍然要等名单：先查名单，再按名单里的人查资料", async () => {
-    const { started } = fakeSupabase();
+  it("消息正好 50 条时标记还有更早的消息，已归档的课程保留归档标记", async () => {
+    const messages = Array.from({ length: 50 }, (_, index) => ({
+      id: index + 1,
+      sender_id: "me",
+      sender_name: "ME",
+      body: "m",
+      created_at: "t",
+      client_message_id: null,
+    }));
+    fakeSupabase({}, roomRpc(() => ok({ ...ROOM, archived: true, messages })));
 
-    await getCourseRoom(MEMBER, "course-1");
+    const room = await getCourseRoom(MEMBER, "course-1");
 
-    const rosterAt = started.indexOf("conversation_members");
-    const firstProfilesAt = started.indexOf("profiles");
-    expect(rosterAt).toBeGreaterThan(-1);
-    expect(firstProfilesAt).toBeGreaterThan(rosterAt);
+    expect(room?.hasOlderMessages).toBe(true);
+    expect(room?.course.archived).toBe(true);
   });
 });
+
 
 describe("getCourseMessagesAfter", () => {
   it("同样先通过并行的成员校验，再取新消息", async () => {
