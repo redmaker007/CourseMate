@@ -136,6 +136,25 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  /* 手机端：去掉点按高亮和下拉回弹，横屏不自动放大字号 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+a,
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* iOS 对小于 16px 的输入框会在聚焦时自动放大页面，手机端统一用 16px */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 /* 在导航外壳里时，左下角的延迟读数让开左侧导航栏和手机底栏 */

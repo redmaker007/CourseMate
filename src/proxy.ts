@@ -43,7 +43,8 @@ export const config = {
   matcher: [
     /*
      * 跳过静态资源和图片优化请求，避免每个 asset 都打一次 Supabase auth。
+     * manifest.webmanifest 要让未登录的浏览器也能取到，否则会被重定向到登录页。
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

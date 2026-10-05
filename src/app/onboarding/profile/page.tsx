@@ -24,7 +24,7 @@ export default async function ProfileOnboardingPage({
   const profile = await getOwnProfile(member.userId);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-12">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas px-4 py-12">
       <section className="w-full max-w-[480px] rounded-3xl bg-card p-7 shadow-xl shadow-black/5 sm:p-9">
         <div className="mb-8">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-brand">

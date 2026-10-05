@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 
@@ -15,6 +15,21 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "CourseMate 学校邮箱登录",
   description: "使用学校邮箱验证码登录 CourseMate",
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  // 加到 iPhone 主屏幕后以独立窗口打开；清单见 manifest.ts
+  appleWebApp: { capable: true, title: "CourseMate", statusBarStyle: "default" },
+};
+
+// viewport-fit=cover 让页面铺到刘海和 Home 条下面，env(safe-area-inset-*) 才有真实数值；
+// 底栏与外壳已经按安全区留白（见 mobile-tab-bar.tsx、app-shell.tsx）。
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f9fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#16171a" },
+  ],
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
