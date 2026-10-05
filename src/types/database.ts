@@ -1203,6 +1203,14 @@ export type Database = {
         Args: { target_member_id: string }
         Returns: string
       }
+      get_course_room: {
+        Args: {
+          message_limit?: number
+          target_course: string
+          target_school: string
+        }
+        Returns: Json
+      }
       get_dashboard_courses: {
         Args: { target_school: string }
         Returns: {

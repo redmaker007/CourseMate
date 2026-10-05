@@ -252,35 +252,38 @@ async function messageViews(
   return ascending ? messages : messages.reverse();
 }
 
+/** get_course_room 返回的 jsonb 结构，见 202610050002_course_room_rpc.sql。 */
+type CourseRoomPayload = {
+  course: { id: string; school_id: string; code: string; title: string; term: string };
+  conversation_id: string;
+  archived: boolean;
+  members: { user_id: string; display_name: string | null; avatar_url: string | null }[];
+  messages: {
+    id: number | string;
+    sender_id: string | null;
+    sender_name: string | null;
+    body: string;
+    created_at: string;
+    client_message_id: string | null;
+  }[];
+};
+
+const ROOM_MESSAGE_LIMIT = 50;
+
 export async function getCourseRoom(
   member: CurrentMember,
   courseId: string,
 ): Promise<CourseRoom | null> {
   const supabase = await createClient();
-  const access = await resolveJoinedCourse(supabase, member, courseId);
-  if (!access) return null;
-
   const invokeRpc = supabase.rpc.bind(supabase) as unknown as FriendshipRpcClient["rpc"];
-  // 通过成员身份校验之后，名单、好友关系摘要、最近消息互不依赖，同时发出。
-  // 名单里的资料要等名单才知道查谁，所以两步放在同一路里。
-  const [{ userIds, profiles }, relationships, messages] = await Promise.all([
-    (async () => {
-      const { data: memberRows, error: memberError } = await supabase
-        .from("conversation_members")
-        .select("user_id")
-        .eq("conversation_id", access.conversationId)
-        .order("joined_at");
-      if (memberError) throw memberError;
-      const userIds = (memberRows ?? []).map((row) => row.user_id);
-      const { data: profiles, error: profileError } = userIds.length
-        ? await supabase
-            .from("profiles")
-            .select("id, display_name, avatar_url")
-            .in("id", userIds)
-        : { data: [], error: null };
-      if (profileError) throw profileError;
-      return { userIds, profiles };
-    })(),
+  // 访问校验、课程、会话归档、名单（含昵称）、最近消息在数据库里一次取完，
+  // 见 202610050002_course_room_rpc.sql；好友关系摘要自己校验成员身份，与它同时发出。
+  const [roomResult, relationships] = await Promise.all([
+    supabase.rpc("get_course_room", {
+      target_course: courseId,
+      target_school: member.schoolId,
+      message_limit: ROOM_MESSAGE_LIMIT,
+    }),
     (async (): Promise<CourseMemberRelationshipSummary[] | null> => {
       try {
         return await createSupabaseFriendBackend({ rpc: invokeRpc })
@@ -290,20 +293,23 @@ export async function getCourseRoom(
         return null;
       }
     })(),
-    messageViews(supabase, access.conversationId, { limit: 50 }),
   ]);
-  const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  if (roomResult.error) throw roomResult.error;
+  // 不是成员、课程不在当前学校、没有会话关联或会话读不到，都返回 null。
+  if (!roomResult.data) return null;
+  const room = roomResult.data as unknown as CourseRoomPayload;
+
   const relationshipById = new Map(
     (relationships ?? []).map((relationship) => [relationship.memberId, relationship]),
   );
-  const members = userIds.map((userId) => {
-    const profile = profileById.get(userId);
+  const members = room.members.map((row) => {
+    const userId = row.user_id;
     const relationship = relationshipById.get(userId);
     const relationshipUnavailable = relationships === null || (!relationship && userId !== member.userId);
     return {
       userId,
-      displayName: profile?.display_name ?? "成员",
-      avatarUrl: profile?.avatar_url ?? null,
+      displayName: row.display_name ?? "成员",
+      avatarUrl: row.avatar_url ?? null,
       relationshipStatus: userId === member.userId
         ? "self" as const
         : relationshipUnavailable
@@ -320,17 +326,25 @@ export async function getCourseRoom(
         : relationship!.conversationId,
     };
   });
+  const messages = room.messages.map((row) => ({
+    id: String(row.id),
+    clientMessageId: row.client_message_id,
+    senderId: row.sender_id,
+    senderName: row.sender_id ? (row.sender_name ?? "成员") : "已注销用户",
+    body: row.body,
+    createdAt: row.created_at,
+  }));
 
   return {
     course: {
-      ...access.course,
-      conversationId: access.conversationId,
-      archived: access.archived,
+      ...catalogEntry(room.course),
+      conversationId: room.conversation_id,
+      archived: room.archived,
       memberCount: members.length,
     },
     members,
     messages,
-    hasOlderMessages: messages.length === 50,
+    hasOlderMessages: messages.length === ROOM_MESSAGE_LIMIT,
   };
 }
 
