@@ -9,8 +9,10 @@ import { LatencyToggle } from "@/features/latency/components/latency-toggle";
 import { updateProfileAction } from "@/features/profile/actions";
 import { ProfileForm } from "@/features/profile/components/profile-form";
 import { getOwnProfile } from "@/features/profile/queries";
+import { PushCard } from "@/features/push/components/push-card";
 import { InstallCard } from "@/features/pwa/components/install-card";
 import { ThemeSelector } from "@/features/theme/components/theme-toggle";
+import { serverEnv } from "@/lib/server-env";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +81,7 @@ export default async function ProfilePage() {
         </section>
 
         <InstallCard />
+        {serverEnv.push ? <PushCard publicKey={serverEnv.push.publicKey} /> : null}
 
         <form action={signOutAndReturnToLoginAction}>
           <button

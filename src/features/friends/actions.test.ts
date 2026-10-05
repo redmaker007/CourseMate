@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({ getCurrentMember: vi.fn() }));
 const cache = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
+const push = vi.hoisted(() => ({ scheduleFriendRequestPush: vi.fn() }));
 const service = vi.hoisted(() => ({
   findMemberByEmail: vi.fn(),
   sendFriendRequest: vi.fn(),
@@ -15,6 +16,7 @@ const production = vi.hoisted(() => ({ createService: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => cache);
+vi.mock("@/features/push/schedule", () => push);
 vi.mock("@/features/auth/session", () => auth);
 vi.mock("./production-friendship-service", () => ({
   createProductionFriendshipService: production.createService,
@@ -94,6 +96,24 @@ describe("friend Server Actions", () => {
     });
     expect(JSON.stringify(result)).not.toContain("bob@wisc.edu");
     expect(service.findMemberByEmail).toHaveBeenCalledWith("  bob@wisc.edu  ");
+  });
+
+  it("schedules a push only when a friend request was actually sent", async () => {
+    const requestId = "44444444-4444-4444-8444-444444444444";
+    service.sendFriendRequest.mockResolvedValueOnce({ status: "sent", requestId });
+    await friendMutationAction(
+      initialFriendActionState,
+      form({ intent: "request", memberId: BOB, message: "你好" }),
+    );
+    expect(push.scheduleFriendRequestPush).toHaveBeenCalledWith(requestId);
+
+    push.scheduleFriendRequestPush.mockClear();
+    service.sendFriendRequest.mockResolvedValueOnce({ status: "already_pending" });
+    await friendMutationAction(
+      initialFriendActionState,
+      form({ intent: "request", memberId: BOB, message: "你好" }),
+    );
+    expect(push.scheduleFriendRequestPush).not.toHaveBeenCalled();
   });
 
   it("maps a reverse pending request to an actionable safe message", async () => {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentMember } from "@/features/auth/session";
+import { scheduleDirectMessagePush } from "@/features/push/schedule";
 
 import type { DirectMessageActionState } from "./message-action-state";
 import { createProductionDirectMessageService } from "./production-direct-message-service";
@@ -72,7 +73,12 @@ export async function sendDirectMessageAction(
   } catch {
     return feedback("temporarily_unavailable", attempt);
   }
-  if (result.status === "sent") refreshMessageSurfaces(conversationId);
+  if (result.status === "sent") {
+    refreshMessageSurfaces(conversationId);
+    if ("message" in result) {
+      scheduleDirectMessagePush(result.message.id, conversationId);
+    }
+  }
   return feedback(result.status, {
     ...attempt,
     ...(result.status === "sent" && "message" in result
