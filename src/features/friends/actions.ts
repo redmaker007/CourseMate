@@ -246,6 +246,8 @@ export async function friendMutationAction(
     if (isSuccessful(result.status)) {
       revalidatePath("/friends");
       revalidatePath("/friends/filtered");
+      // 左栏的会话列表、未读和申请数在 (inbox) 共享 layout 里
+      revalidatePath("/(member)/(inbox)", "layout");
     }
     return state;
   } catch {
