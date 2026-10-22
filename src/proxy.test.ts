@@ -104,6 +104,23 @@ describe("proxy member session", () => {
     vi.clearAllMocks();
   });
 
+  it("移动 API 不使用网页 Cookie 刷新或跳转，由路由独立鉴权", async () => {
+    supabaseBoundary.authUser = null;
+    const response = await proxy(new NextRequest("https://coursemate.example/api/mobile/v1/session", {
+      headers: { cookie: "sb-session=website-session" },
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(supabaseBoundary.incomingCookies).toEqual([]);
+  });
+
+  it("相似路径不能绕过网站保护", async () => {
+    supabaseBoundary.authUser = null;
+    const response = await proxy(new NextRequest("https://coursemate.example/api/mobile/v10/session"));
+    expect(response.status).toBe(307);
+  });
+
   it("浏览器重新访问时读取并安全写回刷新的成员会话 Cookie", async () => {
     const request = new NextRequest("https://coursemate.example/courses", {
       headers: { cookie: "sb-session=existing-session" },
