@@ -72,7 +72,7 @@
 2. **Figma 界面登录后走查**：用真实验证码把各页点一遍（两栏「消息与好友」、深色模式、课程群聊回车发送）。「最后一条消息预览与时间」需要新增数据库函数，并遵守清除历史与拉黑规则，涉及权限，先出方案再做。
 3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——应用迁移 `202610040001`、补登记迁移历史、重新生成 `src/types/database.ts`；本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
 4. **丹尼的课程截图识别（`feature/issue-50-course-image-recognition`，Issues #50–54）**：先开 PR 并由另一位协作者审核；`SUPABASE_SERVICE_ROLE_KEY` 的读取位置统一到 `src/lib/server-env.ts`（他放在 `src/lib/env.ts`），与推送共用；确认学生选课截图发给 Google 的隐私说明；#54（真实截图基准与发布保护，`needs-info`）缺样本；发布顺序是先应用迁移 `202609300001`、再配 `GOOGLE_CLOUD_VISION_API_KEY`、最后发前端。
-5. **App 原生壳（Capacitor）按需**：PWA 已覆盖两端「添加到主屏幕」。只有要上架应用商店时才做；Android 在 Windows 即可，iOS 需要 Mac 或云构建，外加 Apple 开发者账号（99 美元/年），并且审核要求有推送等原生能力、隐私政策与账号删除入口。
+5. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，约定把它划为单独任务，需要排期；「HTTP API 还是直连 Supabase SDK」尚未定案。
 6. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
 7. **此前遗留**（仍然有效）：迁移 `202609260001` 登记到迁移历史表；测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份；本地 `supabase/.temp/project-ref` 仍指向旧项目；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
 8. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
