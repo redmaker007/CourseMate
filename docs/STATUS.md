@@ -6,7 +6,9 @@
 
 接口与原生前端接入要求见 [移动认证交接](handoffs/mobile-auth-api.md)。刷新后先保存整对新凭据，再查询成员状态；临时网络故障不等于账号失效。原生页面、安全凭据存储、本地缓存和推送不在本票实现范围。
 
-本次本地检查：最终全量 `npm test` 101 文件、671 项通过；随后 `npm run build`、`npm run lint`、`npm run typecheck` 依次通过。生产构建的本地 HTTP 检查确认：未带 Bearer 的 session/profile 返回 JSON 401，未知移动路径 JSON 404、错误方法 JSON 405；没有 Cookie 登录或 HTML 重定向。移动接口及 Proxy 定向回归 21 项通过；具体最终结果与阶段 review 记录在 Notion Ticket 1。
+本次本地检查：最终全量 `npm test` 101 文件、672 项通过；随后 `npm run build`、`npm run lint`、`npm run typecheck` 依次通过。生产构建的本地 HTTP 检查确认：未带 Bearer 的 session/profile 返回 JSON 401，未知移动路径 JSON 404、错误方法 JSON 405；没有 Cookie 登录或 HTML 重定向。移动接口及 Proxy 定向回归 21 项、审查新增的会话到期回归分别通过；具体最终结果记录在 Notion Ticket 1。
+
+阶段代码审查：Standards 未发现实质问题；Spec 初审发现服务端 `session_expired` 被误归类为暂时故障，已修复并由独立 reviewer 定向复查通过。上述最终全量检查包含修复。代码符合性已审查，真实环境验收仍按下段保留；未 push、合并或部署。
 
 尚未完成托管 Supabase 真实 OTP、刷新／多设备联调、真实配置核对或 iPhone 验证；本地 SDK 模拟网络测试不能替代这些验收。阶段 review 状态另行记录，不能将本节当作已完成上架准备。以下既有主线及生产记录保留原日期，不代表本分支已发布。
 

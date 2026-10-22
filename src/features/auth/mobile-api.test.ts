@@ -193,6 +193,13 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
     expect((await handler(request("auth/refresh", { refreshToken: "synthetic-refresh" }))).status).toBe(503);
   });
 
+  it("服务端确认会话到期时要求重登，不把它当成暂时故障", async () => {
+    refreshFailure = "session_expired";
+    const response = await api()(request("auth/refresh", { refreshToken: "synthetic-refresh" }));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ status: "session_invalid" });
+  });
+
   it("资料读写使用会话本人，复用验证并保留 insert 冲突后 update", async () => {
     const handler = api();
     expect((await (await handler(request("profile", undefined, token))).json()).profile).toBeNull();
