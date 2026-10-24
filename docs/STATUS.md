@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-10-25：移动课程 Ticket 2 已实现，待阶段 review
+
+基于 `bd1d557` 在隔离工作树 `tmp/app-readiness`、分支 `feature/mobile-auth-api` 实施；用户明确将 Ticket 1 剩余测试延期。新增移动课程本人列表、当前学期搜索、详情、加入／退出和受权会话入口。学校与用户取自 Bearer 成员上下文，资料未完善返回 403；移动入口明确拒绝跨校和旧学期写操作。分页和退出后缓存／权限恢复契约见 [移动课程交接](handoffs/mobile-courses-api.md)。原生页面及消息读写未计入本票。
+
+搜索和加退课的 Supabase 适配器从网页工厂抽出供两端复用；既有匹配排序、写入失败语义、RLS 与会话惰性创建保留，无新增依赖或迁移。本次实际检查：移动课程定向 22 项通过；完整 `npm test` 102 文件／695 项通过 → build → lint → typecheck 依次通过。实际本地生产构建 HTTP 检查 7 项通过，覆盖五个课程入口认证、Cookie 不能冒充 Bearer、错误方法 JSON 405 及未实现路径 JSON 404；无 Cookie 写入，均 no-store。
+
+本票轻量检查未发现阻塞；阶段 2 的 Tickets 3–5 尚未实施，整阶段双轴 review 未启动。未 push、合并、部署或写远程业务数据；真实账号课程联调、多连接 PostgreSQL 竞态与 iOS／缓存验收未做。Ticket 1 原有剩余项继续保留，不因本票实施而标为通过。
+
 ## 2026-10-25：CourseMate-test 环境配置与初步联调
 
 用户指定 `CourseMate-test`（`cqrlxcxcgrcoamqnjkwu`，us-west-2）为测试环境；生产 `CourseMate-main` 未修改。测试库补齐 6 条仓库迁移并登记历史，Auth 用户、成员、资料均仍为 7 条；成员上下文 RPC 禁止 anon、允许 authenticated。访问令牌有效期由 3600 调整为 900 秒，保留 6 位／600 秒 OTP、自定义 SMTP、准入 Hook 和 60 秒重发间隔。

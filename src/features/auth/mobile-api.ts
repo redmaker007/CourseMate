@@ -1,6 +1,8 @@
 import { isAuthError, type SupabaseClient } from "@supabase/supabase-js";
 
 import { createSupabaseProfileService } from "@/features/profile/supabase-profile-service";
+import { handleMobileCourseRequest, mobileCourseMethods } from "@/features/courses/mobile-api";
+import type { Database } from "@/types/database";
 
 import type { createEmailOtpContextCodec } from "./email-otp-context";
 import { createEmailOtpService } from "./email-otp-service";
@@ -20,7 +22,7 @@ const methods: Record<string, string[]> = {
 };
 
 type Dependencies = {
-  createClient(accessToken?: string): SupabaseClient;
+  createClient(accessToken?: string): SupabaseClient<Database>;
   getCodec(): ReturnType<typeof createEmailOtpContextCodec>;
 };
 
@@ -74,6 +76,9 @@ function resultHttpStatus(status: string) {
   if (status === "rate_limited") return 429;
   if (["invalid_email", "invalid_or_expired_code", "invalid"].includes(status)) return 400;
   if (status === "unauthenticated") return 401;
+  if (status === "onboarding_required") return 403;
+  if (status === "invalid_request") return 400;
+  if (status === "not_available") return 404;
   return 200;
 }
 
@@ -82,7 +87,8 @@ export function createMobileAuthApi(dependencies: Dependencies) {
     try {
       const pathname = new URL(request.url).pathname;
       const path = pathname.startsWith(MOBILE_API_PREFIX) ? pathname.slice(MOBILE_API_PREFIX.length) : "";
-      const allowed = Object.hasOwn(methods, path) ? methods[path] : undefined;
+      const courseMethods = mobileCourseMethods(path);
+      const allowed = courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
       if (!allowed) return json({ status: "not_found" }, 404);
       if (!allowed.includes(request.method)) return json({ status: "method_not_allowed" }, 405, { allow: allowed.join(", ") });
 
@@ -90,7 +96,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const authorization = path === "auth/refresh" ? null : request.headers.get("authorization");
       const accessToken = authorization?.match(/^Bearer ([^\s]{1,8192})$/i)?.[1];
       if (authorization && !accessToken) return json({ status: "access_token_invalid" }, 401);
-      const protectedPath = ["session", "profile", "auth/sign-out"].includes(path);
+      const protectedPath = courseMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
       if (protectedPath && !accessToken) return json({ status: "authentication_required" }, 401);
       const body = request.method === "GET" ? {} : await readBody(request);
       const codePath = path === "auth/request-code" || path === "auth/verify-code";
@@ -179,6 +185,10 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       }
 
       const member = await readMember();
+      if (courseMethods) {
+        const result = await handleMobileCourseRequest(request, path, body, supabase, member);
+        return json(result, resultHttpStatus(result.status));
+      }
       if (path === "session") return json({ status: "ok", member });
       if (request.method === "PATCH") {
         const input = fields(body, ["displayName", "major", "gradYear"]);
