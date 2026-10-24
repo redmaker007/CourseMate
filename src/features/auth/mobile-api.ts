@@ -159,7 +159,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         if (!input.refreshToken) return json({ status: "invalid_request" }, 400);
         const { error } = await supabase.auth.refreshSession({ refresh_token: input.refreshToken });
         if (error) {
-          if (["refresh_token_not_found", "refresh_token_already_used", "session_not_found", "session_expired", "user_not_found", "user_banned"].includes(error.code ?? "")) return json({ status: "session_invalid" }, 401);
+          if (["validation_failed", "refresh_token_not_found", "refresh_token_already_used", "session_not_found", "session_expired", "user_not_found", "user_banned"].includes(error.code ?? "")) return json({ status: "session_invalid" }, 401);
           if (error.status === 429) return json({ status: "rate_limited" }, 429);
           throw error;
         }

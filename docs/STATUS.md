@@ -1,5 +1,11 @@
 # 当前状态
 
+## 2026-10-25：CourseMate-test 环境配置与初步联调
+
+用户指定 `CourseMate-test`（`cqrlxcxcgrcoamqnjkwu`，us-west-2）为测试环境；生产 `CourseMate-main` 未修改。测试库补齐 6 条仓库迁移并登记历史，Auth 用户、成员、资料均仍为 7 条；成员上下文 RPC 禁止 anon、允许 authenticated。访问令牌有效期由 3600 调整为 900 秒，保留 6 位／600 秒 OTP、自定义 SMTP、准入 Hook 和 60 秒重发间隔。
+
+隔离工作树已通过忽略的 `.env.local` 连接此测试库。本地移动接口读取 3 所学校成功，未登录、伪造 Bearer、Cookie 冒充、输入与请求边界已检查。实测发现格式错误的 refreshToken 被误归类为 503，已修复并复测为 401／session_invalid；新增定向回归通过，全量 101 文件／673 项测试、build、lint、typecheck 依次通过。真实邮件收取、验证码成功登录、资料保存、正常刷新与双设备退出尚未验收，等待可收信的测试学校邮箱。详见 [测试记录](handoffs/mobile-auth-test-20261025.md)。未发布移动接口或验证 iPhone 原生端。
+
 ## 2026-10-22：移动认证阶段 1（本地功能分支）
 
 `feature/mobile-auth-api` 基于主线 `e4be133` 实施 Ticket 1，尚未合并或部署。新增 `/api/mobile/v1/` 学校、验证码、会话刷新、可信成员、本人资料与当前设备退出 HTTP 入口；复用既有账号、学校准入及资料规则，网页 Cookie／Server Actions 保留。无数据库迁移或新增依赖。
