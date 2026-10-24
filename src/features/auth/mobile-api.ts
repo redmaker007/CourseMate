@@ -3,6 +3,7 @@ import { isAuthError, type SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseProfileService } from "@/features/profile/supabase-profile-service";
 import { handleMobileCourseRequest, mobileCourseMethods } from "@/features/courses/mobile-api";
 import type { Database } from "@/types/database";
+import { handleMobileFriendRequest, mobileFriendMethods, mobileFriendHttpStatus } from "@/features/friends/mobile-api";
 
 import type { createEmailOtpContextCodec } from "./email-otp-context";
 import { createEmailOtpService } from "./email-otp-service";
@@ -24,6 +25,7 @@ const methods: Record<string, string[]> = {
 type Dependencies = {
   createClient(accessToken?: string): SupabaseClient<Database>;
   getCodec(): ReturnType<typeof createEmailOtpContextCodec>;
+  onFriendRequestSent?(requestId: string): void;
 };
 
 function json(body: unknown, status = 200, headers?: HeadersInit) {
@@ -88,7 +90,8 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const pathname = new URL(request.url).pathname;
       const path = pathname.startsWith(MOBILE_API_PREFIX) ? pathname.slice(MOBILE_API_PREFIX.length) : "";
       const courseMethods = mobileCourseMethods(path);
-      const allowed = courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
+      const friendMethods = mobileFriendMethods(path);
+      const allowed = friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
       if (!allowed) return json({ status: "not_found" }, 404);
       if (!allowed.includes(request.method)) return json({ status: "method_not_allowed" }, 405, { allow: allowed.join(", ") });
 
@@ -96,7 +99,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const authorization = path === "auth/refresh" ? null : request.headers.get("authorization");
       const accessToken = authorization?.match(/^Bearer ([^\s]{1,8192})$/i)?.[1];
       if (authorization && !accessToken) return json({ status: "access_token_invalid" }, 401);
-      const protectedPath = courseMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
+      const protectedPath = courseMethods !== undefined || friendMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
       if (protectedPath && !accessToken) return json({ status: "authentication_required" }, 401);
       const body = request.method === "GET" ? {} : await readBody(request);
       const codePath = path === "auth/request-code" || path === "auth/verify-code";
@@ -185,6 +188,10 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       }
 
       const member = await readMember();
+      if (friendMethods) {
+        const result = await handleMobileFriendRequest(request, path, body, supabase, member, dependencies.onFriendRequestSent);
+        return json(result, mobileFriendHttpStatus(result.status));
+      }
       if (courseMethods) {
         const result = await handleMobileCourseRequest(request, path, body, supabase, member);
         return json(result, resultHttpStatus(result.status));

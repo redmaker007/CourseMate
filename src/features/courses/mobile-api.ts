@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { MemberContext } from "@/features/auth/member-session";
 import type { Database } from "@/types/database";
+import { readMobilePagination } from "@/lib/mobile-pagination";
 import { createSupabaseCourseSearch, getSupabaseCurrentTerm } from "./supabase-course-search";
 import { createSupabaseCourseOperations, getSupabaseJoinedCourse } from "./supabase-course-operations";
 import { isUuid } from "./course-identifiers";
@@ -11,13 +12,6 @@ export function mobileCourseMethods(path: string) {
   if (/^courses\/[^/]+$/.test(path)) return ["GET"];
   if (/^courses\/[^/]+\/(join|leave)$/.test(path)) return ["POST"];
   return undefined;
-}
-
-function pagination(params: URLSearchParams) {
-  const limit = params.get("limit") ?? "50";
-  const offset = params.get("offset") ?? "0";
-  if (!/^[1-9]\d{0,2}$/.test(limit) || Number(limit) > 100 || !/^(0|[1-9]\d{0,5})$/.test(offset)) return null;
-  return { limit: Number(limit), offset: Number(offset) };
 }
 
 export async function handleMobileCourseRequest(
@@ -60,7 +54,7 @@ export async function handleMobileCourseRequest(
   const search = path === "courses/search";
   const allowed = search ? ["q", "limit", "offset"] : ["scope", "limit", "offset"];
   if ([...params.keys()].some(key => !allowed.includes(key) || params.getAll(key).length !== 1)) return { status: "invalid_request" } as const;
-  const page = pagination(params);
+  const page = readMobilePagination(params);
   const scope = params.get("scope") ?? "current";
   if (!page || !["current", "archived"].includes(scope)) return { status: "invalid_request" } as const;
   const query = params.get("q")?.trim() ?? "";
