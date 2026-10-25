@@ -794,6 +794,60 @@ describe("phase-one full-chain integration", () => {
     }
   });
 
+  it("移动举报沿用完整迁移链的真实目标、本人身份、私有证据和留存，课程举报缺口不假报成功", async () => {
+    await database.exec("begin;");
+    try {
+      const direct = await database.query<{ conversation_id: string }>(`select conversation_id from public.direct_conversations
+        where member_low = '${ALICE}' and member_high = '${BOB}'`);
+      const conversationId = direct.rows[0].conversation_id;
+      const messageId = "9007199254740995";
+      await database.exec(`insert into public.messages (id, conversation_id, sender_id, body)
+        overriding system value values (${messageId}, '${conversationId}', '${BOB}', 'controlled evidence')`);
+      const create = `select * from public.create_behavior_report('message', '${messageId}', 'harassment', ' context ')`;
+      const result = await asUser(ALICE, create);
+      expect(result.ok && result.rows[0].result_status).toBe("created");
+      const reportId = result.ok ? String(result.rows[0].report_id) : "";
+      expect(await asUser(ALICE, create)).toEqual({ ok: true, rows: [{ result_status: "already_pending", report_id: reportId }] });
+      expect(await asUser(CAROL, create)).toEqual({ ok: true, rows: [{ result_status: "not_available", report_id: null }] });
+      expect(await asUser(BOB, create)).toEqual({ ok: true, rows: [{ result_status: "self_report", report_id: null }] });
+      expect(await asUser(INCOMPLETE, create)).toEqual({ ok: true, rows: [{ result_status: "onboarding_required", report_id: null }] });
+      expect(await asUser(ALICE, `select reporter_id, status, details from public.behavior_reports where id = '${reportId}'`))
+        .toEqual({ ok: true, rows: [{ reporter_id: ALICE, status: "pending", details: "context" }] });
+      expect(await asUser(BOB, `select * from public.behavior_reports where id = '${reportId}'`)).toEqual({ ok: true, rows: [] });
+      const chain = await database.query(`select evidence.reported_user_id, evidence.snapshot ->> 'body' as body,
+        retention.source_id, retention.message_id::text from public.report_evidence evidence
+        join public.report_source_retention retention using (report_id) where evidence.report_id = '${reportId}'`);
+      expect(chain.rows).toEqual([{ reported_user_id: BOB, body: "controlled evidence", source_id: messageId, message_id: messageId }]);
+      const grants = await database.query(`select
+        has_table_privilege('authenticated', 'public.report_evidence', 'select') as evidence,
+        has_table_privilege('authenticated', 'public.report_source_retention', 'select') as retention,
+        has_table_privilege('authenticated', 'public.behavior_reports', 'insert') as direct_insert,
+        has_table_privilege('authenticated', 'public.behavior_reports', 'update') as moderate`);
+      expect(grants.rows).toEqual([{ evidence: false, retention: false, direct_insert: false, moderate: false }]);
+      // 拉黑不删除举报，也不妨碍对仍可见私信进行正式举报。
+      await asUser(ALICE, `select public.set_member_blocked('${BOB}', true)`);
+      expect(await asUser(ALICE, create)).toEqual({ ok: true, rows: [{ result_status: "already_pending", report_id: reportId }] });
+      await asUser(ALICE, `select public.clear_direct_conversation('${conversationId}', ${messageId})`);
+      expect(await asUser(ALICE, create)).toEqual({ ok: true, rows: [{ result_status: "not_available", report_id: null }] });
+      expect((await database.query(`select count(*)::int as count from public.report_evidence where report_id = '${reportId}'`)).rows).toEqual([{ count: 1 }]);
+
+      const courseId = "a6666666-6666-4666-8666-666666666666";
+      await database.exec(`insert into public.courses (id, school_id, code, title, term)
+        select '${courseId}', 'uw-madison', 'SAFE 901', 'Reporting fixture', current_term
+        from public.school_term_settings where school_id = 'uw-madison'`);
+      await asUser(ALICE, `insert into public.course_members (course_id) values ('${courseId}')`);
+      await asUser(BOB, `insert into public.course_members (course_id) values ('${courseId}')`);
+      const course = await database.query<{ conversation_id: string }>(`select conversation_id from public.course_conversations where course_id = '${courseId}'`);
+      const sent = await asUser(BOB, `select message_id::text from public.send_conversation_message('${course.rows[0].conversation_id}', 'course evidence', gen_random_uuid())`);
+      const courseMessageId = sent.ok ? String(sent.rows[0].message_id) : "";
+      expect(await asUser(ALICE, `select id::text from public.messages where id = ${courseMessageId}`)).toEqual({ ok: true, rows: [{ id: courseMessageId }] });
+      expect(await asUser(ALICE, `select * from public.create_behavior_report('message', '${courseMessageId}', 'spam', null)`))
+        .toEqual({ ok: true, rows: [{ result_status: "not_available", report_id: null }] });
+    } finally {
+      await database.exec("rollback;");
+    }
+  });
+
   it("完整迁移后仍允许成员完成 onboarding 并更新受列权限保护的资料", async () => {
     const inserted = await asUser(
       INCOMPLETE,

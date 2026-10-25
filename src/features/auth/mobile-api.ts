@@ -5,6 +5,7 @@ import { handleMobileCourseRequest, mobileCourseMethods } from "@/features/cours
 import type { Database } from "@/types/database";
 import { handleMobileFriendRequest, mobileFriendMethods, mobileFriendHttpStatus } from "@/features/friends/mobile-api";
 import { handleMobileMessageRequest, mobileMessageMethods, mobileMessageHttpStatus } from "@/features/messages/mobile-api";
+import { handleMobileReportRequest, mobileReportMethods, mobileReportHttpStatus } from "@/features/reporting/mobile-api";
 
 import type { createEmailOtpContextCodec } from "./email-otp-context";
 import { createEmailOtpService } from "./email-otp-service";
@@ -94,7 +95,8 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const courseMethods = mobileCourseMethods(path);
       const friendMethods = mobileFriendMethods(path);
       const messageMethods = mobileMessageMethods(path);
-      const allowed = messageMethods ?? friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
+      const reportMethods = mobileReportMethods(path);
+      const allowed = reportMethods ?? messageMethods ?? friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
       if (!allowed) return json({ status: "not_found" }, 404);
       if (!allowed.includes(request.method)) return json({ status: "method_not_allowed" }, 405, { allow: allowed.join(", ") });
 
@@ -102,7 +104,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const authorization = path === "auth/refresh" ? null : request.headers.get("authorization");
       const accessToken = authorization?.match(/^Bearer ([^\s]{1,8192})$/i)?.[1];
       if (authorization && !accessToken) return json({ status: "access_token_invalid" }, 401);
-      const protectedPath = courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
+      const protectedPath = courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
       if (protectedPath && !accessToken) return json({ status: "authentication_required" }, 401);
       const body = request.method === "GET" ? {} : await readBody(request);
       const codePath = path === "auth/request-code" || path === "auth/verify-code";
@@ -191,6 +193,10 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       }
 
       const member = await readMember();
+      if (reportMethods) {
+        const result = await handleMobileReportRequest(request, body, supabase, member);
+        return json(result, mobileReportHttpStatus(result.status));
+      }
       if (messageMethods) {
         const result = await handleMobileMessageRequest(request, path, body, supabase, member, dependencies.onDirectMessageSent);
         return json(result, mobileMessageHttpStatus(result.status));
