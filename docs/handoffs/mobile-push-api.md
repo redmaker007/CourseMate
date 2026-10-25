@@ -92,6 +92,6 @@ DELETE 按当前 Bearer 的账号＋会话限制，可在资料／成员准入�
 
 ## 验证及待办
 
-本票本地完整检查：110 文件／805 项测试、build、lint、typecheck 通过；首次 build 的环境字面量推导问题已修复。数据库重放 30 条迁移检查权限／幂等／租约／重试／环境／退出／换号／注销级联；HTTP 用真实 Supabase SDK 模拟网络；发送器用真实本地 HTTP/2 和临时 P-256 签名校验。本地生产 HTTP 边界 10 项通过；发现并修正 Next 空 POST 流误报 400，定向回归及重建／lint／typecheck 后真实 HTTP 复查通过。阶段审查另记。
+本票审查修复后完整检查：110 文件／806 项测试、build、lint、typecheck 通过；首次 build 的环境字面量推导问题已修复。数据库重放 30 条迁移检查权限／幂等／租约／重试／环境／退出／换号／注销级联；HTTP 用真实 Supabase SDK 模拟网络；发送器用真实本地 HTTP/2 和临时 P-256 签名校验。本地生产 HTTP 边界 10 项通过；发现并修正 Next 空 POST 流误报 400，定向回归及重建／lint／typecheck 后真实 HTTP 复查通过。阶段两轴审查及同绑定重复登记 P2 的修复复查通过，详见 [审查记录](mobile-stage-three-review-20261026.md)。
 
 未使用真实 Apple 凭据／设备 token，未发送 APNs、迁移远端、购买服务、接通线上 cron、push／合并／部署。仍需托管 Auth session_id／not_after、PostgreSQL 多连接领取／改绑竞态、iPhone 授权／拒绝、TestFlight 环境、前后台／冷启动／离线／在途通知、跨账号和设备隔离，以及 Ticket 6 客户端缓存／通知清理联合验收。Ticket 1 延期项不变。

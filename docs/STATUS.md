@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-10-26：阶段 3 后端代码审查及修复复查完成
+
+Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接及独立 Standards／Spec 两轴审查。阶段基线 `fe4b72c` → 初审 `f0fa83b`，28 路径快照／指纹核对。Standards 发现同绑定登记会无条件清掉 pending／retry 通知的 P2；`cba0ee4` 修复为仅账号／会话／token／环境实际改变才清旧任务，同绑定重试保留队列。两轴分别针对性复查通过，无新增确认问题。
+
+最终本次 `npm test` 110 文件／806 项 → build → lint → typecheck 依次通过；生产构建 HTTP 边界 10 项此前已复查通过。完整两轴报告、来源与指纹位置见 [阶段 3 审查记录](handoffs/mobile-stage-three-review-20261026.md)。详细原生通知、注册／解绑、导航和调度交接见 [推送交接](handoffs/mobile-push-api.md)。以下“待阶段 review”均为当时记录，以本节为最新。
+
+仍待真实 Apple／APNs／iPhone、托管 Auth／SMTP／Storage、多连接竞态、网页／原生缓存与通知清理、合法保留例外、恢复 cron 配置、目标迁移及类型重新生成。后端代码符合性通过不等于联合验收或上架通过；无真实推送、远程迁移／删除、购买、push／合并／部署。Ticket 1 延期项继续保留，Ticket 8–10 未实施，不自动跨入下一阶段。
+
 ## 2026-10-26：iOS 私信推送 Ticket 7 本地实现，待阶段 review
 
 用户选择 A：直接调用 Apple APNs，沿用阶段 3 当前推理设置。阶段基线 `fe4b72c`，本票起点 `3da1bbe`，在隔离工作树 `tmp/app-readiness` 的 `feature/mobile-auth-api` 实施，起点 clean；原根工作区其他功能改动未纳入。新增第 30 条迁移 `202610260002_mobile_push.sql`：受控设备绑定、消息事务队列、资格复查、租约／退避／失效处理及注销级联；与网页 VAPID 记录分开，不改变聊天写权限。
