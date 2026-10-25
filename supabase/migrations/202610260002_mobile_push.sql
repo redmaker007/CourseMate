@@ -33,6 +33,7 @@ returns text language plpgsql security definer set search_path = '' as $$
 declare
   actor uuid := auth.uid();
   sid uuid := (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'session_id')::uuid;
+  changed_installation uuid;
 begin
   if actor is null or sid is null or not exists(select 1 from auth.sessions s where s.id=sid and s.user_id=actor
       and coalesce((to_jsonb(s)->>'not_after')::timestamptz>now(),true))
@@ -58,9 +59,14 @@ begin
   insert into public.mobile_push_devices as d(installation_id,user_id,session_id,device_token,environment)
     values(target_installation,actor,sid,lower(target_token),target_environment)
   on conflict(installation_id) do update set user_id=excluded.user_id,session_id=excluded.session_id,
-    device_token=excluded.device_token,environment=excluded.environment,updated_at=now();
-  -- 重新绑定时丢弃上次账号／token 的任务，不把旧通知改投新账号。
-  delete from public.mobile_push_jobs where installation_id=target_installation;
+    device_token=excluded.device_token,environment=excluded.environment,updated_at=now()
+    where (d.user_id,d.session_id,d.device_token,d.environment) is distinct from
+      (excluded.user_id,excluded.session_id,excluded.device_token,excluded.environment)
+    returning d.installation_id into changed_installation;
+  -- 只有实际改绑才丢弃旧任务；幂等登记不能抹掉待投递或待重试通知。
+  if changed_installation is not null then
+    delete from public.mobile_push_jobs where installation_id=changed_installation;
+  end if;
   return 'registered';
 end; $$;
 

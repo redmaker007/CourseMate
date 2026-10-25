@@ -69,6 +69,18 @@ it("落库与推送同一事务入队；领取只含发送者和目标，不含�
   expect(await service("select * from public.claim_mobile_push_jobs(5)")).toEqual([]);
 });
 
+it("相同绑定的登记重试保留 pending／retry 任务，真正轮换 token 才清旧任务", async () => {
+  await message();
+  await user(B, `select public.register_mobile_push_device('${DEVICE}','${TOKEN}')`);
+  const [job] = await service("select * from public.claim_mobile_push_jobs(5)");
+  expect(job).toBeDefined();
+  await service(`select public.finish_mobile_push_job('${job.job_id}','${job.lease}','retry')`);
+  await user(B, `select public.register_mobile_push_device('${DEVICE}','${TOKEN}')`);
+  expect((await db.query("select state,attempts from public.mobile_push_jobs")).rows).toEqual([{ state: "pending", attempts: 1 }]);
+  await user(B, `select public.register_mobile_push_device('${DEVICE}','${"cd".repeat(32)}')`);
+  expect((await db.query("select * from public.mobile_push_jobs")).rows).toEqual([]);
+});
+
 it.each(["hide", "block", "session", "expired_session", "clear", "school", "delete"])("投递前重新校验 %s，不向已失去资格的目标发送", async change => {
   const m = await message();
   if (change === "hide") await user(B, `select * from public.set_friend_hidden('${A}',true)`);
