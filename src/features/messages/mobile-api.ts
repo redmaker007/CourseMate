@@ -45,8 +45,9 @@ export async function handleMobileMessageRequest(
     return { status: "loaded", counts: { visible: row.visible_unread, hidden: row.hidden_unread } };
   }
   if (path !== "conversations") {
-    const [, conversationId, action] = path.split("/");
-    if (!isUuid(conversationId)) return { status: "invalid_request" };
+    const [, rawConversationId, action] = path.split("/");
+    if (!isUuid(rawConversationId)) return { status: "invalid_request" };
+    const conversationId = rawConversationId.toLowerCase();
     const post = request.method === "POST";
     const allowed = !post && action === "messages" ? ["before", "after", "through", "limit"] : [];
     if ([...params.keys()].some(key => !allowed.includes(key) || params.getAll(key).length !== 1)) return { status: "invalid_request" };
@@ -63,6 +64,7 @@ export async function handleMobileMessageRequest(
       const exactFields = (keys: string[]) => Object.keys(body).length === keys.length && keys.every(key => Object.hasOwn(body, key));
       if (action === "messages") {
         if (!exactFields(["clientMessageId", "body"]) || !isUuid(body.clientMessageId) || typeof body.body !== "string") return { status: "invalid_request" };
+        const clientMessageId = body.clientMessageId.toLowerCase();
         const normalized = body.body.trim();
         if (!normalized || Array.from(normalized).length > 4000) return { status: "invalid_body" };
         // shortcut: 幂等沿用消息行唯一键，物理删除后旧 UUID 的重放边界由 Ticket 6 联合核验。
@@ -74,7 +76,7 @@ export async function handleMobileMessageRequest(
             throw new Error("Invalid send response");
           }
           return result;
-        } }, conversationId, body.clientMessageId, normalized);
+        } }, conversationId, clientMessageId, normalized);
         if (result.status === "sent") {
           if (!isMobileMessageId(result.message.id) || result.message.conversationId !== conversationId || result.message.senderId !== member.userId) throw new Error("Invalid message receipt");
           // 原 RPC 的幂等回执可能对应已清除的旧消息；返回正文前仍须经过当前 RLS。
@@ -84,7 +86,7 @@ export async function handleMobileMessageRequest(
           if (access.kind === "direct") {
             try { onDirectMessageSent?.(result.message.id, conversationId); } catch { /* 推送失败不能改变已发送结果。 */ }
           }
-          if (!visible) return { status: "sent_not_visible", messageId: result.message.id, clientMessageId: body.clientMessageId, conversationId };
+          if (!visible) return { status: "sent_not_visible", messageId: result.message.id, clientMessageId, conversationId };
         }
         return result;
       }

@@ -61,6 +61,8 @@ course 状态改为 courseId、hidden=false、sendStatus=allowed／readonly，�
 
 ## ID、消息分页与幂等
 
+会话路径 UUID 和发送 clientMessageId 接受合法大小写，移动入口统一转为小写后调用业务并返回规范 UUID。原生端也应将两种 UUID 归一后存储和匹配 pending，避免发送回执与后续数据库读取的大小写不一致；消息 ID 是下述十进制字符串，不作 UUID 处理。
+
 所有消息 ID、游标、已读／清除位置、未读计数都以**十进制字符串**传输；消息 ID 为正 PostgreSQL bigint（最大 9223372036854775807）。before 必须正数；after／through 可为 "0"。latestMessageId="0" 表示当前没有可见消息，个人游标没有值时为 null。不能转为 JS number 后再 String，大小比较也不能按字典序；使用不丢精度的整数方式。
 
 before 与 after 互斥；through 仅用于 after，且 after≤through。无游标取最近一页。服务器按数值 ID 查询，**响应 messages 始终按 ID 升序**，每项包含 id、clientMessageId（可 null）、conversationId、senderId（可 null）、senderDisplayName、body、createdAt。昵称无法读取时为“成员”，发送者为空时为“已注销用户”；这不等于已经实施永久注销。

@@ -7,10 +7,10 @@ import { createEmailOtpContextCodec } from "@/features/auth/email-otp-context";
 import { createMobileAuthApi } from "@/features/auth/mobile-api";
 
 const userId = "11111111-1111-4111-8111-111111111111";
-const conversationId = "22222222-2222-4222-8222-222222222222";
+const conversationId = "abcdefab-abcd-4abc-8abc-abcdefabcdef";
 const otherId = "33333333-3333-4333-8333-333333333333";
 const courseId = "44444444-4444-4444-8444-444444444444";
-const clientId = "55555555-5555-4555-8555-555555555555";
+const clientId = "bcdefabc-bcde-4bcd-8bcd-bcdefabcdefa";
 const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const email = "student@wisc.edu";
 const token = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: userId, email, exp: Math.floor(Date.now() / 1000) + 3600, role: "authenticated" })}.${encode("synthetic-signature")}`;
@@ -138,6 +138,21 @@ describe("移动消息 HTTP 契约（真实 SDK，模拟网络；SQL 权限另�
     kind = "course"; stored = null; notify.mockClear();
     expect((await handler(request(path, { clientMessageId: clientId, body: "course" }))).status).toBe(200);
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("大写消息 UUID 归一后返回成功，重试复用回执并与补拉的数据库 UUID 一致", async () => {
+    const notify = vi.fn(); const handler = api(notify);
+    const firstResponse = await handler(request(`conversations/${conversationId.toUpperCase()}/messages`, { clientMessageId: clientId.toUpperCase(), body: "hello" }));
+    expect(firstResponse.status).toBe(200);
+    const first = await firstResponse.json();
+    expect(first).toMatchObject({ status: "sent", message: { conversationId, clientMessageId: clientId } });
+    const repeated = await handler(request(`conversations/${conversationId}/messages`, { clientMessageId: clientId, body: "hello" }));
+    expect(repeated.status).toBe(200);
+    expect(await repeated.json()).toEqual(first);
+    expect(calls.filter(call => call.name === "send_conversation_message").every(call => call.body.target_conversation_id === conversationId && call.body.client_message_id === clientId)).toBe(true);
+    expect(notify).toHaveBeenCalledWith("9007199254740993", conversationId);
+    const reconcile = await handler(request(`conversations/${conversationId.toUpperCase()}/reconcile`, { messageIds: ["8"] }));
+    expect(await reconcile.json()).toMatchObject({ conversationId });
   });
 
   it("清除仅调用本人的既有 RPC；重校验返回不可见 ID，不复活已清除或删除内容", async () => {
