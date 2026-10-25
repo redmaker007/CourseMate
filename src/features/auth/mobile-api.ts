@@ -7,6 +7,7 @@ import { handleMobileFriendRequest, mobileFriendMethods, mobileFriendHttpStatus 
 import { handleMobileMessageRequest, mobileMessageMethods, mobileMessageHttpStatus } from "@/features/messages/mobile-api";
 import { handleMobileReportRequest, mobileReportMethods, mobileReportHttpStatus } from "@/features/reporting/mobile-api";
 import { handleMobileDeletionRequest, mobileDeletionMethods, deletionHttpStatus, type DeletionDependencies } from "./account-deletion-api";
+import { handleMobilePushDevice, mobilePushMethods, mobilePushHttpStatus, removeCurrentMobileDevices } from "@/features/push/mobile-api";
 
 import type { createEmailOtpContextCodec } from "./email-otp-context";
 import { createEmailOtpService } from "./email-otp-service";
@@ -30,6 +31,7 @@ type Dependencies = DeletionDependencies & {
   getCodec(): ReturnType<typeof createEmailOtpContextCodec>;
   onFriendRequestSent?(requestId: string): void;
   onDirectMessageSent?(messageId: string, conversationId: string): void;
+  getPushEnvironment?(): "sandbox" | "production" | undefined;
 };
 
 function json(body: unknown, status = 200, headers?: HeadersInit) {
@@ -98,7 +100,8 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const messageMethods = mobileMessageMethods(path);
       const reportMethods = mobileReportMethods(path);
       const deletionMethods = mobileDeletionMethods(path);
-      const allowed = deletionMethods ?? reportMethods ?? messageMethods ?? friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
+      const pushMethods = mobilePushMethods(path);
+      const allowed = pushMethods ?? deletionMethods ?? reportMethods ?? messageMethods ?? friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
       if (!allowed) return json({ status: "not_found" }, 404);
       if (!allowed.includes(request.method)) return json({ status: "method_not_allowed" }, 405, { allow: allowed.join(", ") });
 
@@ -107,7 +110,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const authorization = path === "auth/refresh" || deletionStatus ? null : request.headers.get("authorization");
       const accessToken = authorization?.match(/^Bearer ([^\s]{1,8192})$/i)?.[1];
       if (authorization && !accessToken) return json({ status: "access_token_invalid" }, 401);
-      const protectedPath = (deletionMethods !== undefined && !deletionStatus) || courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
+      const protectedPath = pushMethods !== undefined || (deletionMethods !== undefined && !deletionStatus) || courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
       if (protectedPath && !accessToken) return json({ status: "authentication_required" }, 401);
       const body = request.method === "GET" ? {} : await readBody(request);
       if (deletionMethods) {
@@ -192,6 +195,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         fields(body, []);
         // SDK 的 admin.signOut 使用传入的用户 JWT 调用 /logout；不使用 service_role。
         const service = createSignOutService({ signOut: async () => {
+          await removeCurrentMobileDevices(supabase);
           const { error } = await supabase.auth.admin.signOut(accessToken!, "local");
           if (error) throw error;
         } });
@@ -199,6 +203,14 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         return json(result, resultHttpStatus(result.status));
       }
 
+      if (pushMethods) {
+        if (request.method === "PUT") {
+          const member = await readMember();
+          if (!member.onboardingComplete) return json({ status: "onboarding_required" }, 403);
+        }
+        const result = await handleMobilePushDevice(request, body, supabase, request.method === "PUT" ? dependencies.getPushEnvironment?.() : undefined);
+        return json(result, mobilePushHttpStatus(result.status));
+      }
       const member = await readMember();
       if (reportMethods) {
         const result = await handleMobileReportRequest(request, body, supabase, member);

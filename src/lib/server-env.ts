@@ -8,6 +8,15 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const serverEnv = {
+  get apns() {
+    const keyId = process.env.APNS_KEY_ID, teamId = process.env.APNS_TEAM_ID;
+    const bundleId = process.env.APNS_BUNDLE_ID, privateKey = process.env.APNS_PRIVATE_KEY?.replace(/\\n/g,"\n");
+    const environment = process.env.APNS_ENVIRONMENT;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!keyId || !teamId || !bundleId || !privateKey || !serviceRoleKey || (environment !== "sandbox" && environment !== "production")) return null;
+    if (!/^[A-Z0-9]{10}$/.test(keyId) || !/^[A-Z0-9]{10}$/.test(teamId) || !/^[A-Za-z0-9.-]{3,255}$/.test(bundleId)) throw new Error("Invalid APNs configuration");
+    return { keyId, teamId, bundleId, privateKey, environment, serviceRoleKey } as const;
+  },
   get accountDeletionServiceRoleKey() {
     return required("SUPABASE_SERVICE_ROLE_KEY", process.env.SUPABASE_SERVICE_ROLE_KEY);
   },

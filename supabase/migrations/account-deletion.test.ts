@@ -64,6 +64,10 @@ describe("永久注销完整迁移链与真实权限（简化 Auth／Storage fix
     const unrelated = await asUser(CAROL, `select report_id from public.create_behavior_report('profile','${BOB}','spam',null)`);
     await db.exec(`insert into public.push_subscriptions values ('https://synthetic.test/push','${ALICE}','key','secret',now());
       insert into auth.sessions values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','${ALICE}');
+      insert into public.mobile_push_devices(installation_id,user_id,session_id,device_token,environment)
+        values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc','${ALICE}','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('ab',32),'sandbox');
+      insert into public.mobile_push_jobs(installation_id,message_id)
+        values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',${c.other});
       insert into auth.identities values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','${ALICE}');
       insert into auth.refresh_tokens(user_id,session_id) values ('${ALICE}','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
       insert into public.admin_audit_log(actor_id,action,target,details) values ('${BOB}','staff.grant_admin','${ALICE}','{"email":"alice@wisc.edu"}');
@@ -78,6 +82,8 @@ describe("永久注销完整迁移链与真实权限（简化 Auth／Storage fix
       (select count(*)::int from auth.refresh_tokens where user_id='${ALICE}') as refresh,
       (select count(*)::int from auth.audit_log_entries) as auth_audit`);
     expect(counts.rows).toEqual([{ auth: 0, profile: 0, requests: 0, push: 0, refresh: 0, auth_audit: 0 }]);
+    expect((await db.query("select * from public.mobile_push_devices")).rows).toEqual([]);
+    expect((await db.query("select * from public.mobile_push_jobs")).rows).toEqual([]);
     expect((await db.query(`select sender_id,body,client_message_id,deleted_at is not null as deleted from public.messages where id=${c.own}`)).rows)
       .toEqual([{ sender_id: null, body: "[消息已删除]", client_message_id: null, deleted: true }]);
     expect((await asUser(BOB, `select body from public.messages where id=${c.other}`)).rows).toEqual([{ body: "Bob original body" }]);

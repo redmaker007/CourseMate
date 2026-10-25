@@ -25,4 +25,5 @@ export const mobileAuthApi = createMobileAuthApi({
   }),
   onFriendRequestSent: scheduleFriendRequestPush,
   onDirectMessageSent: scheduleDirectMessagePush,
+  getPushEnvironment: () => serverEnv.apns?.environment,
 });

@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-10-26：iOS 私信推送 Ticket 7 本地实现，待阶段 review
+
+用户选择 A：直接调用 Apple APNs，沿用阶段 3 当前推理设置。阶段基线 `fe4b72c`，本票起点 `3da1bbe`，在隔离工作树 `tmp/app-readiness` 的 `feature/mobile-auth-api` 实施，起点 clean；原根工作区其他功能改动未纳入。新增第 30 条迁移 `202610260002_mobile_push.sql`：受控设备绑定、消息事务队列、资格复查、租约／退避／失效处理及注销级联；与网页 VAPID 记录分开，不改变聊天写权限。
+
+移动设备 PUT／DELETE、退出先解绑再撤销、APNs HTTP/2＋ES256、固定发送者＋“发来一条消息”提示及独立秘密保护的恢复入口已接线，无新增依赖。前端页面、注册／接收／冷启动／账号切换和运维调度要求见 [原生推送交接](handoffs/mobile-push-api.md)。未手写 database.ts，目标迁移后仍须 CLI 重新生成。
+
+本次 `npm test` 110 文件／805 项通过 → build → lint → typecheck 通过；首次 build 发现环境字面量类型推导问题，修正后通过。数据库验证完整 30 条迁移和注销级联；发送器为真实本地 HTTP/2／临时 P-256 签名验证，HTTP 为真实 Supabase SDK 模拟网络。本地生产构建另验证 HTTP 边界 10 项；发现并修正 Next 空 POST 流被误报 400，定向回归与重新构建／lint／typecheck 通过，真实 HTTP 复查通过。单票轻量检查不代表阶段 3 审查或真机验收通过。
+
+未提供／使用真实 Apple 凭据，未向 APNs 发真实通知、应用远程迁移、购买服务、配置线上恢复 cron 或 push／合并／部署。托管 Auth／PostgreSQL 并发、真机通知／缓存／退出／注销联调及调度启用待办；APNs 接受不等于到达，在途通知无法保证撤回，离线不可达设备可能无提示。Ticket 1 延期不变，Ticket 8–10 未实施。下方历史“Ticket 7 未实施”以本节为准；接下来仅做阶段 3 双轴 review。
+
 ## 2026-10-26：永久注销 Ticket 6 已实现，待阶段 review
 
 基于 `fe4b72c` 在隔离工作树 `tmp/app-readiness`、分支 `feature/mobile-auth-api` 实施阶段 3 的 Ticket 6；起点 clean，用户回复“开始”后按当前设置继续。用户两项选择均为 A：默认清理相关举报正文／身份，明确保留例外另定；一次事务删除，失败整体回滚并支持回执查询／重试。[数据清单](handoffs/account-deletion-design.md)先基于原 28 条迁移核查；现新增第 29 条迁移 `202610260001_permanent_account_deletion.sql`，不手改生成的数据库类型，新 RPC 目前使用模块内窄调用端口，目标迁移后仍须 CLI 重新生成类型。

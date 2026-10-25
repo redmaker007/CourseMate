@@ -21,6 +21,7 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
   let memberFailure: boolean;
   let refreshFailure: string | null;
   let logoutFailure: boolean;
+  let unbindFailure: boolean;
   let profileExists: boolean;
   let saved: Record<string, unknown> | null;
   let otpStatus: number;
@@ -31,6 +32,7 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
     memberFailure = false;
     refreshFailure = null;
     logoutFailure = false;
+    unbindFailure = false;
     profileExists = false;
     saved = null;
     otpStatus = 200;
@@ -59,6 +61,8 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
               }
               if (path.endsWith("/user")) return json({ user });
               if (path.endsWith("/logout")) return logoutFailure ? json({ msg: "synthetic failure" }, 503) : new Response(null, { status: 204 });
+              if (path.endsWith("/remove_mobile_push_device")) return unbindFailure ? json({ message: "synthetic failure" }, 503) : json("removed");
+              if (path.endsWith("/register_mobile_push_device")) return json("registered");
               if (path.endsWith("/enabled_school_id_for_email_domain")) return json(body.candidate_domain === "wisc.edu" ? schoolId : null);
               if (path.endsWith("/get_member_context")) return memberFailure ? json({ message: "synthetic database failure" }, 503) : json(memberRows);
               if (path.endsWith("/get_own_profile")) return json(profileExists ? [{ id: userId, display_name: "同学", major: null, grad_year: null, avatar_url: null }] : []);
@@ -74,6 +78,7 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
         });
       },
       getCodec: () => codec,
+      getPushEnvironment: () => "sandbox",
     });
   }
 
@@ -96,6 +101,29 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
     expect(codec.read(body.context)).toEqual({ schoolId, email });
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("设备注册只接受安装标识和原生 token，身份由 Bearer 产生；退出先解绑再撤销会话", async () => {
+    memberRows = [{ ...(memberRows[0] as object), onboarding_complete: true }];
+    const handler = api();
+    const body = { installationId: "22222222-2222-4222-8222-222222222222", deviceToken: "AB".repeat(32) };
+    const registered = await handler(request("push/device", body, token, "PUT"));
+    expect(registered.status).toBe(200);
+    expect(await registered.json()).toEqual({ status: "registered" });
+    expect(calls.find(c => c.path.endsWith("/register_mobile_push_device"))).toMatchObject({ authorization: `Bearer ${token}`,
+      body: { target_installation: body.installationId, target_token: body.deviceToken.toLowerCase(), target_environment: "sandbox" } });
+    for (const extra of [{ recipientId: userId },{ environment: "production" },{ body: "secret" }]) {
+      expect((await handler(request("push/device", { ...body, ...extra }, token, "PUT"))).status).toBe(400);
+    }
+    expect((await handler(request("push/device", body, undefined, "PUT"))).status).toBe(401);
+    expect((await handler(request("push/device", { ...body, deviceToken: "bad" }, token, "PUT"))).status).toBe(400);
+    expect((await handler(request("auth/sign-out", {}, token))).status).toBe(200);
+    const unbind = calls.findIndex(c => c.path.endsWith("/remove_mobile_push_device"));
+    expect(unbind).toBeGreaterThan(-1);
+    expect(calls.findIndex(c => c.path.startsWith("/auth/v1/logout"))).toBeGreaterThan(unbind);
+    calls = []; unbindFailure = true;
+    expect((await handler(request("auth/sign-out", {}, token))).status).toBe(503);
+    expect(calls.some(c => c.path.startsWith("/auth/v1/logout"))).toBe(false);
   });
 
   it.each(["student@gmail.com", "student@sub.wisc.edu", "bad"])('拒绝不合格邮箱 %s，且不发码', async (invalidEmail) => {
