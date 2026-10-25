@@ -19,6 +19,10 @@ export const mobileAuthApi = createMobileAuthApi({
     });
   },
   getCodec: () => createEmailOtpContextCodec(serverEnv.emailOtpContextSecret),
+  getDeletionSecret: () => serverEnv.emailOtpContextSecret,
+  createDeletionAdmin: () => createClient(env.supabaseUrl, serverEnv.accountDeletionServiceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  }),
   onFriendRequestSent: scheduleFriendRequestPush,
   onDirectMessageSent: scheduleDirectMessagePush,
 });

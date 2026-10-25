@@ -6,6 +6,7 @@ import type { Database } from "@/types/database";
 import { handleMobileFriendRequest, mobileFriendMethods, mobileFriendHttpStatus } from "@/features/friends/mobile-api";
 import { handleMobileMessageRequest, mobileMessageMethods, mobileMessageHttpStatus } from "@/features/messages/mobile-api";
 import { handleMobileReportRequest, mobileReportMethods, mobileReportHttpStatus } from "@/features/reporting/mobile-api";
+import { handleMobileDeletionRequest, mobileDeletionMethods, deletionHttpStatus, type DeletionDependencies } from "./account-deletion-api";
 
 import type { createEmailOtpContextCodec } from "./email-otp-context";
 import { createEmailOtpService } from "./email-otp-service";
@@ -24,7 +25,7 @@ const methods: Record<string, string[]> = {
   profile: ["GET", "PATCH"],
 };
 
-type Dependencies = {
+type Dependencies = DeletionDependencies & {
   createClient(accessToken?: string): SupabaseClient<Database>;
   getCodec(): ReturnType<typeof createEmailOtpContextCodec>;
   onFriendRequestSent?(requestId: string): void;
@@ -96,17 +97,23 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const friendMethods = mobileFriendMethods(path);
       const messageMethods = mobileMessageMethods(path);
       const reportMethods = mobileReportMethods(path);
-      const allowed = reportMethods ?? messageMethods ?? friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
+      const deletionMethods = mobileDeletionMethods(path);
+      const allowed = deletionMethods ?? reportMethods ?? messageMethods ?? friendMethods ?? courseMethods ?? (Object.hasOwn(methods, path) ? methods[path] : undefined);
       if (!allowed) return json({ status: "not_found" }, 404);
       if (!allowed.includes(request.method)) return json({ status: "method_not_allowed" }, 405, { allow: allowed.join(", ") });
 
       // 刷新只消费 refreshToken；过期 Bearer 不能覆盖 SDK 刚取得的新会话。
-      const authorization = path === "auth/refresh" ? null : request.headers.get("authorization");
+      const deletionStatus = path === "account/deletion/status";
+      const authorization = path === "auth/refresh" || deletionStatus ? null : request.headers.get("authorization");
       const accessToken = authorization?.match(/^Bearer ([^\s]{1,8192})$/i)?.[1];
       if (authorization && !accessToken) return json({ status: "access_token_invalid" }, 401);
-      const protectedPath = courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
+      const protectedPath = (deletionMethods !== undefined && !deletionStatus) || courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
       if (protectedPath && !accessToken) return json({ status: "authentication_required" }, 401);
       const body = request.method === "GET" ? {} : await readBody(request);
+      if (deletionMethods) {
+        const result = await handleMobileDeletionRequest(request,path,body,accessToken,dependencies);
+        return json(result,deletionHttpStatus(result.status));
+      }
       const codePath = path === "auth/request-code" || path === "auth/verify-code";
       if (codePath && accessToken) {
         const current = await createSupabaseMemberSessionReader(dependencies.createClient(accessToken), accessToken).getMemberSession();

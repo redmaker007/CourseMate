@@ -8,6 +8,9 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const serverEnv = {
+  get accountDeletionServiceRoleKey() {
+    return required("SUPABASE_SERVICE_ROLE_KEY", process.env.SUPABASE_SERVICE_ROLE_KEY);
+  },
   get emailOtpContextSecret() {
     return required(
       "EMAIL_OTP_CONTEXT_SECRET",
@@ -17,7 +20,7 @@ export const serverEnv = {
   /**
    * 网页推送配置。四项缺任何一项都返回 null，推送整体关闭（发送器不动作、资料页不显示开关），
    * 所以代码可以先于密钥发布。SUPABASE_SERVICE_ROLE_KEY 绕过 RLS，只能在 server-only 代码里用，
-   * 且只用来调用 claim_push_targets_* / drop_push_subscription 这几个受限函数。
+   * 此推送客户端只调用 claim_push_targets_* / drop_push_subscription；注销另建隔离客户端调用受控删除／回执 RPC。
    */
   get push() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
