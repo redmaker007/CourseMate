@@ -734,6 +734,66 @@ describe("phase-one full-chain integration", () => {
     ]);
   });
 
+  it("移动消息文本 ID、幂等与缓存重校验沿用真实 RLS，清除／删除／退课不能从 SELECT 绕过", async () => {
+    await database.exec("begin;");
+    try {
+      const direct = await database.query<{ conversation_id: string }>(`
+        select conversation_id from public.direct_conversations
+        where member_low = '${ALICE}' and member_high = '${BOB}'
+      `);
+      const conversationId = direct.rows[0].conversation_id;
+      const first = "9007199254740993";
+      const second = "9007199254740994";
+      const sendId = "a5555555-5555-4555-8555-555555555555";
+      await database.exec(`
+        insert into public.messages (id, conversation_id, sender_id, body, client_message_id)
+        overriding system value values
+          (${first}, '${conversationId}', '${ALICE}', 'cached one', '${sendId}'),
+          (${second}, '${conversationId}', '${BOB}', 'cached two', gen_random_uuid())
+      `);
+      const visibleSql = `select id::text from public.messages
+        where conversation_id = '${conversationId}' and deleted_at is null
+          and id in (${first}, ${second}) order by id`;
+      expect(await asUser(ALICE, visibleSql)).toEqual({ ok: true, rows: [{ id: first }, { id: second }] });
+      expect(await asUser(CAROL, visibleSql)).toEqual({ ok: true, rows: [] });
+      expect(await asUser(ALICE, `select result_status, message_id::text from public.send_conversation_message('${conversationId}', 'cached one', '${sendId}')`))
+        .toEqual({ ok: true, rows: [{ result_status: "sent", message_id: first }] });
+      expect(await asUser(ALICE, `select result_status from public.send_conversation_message('${conversationId}', 'changed', '${sendId}')`))
+        .toEqual({ ok: true, rows: [{ result_status: "idempotency_conflict" }] });
+      expect(await asUser(ALICE, `select public.clear_direct_conversation('${conversationId}', ${first}) as status`))
+        .toEqual({ ok: true, rows: [{ status: "updated" }] });
+      expect(await asUser(ALICE, visibleSql)).toEqual({ ok: true, rows: [{ id: second }] });
+      expect(await asUser(BOB, visibleSql)).toEqual({ ok: true, rows: [{ id: first }, { id: second }] });
+      // 旧发送 RPC 仍确认幂等消息存在；移动入口必须用上面的 RLS 可见性过滤其回执正文。
+      expect(await asUser(ALICE, `select result_status, message_id::text from public.send_conversation_message('${conversationId}', 'cached one', '${sendId}')`))
+        .toEqual({ ok: true, rows: [{ result_status: "sent", message_id: first }] });
+      await asUser(BOB, `select public.set_member_blocked('${ALICE}', true)`);
+      expect(await asUser(ALICE, `select result_status from public.send_conversation_message('${conversationId}', 'blocked', gen_random_uuid())`))
+        .toEqual({ ok: true, rows: [{ result_status: "not_allowed" }] });
+      expect(await asUser(ALICE, visibleSql)).toEqual({ ok: true, rows: [{ id: second }] });
+      // 这里只验证既有 deleted_at 对重新校验的作用，不实施 Ticket 6 的注销流程。
+      await database.exec(`update public.messages set deleted_at = clock_timestamp() where id = ${second}`);
+      expect(await asUser(ALICE, visibleSql)).toEqual({ ok: true, rows: [] });
+
+      const courseId = "a4444444-4444-4444-8444-444444444444";
+      await database.exec(`insert into public.courses (id, school_id, code, title, term)
+        select '${courseId}', 'uw-madison', 'SYNC 901', 'Mobile sync fixture', current_term
+        from public.school_term_settings where school_id = 'uw-madison'`);
+      expect((await asUser(ALICE, `insert into public.course_members (course_id) values ('${courseId}')`)).ok).toBe(true);
+      const link = await database.query<{ conversation_id: string }>(`select conversation_id from public.course_conversations where course_id = '${courseId}'`);
+      const courseConversation = link.rows[0].conversation_id;
+      const sent = await asUser(ALICE, `select result_status from public.send_conversation_message('${courseConversation}', 'course body', gen_random_uuid())`);
+      expect(sent).toEqual({ ok: true, rows: [{ result_status: "sent" }] });
+      const courseSql = `select body from public.messages where conversation_id = '${courseConversation}' and deleted_at is null`;
+      expect(await asUser(CAROL, courseSql)).toEqual({ ok: true, rows: [] });
+      expect(await asUser(ALICE, courseSql)).toEqual({ ok: true, rows: [{ body: "course body" }] });
+      expect((await asUser(ALICE, `delete from public.course_members where course_id = '${courseId}' and user_id = '${ALICE}'`)).ok).toBe(true);
+      expect(await asUser(ALICE, courseSql)).toEqual({ ok: true, rows: [] });
+    } finally {
+      await database.exec("reset role; rollback;");
+    }
+  });
+
   it("完整迁移后仍允许成员完成 onboarding 并更新受列权限保护的资料", async () => {
     const inserted = await asUser(
       INCOMPLETE,

@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
 import { serverEnv } from "@/lib/server-env";
 import type { Database } from "@/types/database";
-import { scheduleFriendRequestPush } from "@/features/push/schedule";
+import { scheduleFriendRequestPush, scheduleDirectMessagePush } from "@/features/push/schedule";
 
 import { createEmailOtpContextCodec } from "./email-otp-context";
 import { createMobileAuthApi } from "./mobile-api";
@@ -20,4 +20,5 @@ export const mobileAuthApi = createMobileAuthApi({
   },
   getCodec: () => createEmailOtpContextCodec(serverEnv.emailOtpContextSecret),
   onFriendRequestSent: scheduleFriendRequestPush,
+  onDirectMessageSent: scheduleDirectMessagePush,
 });
