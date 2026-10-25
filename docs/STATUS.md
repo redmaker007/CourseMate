@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-10-25：移动 API 阶段 2 后端实现及双轴代码审查完成
+
+阶段 2 的 Tickets 2–5（课程、好友、消息、举报）已完成本地后端实现与详细前端交接；不是原生客户端或完整联合验收完成。基线 `bd1d557` → 初审 `67d22bd`，24 个阶段文件及必要调用者由两个独立 reviewer 分别审查 Standards 和 Spec。两轴各发现同一项 P2：大写会话 UUID 可成功发送却因回执字符串比较误报 503，clientMessageId 大小写也可能妨碍 pending 匹配。
+
+修复提交 `a0da6294d82fd4c424144c5a6f43b7ac29278af8`：移动消息入口校验后统一两种 UUID 为小写；保留身份／目标验证与当前 RLS 可见性检查。先新增失败回归再修复，3 文件／34 项定向通过；两轴均完成指纹核对和针对性复查，原 P2 解决，无其他新增阻塞。最终 `npm test` 105 文件／768 项通过 → build → lint → typecheck 依次通过。版本、两轴报告、快照／指纹与未验收边界见 [阶段审查记录](handoffs/mobile-stage-two-review-20261025.md)。以下各票“待阶段 review”为当时记录，以本节为最新结论。
+
+仍待真实账号、iOS 页面／本机缓存、托管 PostgreSQL 多连接竞态、推送实际投递与运营处置验收；课程消息举报、过滤、审核响应／公开联系渠道、跨目标限流及证据保留政策的发布缺口见 [举报交接](handoffs/mobile-reporting-api.md)。Ticket 1 延期及首次验码失败分类遗留继续保留；永久注销／证据清理和原生推送分别属于 Ticket 6／7。未 push、合并、部署或写远程业务数据；阶段边界交接，不自动进入 Ticket 6。
+
 ## 2026-10-25：移动举报 Ticket 5 已实现，待阶段 review
 
 基于 `344f328` 在 `feature/mobile-auth-api` 的隔离工作树新增 `POST /api/mobile/v1/reports`，复用既有举报服务、目标权限与受控 RPC。只接受目标类型／ID、原因和说明；身份来自 Bearer，证据与被举报人由数据库推导。UUID 归一、bigint 字符串精度、pending 重试、畸形响应和私密错误均有检查；不新增迁移、依赖、审核权限、处罚或限流政策。详见 [移动举报交接](handoffs/mobile-reporting-api.md)。
