@@ -124,7 +124,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       }
       // 发码／验码用独立匿名实例，不能让旧 Bearer 覆盖新验证出的身份。
       const supabase = dependencies.createClient(codePath ? undefined : accessToken);
-      const reader = createSupabaseMemberSessionReader(supabase, codePath ? undefined : accessToken);
+      const reader = createSupabaseMemberSessionReader(supabase, codePath ? undefined : accessToken, true);
       const readMember = async () => {
         const member = await reader.getMemberContext();
         if (!member) throw new RequestFailure("membership_denied", 403);
@@ -153,10 +153,24 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       };
 
       if (path === "auth/request-code" || path === "auth/verify-code") {
+        const auth = createSupabaseEmailOtpAuth(supabase);
+        let otpVerified = false, membershipDenied = false;
         const service = createEmailOtpService({
-          auth: createSupabaseEmailOtpAuth(supabase),
+          auth: {
+            ...auth,
+            async verifyCode(email, code) {
+              const result = await auth.verifyCode(email, code);
+              otpVerified = result.status === "verified";
+              return result;
+            },
+          },
           schools: createSupabaseSchoolDirectory(supabase),
-          memberSession: { hasValidMemberSession: async () => (await reader.getMemberSession()) !== null },
+          memberSession: { hasValidMemberSession: async () => {
+            const valid = (await reader.getMemberSession()) !== null;
+            // 共享网页 service 仍清理临时会话；移动入口额外保留明确拒绝与读取故障的区别。
+            if (otpVerified && !valid) membershipDenied = true;
+            return valid;
+          } },
         });
         if (path === "auth/request-code") {
           const input = fields(body, ["schoolId", "email"]);
@@ -170,6 +184,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         const context = dependencies.getCodec().read(input.context);
         if (!context) return json({ status: "invalid_or_expired_context" }, 400);
         const result = await service.verifyEmailCode(context.schoolId, context.email, input.code);
+        if (membershipDenied) return json({ status: "membership_denied" }, 403);
         if (result.status !== "signed_in") return json(result, resultHttpStatus(result.status));
         try { return await sessionReply("signed_in", await readMember()); }
         catch (error) {

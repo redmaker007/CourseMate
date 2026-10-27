@@ -172,10 +172,30 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
     for (const rows of [[], [{ ...(memberRows[0] as object), user_id: schoolId }]]) {
       memberRows = rows;
       const response = await api()(request("auth/verify-code", { context: codec.issue({ schoolId, email }), code: "123456" }));
-      expect(response.status).toBe(503);
+      expect(response.status).toBe(403);
+      expect((await response.clone().json()).status).toBe("membership_denied");
       expect((await response.json()).session).toBeUndefined();
     }
     expect(calls.filter((call) => call.path === "/auth/v1/logout?scope=local")).toHaveLength(2);
+  });
+
+  it("首次验码后成员读取临时失败仍返回 503，并撤销临时会话而不交付凭据", async () => {
+    memberFailure = true;
+    const response = await api()(request("auth/verify-code", { context: codec.issue({ schoolId, email }), code: "123456" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ status: "temporarily_unavailable" });
+    expect(calls.some(call => call.path === "/auth/v1/logout?scope=local")).toBe(true);
+  });
+
+  it("首次验码后畸形成员响应属于临时故障，不能误锁为已确认成员无效", async () => {
+    const malformedResponses = [null, {}, [{ user_id: userId, home_school_id: schoolId }], [null], [false], [0], [""], [[]]];
+    for (const malformed of malformedResponses) {
+      memberRows = malformed as unknown[];
+      const response = await api()(request("auth/verify-code", { context: codec.issue({ schoolId, email }), code: "123456" }));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ status: "temporarily_unavailable" });
+    }
+    expect(calls.filter(call => call.path === "/auth/v1/logout?scope=local")).toHaveLength(malformedResponses.length);
   });
 
   it("Cookie 不能代替 Bearer，缺失及错误令牌不访问成员数据", async () => {

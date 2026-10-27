@@ -113,11 +113,15 @@ end; $$;
 
 create function public.enqueue_mobile_direct_push()
 returns trigger language plpgsql security definer set search_path = '' as $$
+declare recipient uuid;
 begin
-  if exists(select 1 from public.direct_conversations where conversation_id=new.conversation_id) then
+  select case when new.sender_id=c.member_low then c.member_high else c.member_low end into recipient
+    from public.direct_conversations c where c.conversation_id=new.conversation_id
+      and new.sender_id in(c.member_low,c.member_high);
+  if recipient is not null then
     insert into public.mobile_push_jobs(installation_id,message_id)
     select d.installation_id,new.id from public.mobile_push_devices d
-      where public.mobile_push_eligible(new.id,d.installation_id)
+      where d.user_id=recipient and public.mobile_push_eligible(new.id,d.installation_id)
     on conflict do nothing;
   end if;
   return new;

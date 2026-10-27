@@ -109,6 +109,7 @@ export function createSupabaseMemberSession(
 export function createSupabaseMemberSessionReader(
   supabase: CourseMateSupabaseClient,
   accessToken?: string,
+  validateMemberResponse = Boolean(accessToken),
 ) {
   const data: MemberSessionDataPort = {
     async getVerifiedUser() {
@@ -144,12 +145,12 @@ export function createSupabaseMemberSessionReader(
       if (error) throw error;
 
       // 移动入口不能把畸形服务响应当成已确认准入失效，避免误锁本地缓存。
-      if (accessToken && (!Array.isArray(data) || data.length > 1)) {
+      if (validateMemberResponse && (!Array.isArray(data) || data.length > 1)) {
         throw new Error("Invalid member context response");
       }
       const row = Array.isArray(data) ? data[0] : null;
-      if (accessToken && row && (
-        typeof row.user_id !== "string" ||
+      if (validateMemberResponse && data?.length === 1 && (
+        !row || typeof row !== "object" || Array.isArray(row) || typeof row.user_id !== "string" ||
         typeof row.home_school_id !== "string" ||
         !(row.enabled_school_id === null || typeof row.enabled_school_id === "string") ||
         !(row.current_school_id === null || typeof row.current_school_id === "string") ||

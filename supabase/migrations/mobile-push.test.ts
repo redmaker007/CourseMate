@@ -81,6 +81,21 @@ it("相同绑定的登记重试保留 pending／retry 任务，真正轮换 toke
   expect((await db.query("select * from public.mobile_push_jobs")).rows).toEqual([]);
 });
 
+it("私信入队只检查接收人设备，不对无关账号设备逐一复验", async () => {
+  const m = await message();
+  const unrelated = "55555555-5555-4555-8555-555555555555";
+  await db.exec(`insert into public.mobile_push_devices(installation_id,user_id,session_id,device_token,environment)
+    values('${unrelated}','${A}','${SESSION}',repeat('cd',32),'sandbox')`);
+  const definition = (await db.query<{ definition: string }>("select pg_get_functiondef('public.mobile_push_eligible(bigint,uuid)'::regprocedure) as definition")).rows[0].definition;
+  // 在真实资格函数入口注入探针：触发器一旦检查无关安装，测试即失败；finally 恢复。
+  const probe = definition.replace(/\bbegin\b/i, `begin if target_installation='${unrelated}'::uuid then raise exception 'unrelated_device_checked'; end if;`);
+  await db.exec(probe);
+  try {
+    const sent = await user(A, `select message_id::text from public.send_conversation_message('${m.conversation}','next private body',gen_random_uuid())`);
+    expect((await db.query(`select installation_id from public.mobile_push_jobs where message_id=${sent[0].message_id}`)).rows).toEqual([{ installation_id: DEVICE }]);
+  } finally { await db.exec(definition); }
+});
+
 it.each(["hide", "block", "session", "expired_session", "clear", "school", "delete"])("投递前重新校验 %s，不向已失去资格的目标发送", async change => {
   const m = await message();
   if (change === "hide") await user(B, `select * from public.set_friend_hidden('${A}',true)`);
