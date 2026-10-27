@@ -13,6 +13,8 @@
 
 未验证：经 HTTP 接口走真实邮箱 OTP 的完整注销流程、生产库迁移、APNs 真机推送。
 
+**测试库结构核对（2026-10-27）**：CourseMate-test 的迁移历史含仓库全部 30 条（另有一条 `20260915051655` 版本号对齐记录）；按仓库迁移逐项核对，应有的 34 张表、全部函数和 15 个触发器都在，RLS 策略 24 条，与生产相同。测试库比生产多出网页推送（`202610040001`）和本次两条迁移，生产库最新是 `202610050002`。未核对 Auth 配置（准入 Hook、SMTP、令牌时长），以 2026-10-25 条目为准。
+
 ## 2026-10-27：App 分支严格 PR 审查与交接
 
 按用户要求对最新 main `e4be133` → `56fca3e` 的整条 App 分支重新独立审查，覆盖 Tickets 1–7、14 提交和 54 个路径。Standards 发现两项 P2，Spec 独立发现其中认证分类项：首次验码明确拒绝混为503，以及私信入队全站扫描设备。`fae4ff1` 已修复；OTP 入口完整区分明确拒绝403、异常／八类畸形响应503，网页默认不变；入队先筛数据库推导的接收者设备，再保留原资格复验。最终两轴针对性复查通过。
@@ -187,11 +189,16 @@ Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接�
 1. **PWA 真机验收**：Android Chrome 与 iPhone Safari 各走一遍安装、独立窗口、断网离线页、刘海屏底栏、键盘弹出时聊天输入框、退出再登录；临时图标（靛蓝底白色 C）换成设计提供的正式图标。
 2. **Figma 界面登录后走查**：用真实验证码把各页点一遍（两栏「消息与好友」、深色模式、课程群聊回车发送）。「最后一条消息预览与时间」需要新增数据库函数，并遵守清除历史与拉黑规则，涉及权限，先出方案再做。
 3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——应用迁移 `202610040001`、补登记迁移历史、重新生成 `src/types/database.ts`；本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
-4. **丹尼的课程截图识别（`feature/issue-50-course-image-recognition`，Issues #50–54）**：先开 PR 并由另一位协作者审核；`SUPABASE_SERVICE_ROLE_KEY` 的读取位置统一到 `src/lib/server-env.ts`（他放在 `src/lib/env.ts`），与推送共用；确认学生选课截图发给 Google 的隐私说明；#54（真实截图基准与发布保护，`needs-info`）缺样本；发布顺序是先应用迁移 `202609300001`、再配 `GOOGLE_CLOUD_VISION_API_KEY`、最后发前端。
-5. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并（见顶部 2026-10-27 条目，生产未迁移）；「HTTP API 还是直连 Supabase SDK」尚未定案。
-6. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
-7. **此前遗留**（仍然有效）：迁移 `202609260001` 登记到迁移历史表；测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份；本地 `supabase/.temp/project-ref` 仍指向旧项目；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
-8. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
+4. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并（见顶部 2026-10-27 条目，生产未迁移）；「HTTP API 还是直连 Supabase SDK」尚未定案。
+5. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
+6. **此前遗留**（仍然有效）：迁移 `202609260001` 登记到迁移历史表；测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份；本地 `supabase/.temp/project-ref` 仍指向旧项目；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
+7. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
+
+## 日后再谈
+
+以下事项 2026-10-27 主开发者决定暂缓，不在当前排期内；重新启动前先核对分支与 main 的差异。
+
+- **丹尼的课程截图识别**（`feature/issue-50-course-image-recognition`，Issues #50–54，未开 PR）：先开 PR 并由另一位协作者审核；`SUPABASE_SERVICE_ROLE_KEY` 的读取位置统一到 `src/lib/server-env.ts`（他放在 `src/lib/env.ts`），与推送共用；确认学生选课截图发给 Google 的隐私说明；#54（真实截图基准与发布保护，`needs-info`）缺样本；发布顺序是先应用迁移 `202609300001`、再配 `GOOGLE_CLOUD_VISION_API_KEY`、最后发前端。
 
 ## 如何更新
 
