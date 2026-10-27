@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-10-27：App 分支严格 PR 审查与交接
+
+按用户要求对最新 main `e4be133` → `56fca3e` 的整条 App 分支重新独立审查，覆盖 Tickets 1–7、14 提交和 54 个路径。Standards 发现两项 P2，Spec 独立发现其中认证分类项：首次验码明确拒绝混为503，以及私信入队全站扫描设备。`fae4ff1` 已修复；OTP 入口完整区分明确拒绝403、异常／八类畸形响应503，网页默认不变；入队先筛数据库推导的接收者设备，再保留原资格复验。最终两轴针对性复查通过。
+
+本轮最终 `npm test` 110 文件／809 项 → build → lint → typecheck 全通过；本地生产构建 HTTP 边界10项通过，未触发真实OTP／消息／APNs／注销。完整证据、各轴实际运行范围和指纹见 [严格审查](handoffs/mobile-strict-review-20261027.md)，前端／部署／测试配合见 [PR交接](handoffs/mobile-backend-pr-handoff-20261027.md)。以下旧结果按原日期保留。
+
+已授权准备 feature 分支push和PR，不合并main。目标测试库迁移／类型生成、真实托管／并发／APNs／iPhone、客户端缓存和恢复cron仍待验收；永久删除不可逆。Ticket8–10与真实环境验收不因此勾选完成。
+
 ## 2026-10-26：阶段 3 后端代码审查及修复复查完成
 
 Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接及独立 Standards／Spec 两轴审查。阶段基线 `fe4b72c` → 初审 `f0fa83b`，28 路径快照／指纹核对。Standards 发现同绑定登记会无条件清掉 pending／retry 通知的 P2；`cba0ee4` 修复为仅账号／会话／token／环境实际改变才清旧任务，同绑定重试保留队列。两轴分别针对性复查通过，无新增确认问题。

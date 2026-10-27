@@ -7,6 +7,7 @@
 - 只需了解项目：根目录 [CONTEXT.md](../CONTEXT.md) 与 [STATUS.md](STATUS.md)。
 - 修改或排障：下面对应的一行 → 相关 ADR → 代码入口及相邻测试；追查原因时再打开 handoff。
 - 运维操作：直接打开根目录 [README 的操作手册索引](../README.md#操作手册)中对应的一份；涉及多个步骤时再沿链接扩展。
+- 原生 App 后端 PR 接手：读 [PR 交接](handoffs/mobile-backend-pr-handoff-20261027.md) 与 [严格审查记录](handoffs/mobile-strict-review-20261027.md)，再按模块打开逐票接口文档。
 - 接手 Issue：先读该 Issue 的最新正文与评论，再使用本表定位；不批量加载所有历史工单。
 
 ## 按任务定位
