@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_receipts: {
+        Row: {
+          completed_at: string
+          receipt_hash: string
+        }
+        Insert: {
+          completed_at?: string
+          receipt_hash: string
+        }
+        Update: {
+          completed_at?: string
+          receipt_hash?: string
+        }
+        Relationships: []
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -80,7 +95,7 @@ export type Database = {
           details: string | null
           id: string
           reason: string
-          reporter_id: string
+          reporter_id: string | null
           status: string
           target_id: string
           target_type: string
@@ -90,7 +105,7 @@ export type Database = {
           details?: string | null
           id?: string
           reason: string
-          reporter_id: string
+          reporter_id?: string | null
           status?: string
           target_id: string
           target_type: string
@@ -100,7 +115,7 @@ export type Database = {
           details?: string | null
           id?: string
           reason?: string
-          reporter_id?: string
+          reporter_id?: string | null
           status?: string
           target_id?: string
           target_type?: string
@@ -821,6 +836,89 @@ export type Database = {
           },
         ]
       }
+      mobile_push_devices: {
+        Row: {
+          device_token: string
+          environment: string
+          installation_id: string
+          session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          device_token: string
+          environment: string
+          installation_id: string
+          session_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          device_token?: string
+          environment?: string
+          installation_id?: string
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mobile_push_devices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      mobile_push_jobs: {
+        Row: {
+          attempts: number
+          available_at: string
+          created_at: string
+          id: string
+          installation_id: string
+          lease_id: string | null
+          message_id: number
+          state: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          id?: string
+          installation_id: string
+          lease_id?: string | null
+          message_id: number
+          state?: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          created_at?: string
+          id?: string
+          installation_id?: string
+          lease_id?: string | null
+          message_id?: number
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mobile_push_jobs_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_push_devices"
+            referencedColumns: ["installation_id"]
+          },
+          {
+            foreignKeyName: "mobile_push_jobs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_roles: {
         Row: {
           created_at: string
@@ -888,23 +986,70 @@ export type Database = {
           },
         ]
       }
+      push_dispatches: {
+        Row: {
+          created_at: string
+          event_key: string
+        }
+        Insert: {
+          created_at?: string
+          event_key: string
+        }
+        Update: {
+          created_at?: string
+          event_key?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth_secret: string
+          created_at: string
+          endpoint: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth_secret: string
+          created_at?: string
+          endpoint: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth_secret?: string
+          created_at?: string
+          endpoint?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       report_evidence: {
         Row: {
           captured_at: string
           report_id: string
-          reported_user_id: string
+          reported_user_id: string | null
           snapshot: Json
         }
         Insert: {
           captured_at?: string
           report_id: string
-          reported_user_id: string
+          reported_user_id?: string | null
           snapshot: Json
         }
         Update: {
           captured_at?: string
           report_id?: string
-          reported_user_id?: string
+          reported_user_id?: string | null
           snapshot?: Json
         }
         Relationships: [
@@ -1142,6 +1287,33 @@ export type Database = {
         Args: { target_conversation: string }
         Returns: boolean
       }
+      claim_mobile_push_jobs: {
+        Args: { batch_size?: number; target_environment?: string }
+        Returns: {
+          conversation_id: string
+          device_token: string
+          job_id: string
+          lease: string
+          recipient_id: string
+          sender_name: string
+        }[]
+      }
+      claim_push_targets_for_direct_message: {
+        Args: { target_message_id: number }
+        Returns: {
+          auth_secret: string
+          endpoint: string
+          p256dh: string
+        }[]
+      }
+      claim_push_targets_for_friend_request: {
+        Args: { target_request_id: string }
+        Returns: {
+          auth_secret: string
+          endpoint: string
+          p256dh: string
+        }[]
+      }
       clear_direct_conversation: {
         Args: { target_conversation_id: string; through_message_id: number }
         Returns: string
@@ -1167,6 +1339,10 @@ export type Database = {
       direct_message_clear_position: {
         Args: { target_conversation_id: string }
         Returns: number
+      }
+      drop_push_subscription: {
+        Args: { target_endpoint: string }
+        Returns: undefined
       }
       effective_member_school_id: {
         Args: { target_user: string }
@@ -1199,8 +1375,16 @@ export type Database = {
           shared_courses: Json
         }[]
       }
+      finish_mobile_push_job: {
+        Args: { outcome: string; target_job: string; target_lease: string }
+        Returns: string
+      }
       friend_relationship_status: {
         Args: { target_member_id: string }
+        Returns: string
+      }
+      get_account_deletion_receipt: {
+        Args: { receipt_digest: string }
         Returns: string
       }
       get_course_room: {
@@ -1365,6 +1549,14 @@ export type Database = {
         Args: { first_member: string; second_member: string }
         Returns: boolean
       }
+      mobile_push_eligible: {
+        Args: { target_installation: string; target_message: number }
+        Returns: boolean
+      }
+      permanently_delete_member: {
+        Args: { receipt_digest: string; target_user: string }
+        Returns: string
+      }
       preview_direct_message_cleanup: {
         Args: { evaluation_time?: string; requested_batch_size?: number }
         Returns: {
@@ -1373,7 +1565,23 @@ export type Database = {
           message_ids: number[]
         }[]
       }
+      register_mobile_push_device: {
+        Args: {
+          target_environment?: string
+          target_installation: string
+          target_token: string
+        }
+        Returns: string
+      }
       remove_friend: { Args: { target_member_id: string }; Returns: string }
+      remove_mobile_push_device: {
+        Args: { target_installation?: string }
+        Returns: string
+      }
+      remove_push_subscription: {
+        Args: { target_endpoint: string }
+        Returns: string
+      }
       require_platform_role: { Args: { minimum_role: string }; Returns: string }
       respond_to_friend_request: {
         Args: { decision: string; target_request_id: string }
@@ -1391,6 +1599,14 @@ export type Database = {
           message_ids: number[]
           result_status: string
         }[]
+      }
+      save_push_subscription: {
+        Args: {
+          target_auth: string
+          target_endpoint: string
+          target_p256dh: string
+        }
+        Returns: string
       }
       send_conversation_message: {
         Args: {

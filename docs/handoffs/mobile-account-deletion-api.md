@@ -103,7 +103,7 @@ not_completed 表示“尚未确认完成”，可能是未执行、已回滚或
 
 服务端需要 SUPABASE_SERVICE_ROLE_KEY 和至少 32 字符的 EMAIL_OTP_CONTEXT_SECRET；注销独立于 VAPID 是否配置。两种管理用途使用隔离客户端，不向 App、日志或 Notion 暴露管理密钥。旧环境不配置管理密钥时本功能返回 503，不改变原登录／课程／好友／消息接口。
 
-2026-10-27 只读核对生产库（CourseMate-east）：`postgres` 对 `auth.users`／`auth.sessions`／`auth.refresh_tokens`／`auth.audit_log_entries`／`storage.objects` 均有 DELETE 权限，且没有引用 `auth.users` 的 RESTRICT／NO ACTION 外键；权限层面不会挡住注销事务。真实删除一个测试账号仍待执行。
+2026-10-27 只读核对生产库（CourseMate-east）：`postgres` 对 `auth.users`／`auth.sessions`／`auth.refresh_tokens`／`auth.audit_log_entries`／`storage.objects` 均有 DELETE 权限，且没有引用 `auth.users` 的 RESTRICT／NO ACTION 外键；权限层面不会挡住注销事务。同日在托管测试库 CourseMate-test 以 `service_role` 实际注销合成测试账号通过，结果见 [STATUS](../STATUS.md)；经 HTTP 的真实邮箱 OTP 流程仍待联调。
 
 先确认外部副本处理 → 完整迁移链在匹配的测试环境验证 → 应用新迁移及权限 → 由 CLI 重新生成数据库类型 → 发布后端配置 → 前端按本文件接入及真机验收。此次未改写生成的 database.ts，新 RPC 使用模块内窄调用端口；重新生成尚待目标数据库可用时进行。此顺序不授权远端迁移或真实账号删除。
 

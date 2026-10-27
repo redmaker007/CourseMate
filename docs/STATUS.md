@@ -7,7 +7,11 @@
 - **注销时举报改为匿名保留**（取代原“默认清除”）：`202610260001` 不再删除相关举报三表，改为置空本人 ID、去掉资料快照、资料举报目标改为 `deleted:<report_id>`；`reporter_id`／`reported_user_id` 改为可空。规则见 [注销接口交接](handoffs/mobile-account-deletion-api.md)。
 - **推送入队出错不影响发消息**：`202610260002` 的 `enqueue_mobile_direct_push` 捕获异常后只发 warning 并跳过入队。
 
-另只读核对生产库权限：`postgres` 能删 `auth` 相关表，没有挡住删除用户的外键。真实测试账号注销、迁移上测试库和重新生成 `database.ts`（两列变为可空，当前代码不读这两列）仍待完成。
+另只读核对生产库权限：`postgres` 能删 `auth` 相关表，没有挡住删除用户的外键。
+
+**托管测试库验证（CourseMate-test，ref `cqrlxcxcgrcoamqnjkwu`，us-west-2）**：已应用 `202610260001`、`202610260002`，迁移记录版本号与仓库文件对齐。用两个合成账号（`deletion-test-a/b@wisc.edu`）走真实 RPC 造好友、私信和三条举报，再以 `service_role` 调用 `permanently_delete_member`：返回 completed；A 的 `auth.users`／identities／sessions／refresh_tokens、成员、资料、推送设备、好友申请全部清除；A 的消息变占位，B 的消息保留；三条举报保留并匿名化，举报三表中查不到 A 的 ID、邮箱或昵称。同回执重放返回 completed，换回执返回 not_available；`service_role` 伪造事务开关改证据被拒。随后注销 B 作清理，举报双方均置空、正文保留；原有 7 个账号未动。测试库留下这三条匿名举报和两条占位消息，属预期。`database.ts` 已从该库重新生成（`PostgrestVersion` 保留原值）。本次 `npm test` 110 文件／810 项 → build → lint → typecheck 全通过。
+
+未验证：经 HTTP 接口走真实邮箱 OTP 的完整注销流程、生产库迁移、APNs 真机推送。
 
 ## 2026-10-27：App 分支严格 PR 审查与交接
 
