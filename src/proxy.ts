@@ -26,6 +26,10 @@ function redirectWithSessionState(url: URL, sessionResponse: NextResponse) {
  * 数据访问仍由各 Server Action / Route Handler 和 Supabase RLS 重新授权，不能只信 Proxy。
  */
 export async function proxy(request: NextRequest) {
+  // 移动入口逐请求验证 Bearer，不能先刷新网站 Cookie 或返回登录 HTML。
+  if (request.nextUrl.pathname.startsWith("/api/mobile/v1/")) {
+    return NextResponse.next();
+  }
   const { response, memberSession } = await updateSession(request);
   const { pathname } = request.nextUrl;
   const access = resolveProtectedAccess(pathname, memberSession);

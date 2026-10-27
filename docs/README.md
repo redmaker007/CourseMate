@@ -7,6 +7,7 @@
 - 只需了解项目：根目录 [CONTEXT.md](../CONTEXT.md) 与 [STATUS.md](STATUS.md)。
 - 修改或排障：下面对应的一行 → 相关 ADR → 代码入口及相邻测试；追查原因时再打开 handoff。
 - 运维操作：直接打开根目录 [README 的操作手册索引](../README.md#操作手册)中对应的一份；涉及多个步骤时再沿链接扩展。
+- 原生 App 后端 PR 接手：读 [PR 交接](handoffs/mobile-backend-pr-handoff-20261027.md) 与 [严格审查记录](handoffs/mobile-strict-review-20261027.md)，再按模块打开逐票接口文档。
 - 接手 Issue：先读该 Issue 的最新正文与评论，再使用本表定位；不批量加载所有历史工单。
 
 ## 按任务定位
@@ -16,6 +17,13 @@
 | 任务 | 首读文档 / 决策 | 代码入口 |
 |---|---|---|
 | OTP、登录、退出、学校准入 | [认证规格](specs/auth-email-otp.md)、[ADR-0001](adr/0001-separate-member-account-from-profile.md)；成员会话本地验签与令牌有效期见 [ADR-0009](adr/0009-verify-access-token-locally.md)；实测验收看 Issue #7 | `src/features/auth/`；`src/lib/supabase/`；`src/proxy.ts` |
+| 原生 App 登录、成员与资料 HTTP 接入 | [移动认证交接](handoffs/mobile-auth-api.md)；沿用上述认证 ADR | `src/app/api/mobile/v1/`；`src/features/auth/mobile-api.ts`；`src/features/auth/production-mobile-api.ts` |
+| 原生 App 搜课、课程列表／详情、加退课与会话入口 | [移动课程交接](handoffs/mobile-courses-api.md)；沿用 ADR-0004／0007 | `src/features/courses/mobile-api.ts`；`supabase-course-search.ts`；`supabase-course-operations.ts` |
+| 原生 App 好友、申请、屏蔽与拉黑 | [移动好友交接](handoffs/mobile-friends-api.md)；沿用 ADR-0006／0008 | `src/features/friends/mobile-api.ts`；`friendship-service.ts`；`supabase-friend-backend.ts` |
+| 原生 App 课程／私聊消息、幂等、清除与缓存恢复 | [移动聊天交接](handoffs/mobile-messages-api.md)；沿用 ADR-0006／0008 | `src/features/messages/mobile-api.ts`；`mobile-message-data.ts`；既有发送／私聊 service 与 RPC |
+| 原生 App 举报、受控证据与安全／发布缺口 | [移动举报交接](handoffs/mobile-reporting-api.md)；沿用既有举报／清理规则 | `src/features/reporting/mobile-api.ts`；`reporting-service.ts`；`supabase-reporting-backend.ts` |
+| 原生 App 永久注销、本人核验、回执与删除同步 | [注销交接](handoffs/mobile-account-deletion-api.md)、[数据清单](handoffs/account-deletion-design.md)；涉及举报／清理及会话 ADR | `src/features/auth/account-deletion-api.ts`；`account-deletion-context.ts`；注销迁移及集成测试 |
+| iOS 私信推送、设备绑定／解绑和恢复调度 | [原生推送交接](handoffs/mobile-push-api.md)；沿用认证／消息与注销边界 | `src/features/push/mobile-api.ts`；`apns.ts`；`mobile-dispatch.ts`；`202610260002_mobile_push.sql` |
 | 资料保存、首次登录卡住 | [ADR-0004](adr/0004-require-profile-onboarding-for-app-access.md)；权限事故见[课程整合交接](handoffs/course-catalog-integration.md)“新成员卡在 onboarding” | `src/features/profile/`；`src/app/onboarding/profile/` |
 | 搜课、加退课、课程消息 | [ADR-0007](adr/0007-lazy-course-conversation-creation.md)、[统一会话交接](handoffs/unified-conversation-core.md)；课程来源见[录入课程](runbooks/seed-courses.md) | `src/features/courses/`；`src/app/(member)/dashboard/`；`src/app/(member)/courses/`；`src/app/api/courses/` |
 | 好友、拉黑、私聊与可靠发送 | [好友页面](handoffs/friend-pages.md)、[第一阶段联调](handoffs/phase-one-integration.md)、[可靠发送验收](testing/issue-23-message-send.md) | `src/features/friends/`；`src/features/messages/`；`src/app/(member)/(inbox)/`（「消息与好友」两栏：左栏列表在 `layout.tsx`，右栏页面在 `src/features/friends/friends-page.tsx`） |

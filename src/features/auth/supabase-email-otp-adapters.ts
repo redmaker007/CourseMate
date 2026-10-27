@@ -108,6 +108,8 @@ export function createSupabaseMemberSession(
 
 export function createSupabaseMemberSessionReader(
   supabase: CourseMateSupabaseClient,
+  accessToken?: string,
+  validateMemberResponse = Boolean(accessToken),
 ) {
   const data: MemberSessionDataPort = {
     async getVerifiedUser() {
@@ -115,7 +117,9 @@ export function createSupabaseMemberSessionReader(
       // 服务器往返一次。代价：令牌被撤销（如别处退出登录）要等它过期才失效，所以
       // Supabase 的 JWT expiry 要保持较短。删除用户仍然立即生效——下面读取成员账号时
       // 会查不到。
-      const { data, error } = await supabase.auth.getClaims();
+      const { data, error } = accessToken
+        ? await supabase.auth.getClaims(accessToken)
+        : await supabase.auth.getClaims();
 
       if (error?.name === "AuthSessionMissingError") return null;
       if (error) throw error;
@@ -140,7 +144,18 @@ export function createSupabaseMemberSessionReader(
 
       if (error) throw error;
 
+      // 移动入口不能把畸形服务响应当成已确认准入失效，避免误锁本地缓存。
+      if (validateMemberResponse && (!Array.isArray(data) || data.length > 1)) {
+        throw new Error("Invalid member context response");
+      }
       const row = Array.isArray(data) ? data[0] : null;
+      if (validateMemberResponse && data?.length === 1 && (
+        !row || typeof row !== "object" || Array.isArray(row) || typeof row.user_id !== "string" ||
+        typeof row.home_school_id !== "string" ||
+        !(row.enabled_school_id === null || typeof row.enabled_school_id === "string") ||
+        !(row.current_school_id === null || typeof row.current_school_id === "string") ||
+        typeof row.onboarding_complete !== "boolean"
+      )) throw new Error("Invalid member context row");
       // 没有成员账号时函数返回零行。形状不对的行也按没有处理，不放行。
       if (
         !row ||
