@@ -125,6 +125,10 @@ begin
     on conflict do nothing;
   end if;
   return new;
+exception when others then
+  -- 推送是附带功能：资格查询或入队出错只跳过推送，不能让消息写入随之失败。
+  raise warning 'mobile push enqueue skipped (%)', sqlstate;
+  return new;
 end; $$;
 create trigger enqueue_mobile_direct_push after insert on public.messages
   for each row execute function public.enqueue_mobile_direct_push();

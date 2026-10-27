@@ -8,6 +8,10 @@ create table public.account_deletion_receipts (
 alter table public.account_deletion_receipts enable row level security;
 revoke all on public.account_deletion_receipts from public, anon, authenticated, service_role;
 
+-- 注销后举报匿名保留：举报人／被举报人 ID 可为空，表示该账号已永久注销。
+alter table public.behavior_reports alter column reporter_id drop not null;
+alter table public.report_evidence alter column reported_user_id drop not null;
+
 create or replace function public.get_account_deletion_receipt(receipt_digest text)
 returns text language plpgsql security definer set search_path = ''
 as $$
@@ -58,12 +62,23 @@ begin
       select id::text from public.friend_requests where target_user in (pair_low, pair_high, requester_id, recipient_id)
     ));
 
-  -- 仅此受控 SECURITY DEFINER 调用可在事务内释放不可变的本人关联材料。
+  -- 相关举报匿名化而非删除：被举报人注销不能顺带抹掉别人对他的举报，举报人注销也不撤回已交的举报。
+  -- 保留原因、说明与证据正文，只去掉指向本人的 ID 和资料快照；仅此受控调用可在事务内改写不可变证据。
   perform set_config('coursemate.account_deletion', 'on', true);
-  delete from public.report_source_retention where report_id = any(related_reports);
-  delete from public.report_evidence where report_id = any(related_reports);
-  delete from public.behavior_reports where id = any(related_reports);
+  update public.report_evidence
+    set reported_user_id = null,
+        snapshot = (snapshot - array['profile_id', 'display_name', 'avatar_url', 'major', 'grad_year'])
+          || '{"subject": "deleted_account"}'::jsonb
+    where report_id = any(related_reports) and reported_user_id = target_user;
+  update public.report_source_retention
+    set source_id = 'deleted:' || report_id::text
+    where report_id = any(related_reports) and source_type = 'profile' and lower(source_id) = target_user::text;
   perform set_config('coursemate.account_deletion', '', true);
+  update public.behavior_reports
+    set reporter_id = case when reporter_id = target_user then null else reporter_id end,
+        target_id = case when target_type = 'profile' and lower(target_id) = target_user::text
+          then 'deleted:' || id::text else target_id end
+    where id = any(related_reports);
 
   -- 必要占位保留 ID／会话顺序，所有本人正文和可识别发送关联都移除。
   update public.messages set sender_id = null, body = '[消息已删除]', deleted_at = coalesce(deleted_at, now()),

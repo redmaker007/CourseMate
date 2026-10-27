@@ -96,6 +96,18 @@ it("私信入队只检查接收人设备，不对无关账号设备逐一复验"
   } finally { await db.exec(definition); }
 });
 
+it("推送资格查询出错只跳过入队，私信照常落库", async () => {
+  const m = await message();
+  const definition = (await db.query<{ definition: string }>("select pg_get_functiondef('public.mobile_push_eligible(bigint,uuid)'::regprocedure) as definition")).rows[0].definition;
+  await db.exec(definition.replace(/\bbegin\b/i, "begin raise exception 'synthetic_push_failure';"));
+  try {
+    const sent = await user(A, `select result_status,message_id::text from public.send_conversation_message('${m.conversation}','still delivered',gen_random_uuid())`);
+    expect(sent[0].result_status).toBe("sent");
+    expect((await db.query(`select body from public.messages where id=${sent[0].message_id}`)).rows).toEqual([{ body: "still delivered" }]);
+    expect((await db.query(`select count(*)::int as count from public.mobile_push_jobs where message_id=${sent[0].message_id}`)).rows).toEqual([{ count: 0 }]);
+  } finally { await db.exec(definition); }
+});
+
 it.each(["hide", "block", "session", "expired_session", "clear", "school", "delete"])("投递前重新校验 %s，不向已失去资格的目标发送", async change => {
   const m = await message();
   if (change === "hide") await user(B, `select * from public.set_friend_hidden('${A}',true)`);

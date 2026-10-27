@@ -59,8 +59,9 @@ async function conversation() {
 describe("永久注销完整迁移链与真实权限（简化 Auth／Storage fixture，不代替托管验证）", () => {
   it("一次提交清本人内容／身份和关联副本，保留他人原消息与稳定占位，随机回执支持重试", async () => {
     const c = await conversation();
-    await asUser(BOB, `select * from public.create_behavior_report('message','${c.own}','harassment',null)`);
-    await asUser(ALICE, `select * from public.create_behavior_report('message','${c.other}','spam',null)`);
+    const against = await asUser(BOB, `select report_id from public.create_behavior_report('message','${c.own}','harassment',null)`);
+    const filed = await asUser(ALICE, `select report_id from public.create_behavior_report('message','${c.other}','spam',null)`);
+    const profile = await asUser(BOB, `select report_id from public.create_behavior_report('profile','${ALICE}','impersonation',null)`);
     const unrelated = await asUser(CAROL, `select report_id from public.create_behavior_report('profile','${BOB}','spam',null)`);
     await db.exec(`insert into public.push_subscriptions values ('https://synthetic.test/push','${ALICE}','key','secret',now());
       insert into auth.sessions values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','${ALICE}');
@@ -87,7 +88,24 @@ describe("永久注销完整迁移链与真实权限（简化 Auth／Storage fix
     expect((await db.query(`select sender_id,body,client_message_id,deleted_at is not null as deleted from public.messages where id=${c.own}`)).rows)
       .toEqual([{ sender_id: null, body: "[消息已删除]", client_message_id: null, deleted: true }]);
     expect((await asUser(BOB, `select body from public.messages where id=${c.other}`)).rows).toEqual([{ body: "Bob original body" }]);
-    expect((await db.query("select id from public.behavior_reports")).rows).toEqual([{ id: unrelated.rows[0].report_id }]);
+    // 相关举报匿名保留：不再含本人 ID 或资料，原因与证据正文仍可供审核。
+    const reports = await db.query<Record<string, unknown>>(`select report.id, report.reporter_id, report.target_id, report.reason,
+        evidence.reported_user_id, evidence.snapshot, retention.source_id
+      from public.behavior_reports report join public.report_evidence evidence on evidence.report_id=report.id
+      join public.report_source_retention retention on retention.report_id=report.id`);
+    const byId = Object.fromEntries(reports.rows.map(row => [row.id, row]));
+    expect(reports.rows).toHaveLength(4);
+    expect(byId[String(against.rows[0].report_id)]).toMatchObject({ reporter_id: BOB, reported_user_id: null, reason: "harassment",
+      snapshot: expect.objectContaining({ body: "Alice private body", subject: "deleted_account" }) });
+    expect(byId[String(filed.rows[0].report_id)]).toMatchObject({ reporter_id: null, reported_user_id: BOB,
+      snapshot: expect.objectContaining({ body: "Bob original body" }) });
+    const anonymizedProfile = byId[String(profile.rows[0].report_id)];
+    expect(anonymizedProfile).toMatchObject({ reporter_id: BOB, reported_user_id: null, reason: "impersonation",
+      target_id: `deleted:${profile.rows[0].report_id}`, source_id: `deleted:${profile.rows[0].report_id}` });
+    expect(anonymizedProfile.snapshot).toEqual({ target_type: "profile", subject: "deleted_account" });
+    expect(byId[String(unrelated.rows[0].report_id)]).toMatchObject({ reporter_id: CAROL, reported_user_id: BOB, target_id: BOB });
+    expect(JSON.stringify(reports.rows)).not.toContain(ALICE);
+    expect(JSON.stringify(reports.rows)).not.toContain("alice@wisc.edu");
     expect((await db.query(`select target,details from public.admin_audit_log`)).rows).toEqual([{ target: null, details: {} }]);
     expect((await asRole("service_role", `select public.get_account_deletion_receipt('${RECEIPT}') as status`)).rows).toEqual([{ status: "completed" }]);
     expect((await db.query("select column_name from information_schema.columns where table_schema='public' and table_name='account_deletion_receipts' order by ordinal_position")).rows)
