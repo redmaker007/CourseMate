@@ -11,11 +11,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 import {
-  createCourseService,
   type CourseCatalogEntry,
   type CourseSearchResult,
 } from "./course-service";
 import type { SyncedCourseMessage } from "./message-sync";
+import { createSupabaseCourseSearch } from "./supabase-course-search";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -68,48 +68,12 @@ function catalogEntry(row: {
   };
 }
 
-async function currentTerm(supabase: SupabaseClient, schoolId: string) {
-  const { data, error } = await supabase
-    .from("school_term_settings")
-    .select("current_term")
-    .eq("school_id", schoolId)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.current_term ?? null;
-}
-
-async function catalogCourses(
-  supabase: SupabaseClient,
-  schoolId: string,
-  term: string,
-) {
-  const pageSize = 500;
-  const courses: CourseCatalogEntry[] = [];
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase
-      .from("courses")
-      .select("id, school_id, code, title, term")
-      .eq("school_id", schoolId)
-      .eq("term", term)
-      .order("code_normalized")
-      .order("id")
-      .range(offset, offset + pageSize - 1);
-    if (error) throw error;
-    courses.push(...(data ?? []).map(catalogEntry));
-    if ((data ?? []).length < pageSize) return courses;
-  }
-}
-
 export async function searchAvailableCourses(
   member: CurrentMember,
   query: string,
 ): Promise<CourseSearchItem[]> {
   const supabase = await createClient();
-  const service = createCourseService({
-    getCurrentTerm: (schoolId) => currentTerm(supabase, schoolId),
-    listCatalogCourses: ({ schoolId, term }) =>
-      catalogCourses(supabase, schoolId, term),
-  });
+  const service = createSupabaseCourseSearch(supabase);
   const matches = await service.searchCourses(member.schoolId, query);
   if (matches.length === 0) return [];
 

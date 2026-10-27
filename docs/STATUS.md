@@ -1,5 +1,122 @@
 # 当前状态
 
+## 2026-10-27：PR #58 审查跟进修复
+
+主开发者接手 PR #58，目标合并。按审查意见改了两处，均直接改本 PR 尚未上线的迁移：
+
+- **注销时举报改为匿名保留**（取代原“默认清除”）：`202610260001` 不再删除相关举报三表，改为置空本人 ID、去掉资料快照、资料举报目标改为 `deleted:<report_id>`；`reporter_id`／`reported_user_id` 改为可空。规则见 [注销接口交接](handoffs/mobile-account-deletion-api.md)。
+- **推送入队出错不影响发消息**：`202610260002` 的 `enqueue_mobile_direct_push` 捕获异常后只发 warning 并跳过入队。
+
+另只读核对生产库权限：`postgres` 能删 `auth` 相关表，没有挡住删除用户的外键。
+
+**托管测试库验证（CourseMate-test，ref `cqrlxcxcgrcoamqnjkwu`，us-west-2）**：已应用 `202610260001`、`202610260002`，迁移记录版本号与仓库文件对齐。用两个合成账号（`deletion-test-a/b@wisc.edu`）走真实 RPC 造好友、私信和三条举报，再以 `service_role` 调用 `permanently_delete_member`：返回 completed；A 的 `auth.users`／identities／sessions／refresh_tokens、成员、资料、推送设备、好友申请全部清除；A 的消息变占位，B 的消息保留；三条举报保留并匿名化，举报三表中查不到 A 的 ID、邮箱或昵称。同回执重放返回 completed，换回执返回 not_available；`service_role` 伪造事务开关改证据被拒。随后注销 B 作清理，举报双方均置空、正文保留；原有 7 个账号未动。测试库留下这三条匿名举报和两条占位消息，属预期。`database.ts` 已从该库重新生成（`PostgrestVersion` 保留原值）。本次 `npm test` 110 文件／810 项 → build → lint → typecheck 全通过。
+
+未验证：经 HTTP 接口走真实邮箱 OTP 的完整注销流程、生产库迁移、APNs 真机推送。
+
+## 2026-10-27：App 分支严格 PR 审查与交接
+
+按用户要求对最新 main `e4be133` → `56fca3e` 的整条 App 分支重新独立审查，覆盖 Tickets 1–7、14 提交和 54 个路径。Standards 发现两项 P2，Spec 独立发现其中认证分类项：首次验码明确拒绝混为503，以及私信入队全站扫描设备。`fae4ff1` 已修复；OTP 入口完整区分明确拒绝403、异常／八类畸形响应503，网页默认不变；入队先筛数据库推导的接收者设备，再保留原资格复验。最终两轴针对性复查通过。
+
+本轮最终 `npm test` 110 文件／809 项 → build → lint → typecheck 全通过；本地生产构建 HTTP 边界10项通过，未触发真实OTP／消息／APNs／注销。完整证据、各轴实际运行范围和指纹见 [严格审查](handoffs/mobile-strict-review-20261027.md)，前端／部署／测试配合见 [PR交接](handoffs/mobile-backend-pr-handoff-20261027.md)。以下旧结果按原日期保留。
+
+已授权准备 feature 分支push和PR，不合并main。目标测试库迁移／类型生成、真实托管／并发／APNs／iPhone、客户端缓存和恢复cron仍待验收；永久删除不可逆。Ticket8–10与真实环境验收不因此勾选完成。
+
+## 2026-10-26：阶段 3 后端代码审查及修复复查完成
+
+Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接及独立 Standards／Spec 两轴审查。阶段基线 `fe4b72c` → 初审 `f0fa83b`，28 路径快照／指纹核对。Standards 发现同绑定登记会无条件清掉 pending／retry 通知的 P2；`cba0ee4` 修复为仅账号／会话／token／环境实际改变才清旧任务，同绑定重试保留队列。两轴分别针对性复查通过，无新增确认问题。
+
+最终本次 `npm test` 110 文件／806 项 → build → lint → typecheck 依次通过；生产构建 HTTP 边界 10 项此前已复查通过。完整两轴报告、来源与指纹位置见 [阶段 3 审查记录](handoffs/mobile-stage-three-review-20261026.md)。详细原生通知、注册／解绑、导航和调度交接见 [推送交接](handoffs/mobile-push-api.md)。以下“待阶段 review”均为当时记录，以本节为最新。
+
+仍待真实 Apple／APNs／iPhone、托管 Auth／SMTP／Storage、多连接竞态、网页／原生缓存与通知清理、合法保留例外、恢复 cron 配置、目标迁移及类型重新生成。后端代码符合性通过不等于联合验收或上架通过；无真实推送、远程迁移／删除、购买、push／合并／部署。Ticket 1 延期项继续保留，Ticket 8–10 未实施，不自动跨入下一阶段。
+
+## 2026-10-26：iOS 私信推送 Ticket 7 本地实现，待阶段 review
+
+用户选择 A：直接调用 Apple APNs，沿用阶段 3 当前推理设置。阶段基线 `fe4b72c`，本票起点 `3da1bbe`，在隔离工作树 `tmp/app-readiness` 的 `feature/mobile-auth-api` 实施，起点 clean；原根工作区其他功能改动未纳入。新增第 30 条迁移 `202610260002_mobile_push.sql`：受控设备绑定、消息事务队列、资格复查、租约／退避／失效处理及注销级联；与网页 VAPID 记录分开，不改变聊天写权限。
+
+移动设备 PUT／DELETE、退出先解绑再撤销、APNs HTTP/2＋ES256、固定发送者＋“发来一条消息”提示及独立秘密保护的恢复入口已接线，无新增依赖。前端页面、注册／接收／冷启动／账号切换和运维调度要求见 [原生推送交接](handoffs/mobile-push-api.md)。未手写 database.ts，目标迁移后仍须 CLI 重新生成。
+
+本次 `npm test` 110 文件／805 项通过 → build → lint → typecheck 通过；首次 build 发现环境字面量类型推导问题，修正后通过。数据库验证完整 30 条迁移和注销级联；发送器为真实本地 HTTP/2／临时 P-256 签名验证，HTTP 为真实 Supabase SDK 模拟网络。本地生产构建另验证 HTTP 边界 10 项；发现并修正 Next 空 POST 流被误报 400，定向回归与重新构建／lint／typecheck 通过，真实 HTTP 复查通过。单票轻量检查不代表阶段 3 审查或真机验收通过。
+
+未提供／使用真实 Apple 凭据，未向 APNs 发真实通知、应用远程迁移、购买服务、配置线上恢复 cron 或 push／合并／部署。托管 Auth／PostgreSQL 并发、真机通知／缓存／退出／注销联调及调度启用待办；APNs 接受不等于到达，在途通知无法保证撤回，离线不可达设备可能无提示。Ticket 1 延期不变，Ticket 8–10 未实施。下方历史“Ticket 7 未实施”以本节为准；接下来仅做阶段 3 双轴 review。
+
+## 2026-10-26：永久注销 Ticket 6 已实现，待阶段 review
+
+基于 `fe4b72c` 在隔离工作树 `tmp/app-readiness`、分支 `feature/mobile-auth-api` 实施阶段 3 的 Ticket 6；起点 clean，用户回复“开始”后按当前设置继续。用户两项选择均为 A：默认清理相关举报正文／身份，明确保留例外另定；一次事务删除，失败整体回滚并支持回执查询／重试。[数据清单](handoffs/account-deletion-design.md)先基于原 28 条迁移核查；现新增第 29 条迁移 `202610260001_permanent_account_deletion.sql`，不手改生成的数据库类型，新 RPC 目前使用模块内窄调用端口，目标迁移后仍须 CLI 重新生成类型。
+
+新增本人邮箱验证码核验、明确确认、原子注销及随机回执查询 HTTP 入口；独立于普通学校／资料准入。受控事务清理本人正文／身份、申请配对、相关举报三表及明确审计身份字段，级联资料／关系／订阅与 Auth 身份／会话；保留其他人的原消息、课程与必要非识别占位。普通证据权限仍关闭；owner 未转交或有未清 Storage 对象时明确拒绝，无数据已删。前端必须先保存回执，未知结果先查询，完成后清本人缓存／凭据；详见 [注销接口交接](handoffs/mobile-account-deletion-api.md)。
+
+本次实际检查：注销 HTTP 7 项与完整迁移链 SQL 6 项定向通过；SQL／举报／清理 4 文件／25 项回归通过（此前 SQL 为 5 项）。最终 `npm test` 107 文件／781 项 → build → lint → typecheck 依次通过。本地生产 HTTP 边界 9 项通过，覆盖认证、Cookie 冒充、错误授权、回执格式、JSON 405／Allow 与 404，均 no-store、不设置 Cookie，无真实发码或删除。轻量自检未发现新增阻塞。
+
+未执行远程迁移、真实账号删除、托管 Auth／SMTP／Storage、多连接竞态、iOS 或网页已打开内存缓存联合验收；也未 push、合并或部署。合法保留例外、外部日志／备份与运营导出范围仍须负责人核实，本版默认清理不可直接用于已有明确保留要求的案件。Ticket 1 延期项保留；Ticket 7 未实施，阶段 3 整体双轴 review 待两票完成，不自动开工其他票。
+
+## 2026-10-25：移动 API 阶段 2 后端实现及双轴代码审查完成
+
+阶段 2 的 Tickets 2–5（课程、好友、消息、举报）已完成本地后端实现与详细前端交接；不是原生客户端或完整联合验收完成。基线 `bd1d557` → 初审 `67d22bd`，24 个阶段文件及必要调用者由两个独立 reviewer 分别审查 Standards 和 Spec。两轴各发现同一项 P2：大写会话 UUID 可成功发送却因回执字符串比较误报 503，clientMessageId 大小写也可能妨碍 pending 匹配。
+
+修复提交 `a0da6294d82fd4c424144c5a6f43b7ac29278af8`：移动消息入口校验后统一两种 UUID 为小写；保留身份／目标验证与当前 RLS 可见性检查。先新增失败回归再修复，3 文件／34 项定向通过；两轴均完成指纹核对和针对性复查，原 P2 解决，无其他新增阻塞。最终 `npm test` 105 文件／768 项通过 → build → lint → typecheck 依次通过。版本、两轴报告、快照／指纹与未验收边界见 [阶段审查记录](handoffs/mobile-stage-two-review-20261025.md)。以下各票“待阶段 review”为当时记录，以本节为最新结论。
+
+仍待真实账号、iOS 页面／本机缓存、托管 PostgreSQL 多连接竞态、推送实际投递与运营处置验收；课程消息举报、过滤、审核响应／公开联系渠道、跨目标限流及证据保留政策的发布缺口见 [举报交接](handoffs/mobile-reporting-api.md)。Ticket 1 延期及首次验码失败分类遗留继续保留；永久注销／证据清理和原生推送分别属于 Ticket 6／7。未 push、合并、部署或写远程业务数据；阶段边界交接，不自动进入 Ticket 6。
+
+## 2026-10-25：移动举报 Ticket 5 已实现，待阶段 review
+
+基于 `344f328` 在 `feature/mobile-auth-api` 的隔离工作树新增 `POST /api/mobile/v1/reports`，复用既有举报服务、目标权限与受控 RPC。只接受目标类型／ID、原因和说明；身份来自 Bearer，证据与被举报人由数据库推导。UUID 归一、bigint 字符串精度、pending 重试、畸形响应和私密错误均有检查；不新增迁移、依赖、审核权限、处罚或限流政策。详见 [移动举报交接](handoffs/mobile-reporting-api.md)。
+
+本次实际检查：移动举报 24 项；移动／举报服务回归 4 文件／31 项；完整迁移链、举报与私聊清理 4 文件／44 项通过。最终 `npm test` 105 文件／767 项 → build → lint → typecheck 依次通过；生产构建本地 HTTP 边界 7 项通过，覆盖认证、Cookie 冒充、错误授权、JSON 405／Allow 和 404，均 no-store 且不设置 Cookie。SQL 实际验证目标可见性、本人身份、被举报者不可读、证据／留存链、清除后拒绝，以及课程消息举报尚不支持。轻量检查未发现新增阻塞，待执行阶段 2 的双轴 review。
+
+发布缺口已逐项记录：课程消息举报、内容过滤、审核处置与响应负责人、公开联系渠道、跨目标限流，以及证据保留依据／期限。现有三表受控落库及可定位不等于已有审核工作台；举报不自动拉黑／处罚；证据不可变触发器与消息留存外键对 Ticket 6 的永久注销有实际约束，未擅自删除或无限保留。本票不表示 App Store 条件已满足。
+
+未提交远程真实举报、修改处置或关系数据，未验证真实账号、运营处理、PostgreSQL 多连接竞态及 iOS；未 push、合并或部署。Ticket 1 延期项保留。Ticket 5 是阶段 2 最后一票，后续只做本阶段审查，不自动进入 Ticket 6。下方历史票据的“Ticket 5 未开始”以本节最新状态为准。
+
+## 2026-10-25：移动聊天 Ticket 4 已实现，待阶段 review
+
+基于 `67f3d6e`，在 `feature/mobile-auth-api` 的隔离工作树实施同属阶段 2 的 Ticket 4。新增课程／私聊会话列表与状态、精确字符串消息 ID 的历史分页／有界补拉、受控幂等发送、本人私聊已读／清除及缓存 ID 重新校验。复用既有 RLS 与 RPC，无新增迁移、依赖或 messages 直接写权限；确认的私信发送沿用已有网页推送调度，实际推送未验收。
+
+清除后重试原发送 UUID 时，再经过当前 RLS 校验回执；不可见则只确认请求已处理，不回传旧正文。恢复协议要求重新核验已缓存 ID、覆盖区间重扫、按 ID 合并和淘汰过期响应，防止旧正文恢复或迟提交消息遗漏。接口、字段、原生页面与失败处理详见 [移动聊天交接](handoffs/mobile-messages-api.md)。永久注销最终删除／占位及物理删除后 UUID 重放边界由 Ticket 6 联合验证，不能将本票视为注销已实现。
+
+本次实际检查：移动聊天定向 23 项及完整迁移链 SQL 7 项通过；最终 `npm test` 104 文件／742 项通过 → build → lint → typecheck 依次通过。本地生产构建 HTTP 边界 10 项通过，覆盖 8 个消息入口认证、Cookie 不能冒充 Bearer、JSON 405／404，均 no-store 且不设置 Cookie。SQL 验证实际 RLS、幂等／冲突、个人清除、拉黑、删除可见性和退课收权；轻量检查未发现阻塞。
+
+未写远程业务数据，未验证真实账号／设备、推送投递和 PostgreSQL 多连接竞态；未 push、合并或部署。Ticket 1 延期项继续保留；阶段 2 的 Ticket 5 与整阶段双轴 review 待办，原生 UI／本机缓存验收未完成。下方各票记录保留其当时状态，以本节及 Notion 最新记录为准。
+
+## 2026-10-25：移动好友 Ticket 3 已实现，待阶段 review
+
+基于 `7334c01`，继续在 `feature/mobile-auth-api` 的隔离工作树实施同属阶段 2 的 Ticket 3。新增好友／屏蔽专门列表、本人好友详情、精确邮箱 POST 发现、申请与响应、本人拉黑列表、备注／屏蔽／拉黑／删除移动入口；复用既有 service／RPC，无新增依赖或迁移，不改好友网页、学校授权、历史保留或消息投递语义。只有服务端确认 sent 才沿用既有网页申请推送调度；不新增原生好友申请通知。
+
+当前学校、新申请同校限制、跨校已有历史与自我保护例外继续由 RPC 授权。找人邮箱不进入 URL 或响应；操作结果区分冲突、限流、禁止与成功，未知／畸形成功结果不报成功。分页与 Ticket 2 共用原有规则。前端逐页要求、字段、按钮、跨校／拉黑限制和缓存契约见 [移动好友交接](handoffs/mobile-friends-api.md)。好友列表 sendStatus 不代表消息发送的完整资格，需由后续消息接口重新确认。
+
+本次实际检查：移动好友定向 23 项；好友／网站／SQL 跨校与关系回归 6 文件／82 项通过；最终 `npm test` 103 文件／718 项通过 → build → lint → typecheck 依次通过。本地生产构建真实 HTTP 边界 14 项通过，验证全部好友入口认证、Cookie 不能冒充登录、找人只接受 POST、JSON 405／404、no-store 与不设置 Cookie。轻量检查未发现阻塞。
+
+未发送真实申请或修改远程关系数据，未验证真实账号／设备、网页推送投递与 PostgreSQL 多连接竞态；未 push、合并或部署。Ticket 1 延期测试继续保留；阶段 2 的 4–5 未实施，整阶段双轴 review 尚未启动。原生 UI 和消息读写不在本票交付。
+
+## 2026-10-25：移动课程 Ticket 2 已实现，待阶段 review
+
+基于 `bd1d557` 在隔离工作树 `tmp/app-readiness`、分支 `feature/mobile-auth-api` 实施；用户明确将 Ticket 1 剩余测试延期。新增移动课程本人列表、当前学期搜索、详情、加入／退出和受权会话入口。学校与用户取自 Bearer 成员上下文，资料未完善返回 403；移动入口明确拒绝跨校和旧学期写操作。分页和退出后缓存／权限恢复契约见 [移动课程交接](handoffs/mobile-courses-api.md)。原生页面及消息读写未计入本票。
+
+搜索和加退课的 Supabase 适配器从网页工厂抽出供两端复用；既有匹配排序、写入失败语义、RLS 与会话惰性创建保留，无新增依赖或迁移。本次实际检查：移动课程定向 22 项通过；完整 `npm test` 102 文件／695 项通过 → build → lint → typecheck 依次通过。实际本地生产构建 HTTP 检查 7 项通过，覆盖五个课程入口认证、Cookie 不能冒充 Bearer、错误方法 JSON 405 及未实现路径 JSON 404；无 Cookie 写入，均 no-store。
+
+本票轻量检查未发现阻塞；阶段 2 的 Tickets 3–5 尚未实施，整阶段双轴 review 未启动。未 push、合并、部署或写远程业务数据；真实账号课程联调、多连接 PostgreSQL 竞态与 iOS／缓存验收未做。Ticket 1 原有剩余项继续保留，不因本票实施而标为通过。
+
+## 2026-10-25：CourseMate-test 环境配置与初步联调
+
+用户指定 `CourseMate-test`（`cqrlxcxcgrcoamqnjkwu`，us-west-2）为测试环境；生产 `CourseMate-main` 未修改。测试库补齐 6 条仓库迁移并登记历史，Auth 用户、成员、资料均仍为 7 条；成员上下文 RPC 禁止 anon、允许 authenticated。访问令牌有效期由 3600 调整为 900 秒，保留 6 位／600 秒 OTP、自定义 SMTP、准入 Hook 和 60 秒重发间隔。
+
+隔离工作树已通过忽略的 `.env.local` 连接此测试库。本地移动接口读取 3 所学校成功，未登录、伪造 Bearer、Cookie 冒充、输入与请求边界已检查。实测发现格式错误的 refreshToken 被误归类为 503，已修复并复测为 401／session_invalid；新增定向回归通过，全量 101 文件／673 项测试、build、lint、typecheck 依次通过。
+
+随后用户提供学校邮箱并在本地验证页输入验证码，11 项真实单会话检查全部通过：收信后验证码登录、成员／本人资料读取、空昵称校验、按原值保存及重读、正常刷新、刷新后读取成员、当前设备退出、退出后刷新被拒绝。资料内容未变，测试会话已退出。首次资料补全、双设备隔离、自然到期、成员失效及临时故障联调仍未验收。详见 [测试记录](handoffs/mobile-auth-test-20261025.md)。未发布移动接口或验证 iPhone 原生端。
+
+## 2026-10-22：移动认证阶段 1（本地功能分支）
+
+`feature/mobile-auth-api` 基于主线 `e4be133` 实施 Ticket 1，尚未合并或部署。新增 `/api/mobile/v1/` 学校、验证码、会话刷新、可信成员、本人资料与当前设备退出 HTTP 入口；复用既有账号、学校准入及资料规则，网页 Cookie／Server Actions 保留。无数据库迁移或新增依赖。
+
+接口与原生前端接入要求见 [移动认证交接](handoffs/mobile-auth-api.md)。刷新后先保存整对新凭据，再查询成员状态；临时网络故障不等于账号失效。原生页面、安全凭据存储、本地缓存和推送不在本票实现范围。
+
+本次本地检查：最终全量 `npm test` 101 文件、672 项通过；随后 `npm run build`、`npm run lint`、`npm run typecheck` 依次通过。生产构建的本地 HTTP 检查确认：未带 Bearer 的 session/profile 返回 JSON 401，未知移动路径 JSON 404、错误方法 JSON 405；没有 Cookie 登录或 HTML 重定向。移动接口及 Proxy 定向回归 21 项、审查新增的会话到期回归分别通过；具体最终结果记录在 Notion Ticket 1。
+
+阶段代码审查：Standards 未发现实质问题；Spec 初审发现服务端 `session_expired` 被误归类为暂时故障，已修复并由独立 reviewer 定向复查通过。上述最终全量检查包含修复。代码符合性已审查，真实环境验收仍按下段保留；未 push、合并或部署。
+
+尚未完成托管 Supabase 真实 OTP、刷新／多设备联调、真实配置核对或 iPhone 验证；本地 SDK 模拟网络测试不能替代这些验收。阶段 review 状态另行记录，不能将本节当作已完成上架准备。以下既有主线及生产记录保留原日期，不代表本分支已发布。
+
+## 既有主线及生产记录
+
 核对日期：2026-10-04（Figma 新界面与 PWA 上线，网页推送代码已合并但关闭）。代码基线：`main` 的 `d0ec175`（PR #57 合并后）；生产前端是 `main` 的 `d68f54e`（PR #56 合并后手动发布，`dpl` 对应 `course-mate-ffba2jzto`），不含 #57；上一版 `course-mate-8al81vxhb`（`main` `f6bf06d`）可作回滚目标。
 本页区分代码基线与生产状态；生产状态以下方带日期的条目为准，其中 2026-09-25 的搬迁条目是当前生产数据库的起点。当时的操作、证据与待办清单见[发布交接](handoffs/release-20260925.md)。
 
@@ -14,7 +131,6 @@
 | 举报与清理 | 行为举报、不可变证据、举报消息保留；双方清除满 720 小时后的受控物理清理，默认 dry-run |
 | 平台管理 | `/admin`、所有者与管理员、学校域名、课表导入、学期切换与审计；管理员跨校测试（课程、好友与私聊按当前学校判断，见 [ADR-0006](adr/0006-admin-cross-school-testing.md)） |
 | 延迟显示 | 个人资料页「显示偏好」开关（只存本机浏览器，不进数据库）；开启后页面左下角显示两个毫秒读数：**网络**（HEAD 静态图标，不经函数与数据库）与**服务**（GET `/api/ping`，含 proxy 的登录校验与 Supabase 往返）。每 15 秒测一次，标签页在后台时暂停，换页立即重测；未登录时只显示网络读数 |
-
 | 新界面 | Figma 原型的 6 页（登录、大厅、课程群聊、消息与好友两栏、我的）已移植，含导航外壳（桌面左栏、手机底栏）与深色模式（PR #44–#49，已上线） |
 | PWA | `manifest`、图标、`viewport-fit=cover` 与安全区、Service Worker（只提供可安装条件和断网离线页，不缓存页面与接口）、「我的」页的「安装到手机」卡片（PR #55、#56，已上线；真机验收进行中） |
 | 网页推送 | 私聊与好友申请通知：订阅表、只授权 `service_role` 的认领函数、发送器、开关（PR #57，已合并，**生产关闭**：迁移未应用、四个环境变量未配、前端未发布；见 [ADR-0010](adr/0010-web-push-via-restricted-rpc.md)、[启用手册](runbooks/web-push.md)） |
@@ -72,7 +188,7 @@
 2. **Figma 界面登录后走查**：用真实验证码把各页点一遍（两栏「消息与好友」、深色模式、课程群聊回车发送）。「最后一条消息预览与时间」需要新增数据库函数，并遵守清除历史与拉黑规则，涉及权限，先出方案再做。
 3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——应用迁移 `202610040001`、补登记迁移历史、重新生成 `src/types/database.ts`；本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
 4. **丹尼的课程截图识别（`feature/issue-50-course-image-recognition`，Issues #50–54）**：先开 PR 并由另一位协作者审核；`SUPABASE_SERVICE_ROLE_KEY` 的读取位置统一到 `src/lib/server-env.ts`（他放在 `src/lib/env.ts`），与推送共用；确认学生选课截图发给 Google 的隐私说明；#54（真实截图基准与发布保护，`needs-info`）缺样本；发布顺序是先应用迁移 `202609300001`、再配 `GOOGLE_CLOUD_VISION_API_KEY`、最后发前端。
-5. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，约定把它划为单独任务，需要排期；「HTTP API 还是直连 Supabase SDK」尚未定案。
+5. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并（见顶部 2026-10-27 条目，生产未迁移）；「HTTP API 还是直连 Supabase SDK」尚未定案。
 6. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
 7. **此前遗留**（仍然有效）：迁移 `202609260001` 登记到迁移历史表；测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份；本地 `supabase/.temp/project-ref` 仍指向旧项目；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
 8. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
