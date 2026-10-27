@@ -53,3 +53,17 @@ export const getCurrentMember = cache(async function getCurrentMember(): Promise
     return null;
   }
 });
+
+/**
+ * 当前浏览器里有登录会话，但按 ADR-0011 需要重新输验证码（超过 30 天或密码已失效）。
+ * 只给登录页显示提示用；判断是否放行仍以 getCurrentMember 为准。
+ */
+export async function currentSessionNeedsReverification(): Promise<boolean> {
+  const supabase = await createClient();
+  try {
+    const access = await createSupabaseMemberSessionReader(supabase).getMemberAccess();
+    return access?.status === "reverification_required";
+  } catch {
+    return false;
+  }
+}

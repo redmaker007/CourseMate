@@ -748,6 +748,35 @@ export type Database = {
           },
         ]
       }
+      member_auth_state: {
+        Row: {
+          email_verified_at: string
+          password_fingerprint: string | null
+          password_set_at: string | null
+          user_id: string
+        }
+        Insert: {
+          email_verified_at: string
+          password_fingerprint?: string | null
+          password_set_at?: string | null
+          user_id: string
+        }
+        Update: {
+          email_verified_at?: string
+          password_fingerprint?: string | null
+          password_set_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_auth_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "member_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       member_blocks: {
         Row: {
           blocked_id: string
@@ -1432,6 +1461,7 @@ export type Database = {
           enabled_school_id: string
           home_school_id: string
           onboarding_complete: boolean
+          reverification_required: boolean
           user_id: string
         }[]
       }
@@ -1545,6 +1575,7 @@ export type Database = {
         Args: { target_member_id: string }
         Returns: string
       }
+      member_requires_email_reverification: { Args: never; Returns: boolean }
       members_are_blocked: {
         Args: { first_member: string; second_member: string }
         Returns: boolean
@@ -1553,6 +1584,7 @@ export type Database = {
         Args: { target_installation: string; target_message: number }
         Returns: boolean
       }
+      own_password_status: { Args: never; Returns: boolean }
       permanently_delete_member: {
         Args: { receipt_digest: string; target_user: string }
         Returns: string
@@ -1565,6 +1597,8 @@ export type Database = {
           message_ids: number[]
         }[]
       }
+      record_email_verification: { Args: never; Returns: string }
+      record_password_set: { Args: never; Returns: string }
       register_mobile_push_device: {
         Args: {
           target_environment?: string
@@ -1642,6 +1676,8 @@ export type Database = {
           result_status: string
         }[]
       }
+      session_email_otp_at: { Args: never; Returns: string }
+      session_uses_password: { Args: never; Returns: boolean }
       set_friend_hidden: {
         Args: { requested_hidden: boolean; target_member_id: string }
         Returns: string

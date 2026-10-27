@@ -73,6 +73,7 @@ vi.mock("@supabase/ssr", () => ({
                   enabled_school_id: "uw-madison",
                   current_school_id: binding.school_id,
                   onboarding_complete: true,
+                  reverification_required: false,
                 },
               ]
             : [],

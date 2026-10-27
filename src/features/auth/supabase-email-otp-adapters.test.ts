@@ -48,6 +48,7 @@ describe("Supabase email OTP adapters", () => {
             return { data: {}, error };
           },
         },
+        rpc: async () => ({ data: "recorded", error: null }),
       }),
     );
 
@@ -59,6 +60,28 @@ describe("Supabase email OTP adapters", () => {
       token: "123456",
       type: "email",
     });
+  });
+
+  it("验码成功但记不下验证时间时，退出这个会话并报暂时不可用", async () => {
+    const calls: string[] = [];
+    const adapter = createSupabaseEmailOtpAuth(
+      asSupabaseClient({
+        auth: {
+          verifyOtp: async () => ({ data: {}, error: null }),
+          signOut: async (options: unknown) => {
+            calls.push(`signOut:${JSON.stringify(options)}`);
+            return { error: null };
+          },
+        },
+        rpc: async (name: string) => {
+          calls.push(name);
+          return { data: null, error: { message: "synthetic failure" } };
+        },
+      }),
+    );
+
+    await expect(adapter.verifyCode("student@wisc.edu", "123456")).resolves.toEqual({ status: "unavailable" });
+    expect(calls).toEqual(["record_email_verification", 'signOut:{"scope":"local"}']);
   });
 
   it("通过数据库唯一函数核对所选学校和精确域名", async () => {
@@ -93,6 +116,7 @@ describe("Supabase email OTP adapters", () => {
               enabled_school_id: "uw-madison",
               current_school_id: "uw-madison",
               onboarding_complete: true,
+              reverification_required: false,
             },
           ],
           error: null,
@@ -120,6 +144,7 @@ describe("Supabase email OTP adapters", () => {
               enabled_school_id: "uw-madison",
               current_school_id: "umich",
               onboarding_complete: true,
+              reverification_required: false,
             },
           ],
           error: null,

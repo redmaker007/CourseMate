@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/ui/chat";
 import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
+import { PasswordCard } from "@/features/auth/components/password-card";
+import { requestPasswordCodeAction, setPasswordAction } from "@/features/auth/password-actions";
+import { getOwnPasswordStatus } from "@/features/auth/queries";
 import { getCurrentMember } from "@/features/auth/session";
 import { signOutAndReturnToLoginAction } from "@/features/dashboard/actions";
 import { LatencyToggle } from "@/features/latency/components/latency-toggle";
@@ -21,7 +24,10 @@ export default async function ProfilePage() {
   if (!member) redirect("/login");
   if (!member.onboardingComplete) redirect("/onboarding/profile");
 
-  const profile = await getOwnProfile(member.userId);
+  const [profile, passwordSet] = await Promise.all([
+    getOwnProfile(member.userId),
+    getOwnPasswordStatus(),
+  ]);
   if (!profile) redirect("/onboarding/profile");
 
   return (
@@ -68,6 +74,13 @@ export default async function ProfilePage() {
             submitLabel="保存修改"
           />
         </section>
+
+        <PasswordCard
+          email={member.email}
+          passwordSet={passwordSet}
+          requestAction={requestPasswordCodeAction}
+          setAction={setPasswordAction}
+        />
 
         <section
           aria-labelledby="display-preferences"

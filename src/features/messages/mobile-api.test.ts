@@ -48,7 +48,7 @@ describe("移动消息 HTTP 契约（真实 SDK，模拟网络；SQL 权限另�
             const body = request.method === "GET" ? {} : await request.json();
             calls.push({ name, method: request.method, params: url.searchParams, body, authorization: request.headers.get("authorization") });
             if (name === "user") return Response.json({ user: { id: userId, email, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } });
-            if (name === "get_member_context") return Response.json([{ user_id: userId, home_school_id: "uw-madison", enabled_school_id: "uw-madison", current_school_id: "uw-madison", onboarding_complete: onboarding }]);
+            if (name === "get_member_context") return Response.json([{ user_id: userId, home_school_id: "uw-madison", enabled_school_id: "uw-madison", current_school_id: "uw-madison", onboarding_complete: onboarding, reverification_required: false }]);
             if (databaseFailure) return Response.json({ message: "synthetic private failure" }, { status: 503 });
             if (name === "list_friends") return Response.json([{ member_id: otherId, display_name: "同学", effective_name: "搭子", conversation_id: conversationId, hidden: false }]);
             if (name === "get_dashboard_courses") return Response.json([{ course_id: courseId, conversation_id: conversationId, code: "CS 400", title: "Programming III", term: "2026-fall", archived: false }]);
