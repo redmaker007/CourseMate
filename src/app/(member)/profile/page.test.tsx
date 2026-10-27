@@ -16,6 +16,8 @@ vi.mock("next/navigation", () => navigation);
 vi.mock("@/features/auth/session", () => auth);
 vi.mock("@/features/profile/queries", () => profiles);
 vi.mock("@/features/profile/actions", () => ({ updateProfileAction: vi.fn() }));
+vi.mock("@/features/auth/password-actions", () => ({ requestPasswordCodeAction: vi.fn(), setPasswordAction: vi.fn() }));
+vi.mock("@/features/auth/queries", () => ({ getOwnPasswordStatus: vi.fn(async () => false) }));
 vi.mock("@/features/profile/components/profile-form", () => ({
   ProfileForm: ({ initialProfile }: { initialProfile: { displayName: string } }) => (
     <div data-testid="profile-form">{initialProfile.displayName}</div>

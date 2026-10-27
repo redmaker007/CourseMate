@@ -28,7 +28,7 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
   let calls: { path: string; method: string; authorization: string | null; body: Record<string, unknown> }[];
 
   beforeEach(() => {
-    memberRows = [{ user_id: userId, home_school_id: schoolId, enabled_school_id: schoolId, current_school_id: schoolId, onboarding_complete: false }];
+    memberRows = [{ user_id: userId, home_school_id: schoolId, enabled_school_id: schoolId, current_school_id: schoolId, onboarding_complete: false, reverification_required: false }];
     memberFailure = false;
     refreshFailure = null;
     logoutFailure = false;
@@ -55,6 +55,9 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
               const json = (value: unknown, status = 200) => Response.json(value, { status });
               if (path.endsWith("/otp")) return otpStatus === 200 ? json({}) : json({ error_code: "over_email_send_rate_limit", msg: "synthetic failure" }, otpStatus);
               if (path.endsWith("/verify")) return json(session);
+              if (path.endsWith("/record_email_verification")) return json("recorded");
+              if (path.endsWith("/record_password_set")) return json("recorded");
+              if (path.endsWith("/own_password_status")) return json(true);
               if (path.endsWith("/token")) {
                 if (refreshFailure) return json({ error_code: refreshFailure, msg: "synthetic failure" }, refreshFailure === "unexpected_failure" ? 503 : 400);
                 return json(session);
@@ -282,5 +285,70 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
     const malformed = new Request(plain.url, { method: "POST", headers: { "content-type": "application/json" }, body: "{" });
     expect((await handler(malformed)).status).toBe(400);
     expect((await handler(request("auth/refresh", { refreshToken: "x".repeat(17000) }))).status).toBe(413);
+  });
+
+  describe("密码登录与设置密码（ADR-0011）", () => {
+    beforeEach(() => {
+      memberRows = [{ ...(memberRows[0] as object), onboarding_complete: true }];
+    });
+
+    it("邮箱和密码换取会话与可信成员，不带旧 Bearer", async () => {
+      const response = await api()(request("auth/password-sign-in", { email, password: "secret-123" }));
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({ status: "signed_in", member: { userId }, session: { refreshToken: "synthetic-refresh" } });
+      const grant = calls.find((call) => call.path.startsWith("/auth/v1/token"));
+      expect(grant?.path).toBe("/auth/v1/token?grant_type=password");
+      expect(grant?.body).toMatchObject({ email, password: "secret-123" });
+    });
+
+    it("密码对了但需要重新验证时不交付凭据，撤销刚建的会话", async () => {
+      memberRows = [{ ...(memberRows[0] as object), reverification_required: true }];
+      const response = await api()(request("auth/password-sign-in", { email, password: "secret-123" }));
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ status: "reverification_required" });
+      expect(calls.some((call) => call.path === "/auth/v1/logout?scope=local")).toBe(true);
+    });
+
+    it("已登录的会话超过 30 天时受保护接口返回 401 reverification_required，而不是成员失效", async () => {
+      memberRows = [{ ...(memberRows[0] as object), reverification_required: true }];
+      const response = await api()(request("session", undefined, token));
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ status: "reverification_required" });
+    });
+
+    it("查询密码状态、发码到本人邮箱、验码后设置密码并交付新凭据", async () => {
+      const handler = api();
+      expect(await (await handler(request("account/password", undefined, token))).json()).toEqual({ status: "ok", passwordSet: true });
+
+      const sent = await handler(request("account/password/request-code", {}, token));
+      const sentBody = await sent.json();
+      expect(sentBody).toMatchObject({ status: "code_sent", email, resendAfterSeconds: 60 });
+      expect(codec.read(sentBody.context)).toEqual({ schoolId, email });
+      expect(calls.find((call) => call.path.startsWith("/auth/v1/otp"))?.authorization).not.toBe(`Bearer ${token}`);
+
+      calls = [];
+      const set = await handler(request("account/password", { context: sentBody.context, code: "123456", password: "secret-123" }, token, "PUT"));
+      expect(set.status).toBe(200);
+      // Supabase 改密码会撤销其他会话，App 必须换成这里交付的新凭据。
+      expect(await set.json()).toEqual({ status: "password_set", session: { accessToken: token, refreshToken: "synthetic-refresh", expiresAt: expect.any(Number), tokenType: "bearer" } });
+      const order = calls.map((call) => call.path.replace(/\?.*/, "").split("/").at(-1));
+      expect(order).toEqual(expect.arrayContaining(["verify", "record_email_verification", "user", "record_password_set"]));
+      expect(order).not.toContain("logout");
+      // 验码不带原 Bearer，新会话来自验证码。
+      expect(calls.find((call) => call.path.startsWith("/auth/v1/verify"))?.authorization).not.toBe(`Bearer ${token}`);
+      expect(calls.find((call) => call.method === "PUT" && call.path.startsWith("/auth/v1/user"))?.body).toMatchObject({ password: "secret-123" });
+    });
+
+    it("别人的验证码上下文、弱密码、未登录都被拒绝", async () => {
+      const handler = api();
+      const foreign = codec.issue({ schoolId, email: "other@wisc.edu" });
+      expect(await (await handler(request("account/password", { context: foreign, code: "123456", password: "secret-123" }, token, "PUT"))).json()).toEqual({ status: "invalid_context" });
+      const own = codec.issue({ schoolId, email });
+      const weak = await handler(request("account/password", { context: own, code: "123456", password: "short" }, token, "PUT"));
+      expect([weak.status, await weak.json()]).toEqual([400, { status: "weak_password" }]);
+      expect((await handler(request("account/password", { context: own, code: "123456", password: "secret-123" }, undefined, "PUT"))).status).toBe(401);
+      expect(calls.some((call) => call.path.startsWith("/auth/v1/verify"))).toBe(false);
+    });
   });
 });

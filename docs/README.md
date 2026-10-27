@@ -17,6 +17,7 @@
 | 任务 | 首读文档 / 决策 | 代码入口 |
 |---|---|---|
 | OTP、登录、退出、学校准入 | [认证规格](specs/auth-email-otp.md)、[ADR-0001](adr/0001-separate-member-account-from-profile.md)；成员会话本地验签与令牌有效期见 [ADR-0009](adr/0009-verify-access-token-locally.md)；实测验收看 Issue #7 | `src/features/auth/`；`src/lib/supabase/`；`src/proxy.ts` |
+| 密码登录、设置密码、30 天重新验证邮箱 | [ADR-0011](adr/0011-password-sign-in-with-monthly-email-reverification.md)；移动端接口见[移动认证交接](handoffs/mobile-auth-api.md)末节 | `src/features/auth/password-*.ts`；`supabase-password-adapters.ts`；`supabase/migrations/202610270001_password_sign_in.sql` |
 | 原生 App 登录、成员与资料 HTTP 接入 | [移动认证交接](handoffs/mobile-auth-api.md)；沿用上述认证 ADR | `src/app/api/mobile/v1/`；`src/features/auth/mobile-api.ts`；`src/features/auth/production-mobile-api.ts` |
 | 原生 App 搜课、课程列表／详情、加退课与会话入口 | [移动课程交接](handoffs/mobile-courses-api.md)；沿用 ADR-0004／0007 | `src/features/courses/mobile-api.ts`；`supabase-course-search.ts`；`supabase-course-operations.ts` |
 | 原生 App 好友、申请、屏蔽与拉黑 | [移动好友交接](handoffs/mobile-friends-api.md)；沿用 ADR-0006／0008 | `src/features/friends/mobile-api.ts`；`friendship-service.ts`；`supabase-friend-backend.ts` |

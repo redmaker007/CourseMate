@@ -12,6 +12,7 @@ const FACTS: MemberFacts = {
   enabledSchoolId: "uw-madison",
   currentSchoolId: "uw-madison",
   onboardingComplete: true,
+  reverificationRequired: false,
 };
 
 function reader(overrides: Partial<MemberSessionDataPort> = {}) {
@@ -190,5 +191,30 @@ describe("getMemberContext", () => {
     });
 
     await expect(sessionReader.getMemberContext()).resolves.toBeNull();
+  });
+});
+
+describe("需要重新验证邮箱（ADR-0011）", () => {
+  const stale = () =>
+    reader({ getMemberFacts: async () => ({ ...FACTS, reverificationRequired: true }) }).reader;
+
+  it("会话和页面上下文都按未登录处理", async () => {
+    await expect(stale().getMemberSession()).resolves.toBeNull();
+    await expect(stale().getMemberContext()).resolves.toBeNull();
+  });
+
+  it("getMemberAccess 区分出需要重新验证，正常成员带上下文", async () => {
+    await expect(stale().getMemberAccess()).resolves.toEqual({ status: "reverification_required" });
+    await expect(reader().reader.getMemberAccess()).resolves.toMatchObject({
+      status: "member",
+      context: { userId: "user-1", currentSchoolId: "uw-madison" },
+    });
+  });
+
+  it("学校绑定不一致时优先当作未登录，不提示重新验证", async () => {
+    const { reader: mismatched } = reader({
+      getMemberFacts: async () => ({ ...FACTS, enabledSchoolId: null, reverificationRequired: true }),
+    });
+    await expect(mismatched.getMemberAccess()).resolves.toBeNull();
   });
 });

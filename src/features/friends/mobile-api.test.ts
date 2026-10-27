@@ -45,7 +45,7 @@ describe("移动好友 HTTP 契约（真实 SDK，模拟网络）", () => {
               const body = request.method === "GET" ? {} : await request.json();
               calls.push({ name, params: url.searchParams, body, authorization: request.headers.get("authorization") });
               if (name === "user") return Response.json({ user: { id: userId, email, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } });
-              if (name === "get_member_context") return Response.json([{ user_id: userId, home_school_id: "uw-madison", enabled_school_id: "uw-madison", current_school_id: "uw-madison", onboarding_complete: onboarding }]);
+              if (name === "get_member_context") return Response.json([{ user_id: userId, home_school_id: "uw-madison", enabled_school_id: "uw-madison", current_school_id: "uw-madison", onboarding_complete: onboarding, reverification_required: false }]);
               if (failure) return Response.json({ message: "synthetic private failure" }, { status: 503 });
               if (name === "find_member_by_email") return Response.json(discovery);
               if (name.startsWith("list_")) return Response.json(listRows);
