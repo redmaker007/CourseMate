@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-11-03：生产登录事故（10-27 起约 7 天无法登录），已回滚
+
+**现象**：生产站验证码登录先显示"服务暂时不可用"，再用同一验证码显示"验证码错误或已过期"。
+
+**原因**：2026-10-27 20:28（美东）`redmaker007` 账号在 Vercel 后台把 `feature/password-sign-in`（PR #61，未合并，提交 `37002e5`）的预览 Promote 到生产，得到 `dpl_GPHstFpu4SNbNeTX4H6rfXy7aAWZ`（`course-mate-i1ux9amr7`；Vercel API 记录 `source: redeploy`、`meta.action: promote`）。这段代码依赖迁移 `202610270001`，生产库没有应用。验证码校验成功后调用 `record_email_verification` 返回 404，代码按设计登出并报不可用；同时 `get_member_context` 缺少 `reverification_required`，已登录的会话也全部按需要重新验证处理。验证码已被消耗，所以重试报过期。没有任何 Claude 会话在该时段执行部署（会话记录核对）。
+
+**处理**：11-03 `npx vercel rollback` 回到 `course-mate-os0mp6m6t`（`24e266b`，10-05）；登录页恢复旧文案，用户实测验证码登录正常。生产库未做改动。
+
+**影响范围**：Supabase 日志只能查 24 小时，其中失败调用仅 2 次（均为本次排查）；10-27 至 11-02 期间是否有其他成员登录失败无法确认。
+
+**防再发**：新增 `scripts/check-production-ref.mjs` 并接入 `vercel.json` 的 `buildCommand`，来源分支不是 `main` 的生产构建直接失败。发布只走"合并 `main` → 生产库迁移 → 在 `main` 上 `vercel deploy --prod`"，见[部署手册](runbooks/deploy.md)。
+
+**仍待处理**：
+- PR #61 分支的预览 `course-mate-git-feature-password-sign-in-…` 仍连生产库。
+- Vercel Preview 环境变量指向生产库，是否改指测试库需在后台决定。
+- 回滚后生产域名的自动分配已暂停，下次发布用 `--prod`。
+
 ## 2026-10-27：PR #58 审查跟进修复
 
 主开发者接手 PR #58，目标合并。按审查意见改了两处，均直接改本 PR 尚未上线的迁移：
