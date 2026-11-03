@@ -1,9 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node scripts/check-production-ref.mjs && next build",
   "git": {
     "deploymentEnabled": {
       "main": false
     }
   },
-  "regions": ["cle1"]
+  "regions": [
+    "cle1"
+  ]
 }
