@@ -35,6 +35,16 @@ PR #24 引入尚未在生产核实的数据库迁移，因此仓库 `vercel.json
 
 私聊物理清理保持默认 dry-run；生产调度与真实删除须按[清理交接](../handoffs/direct-message-cleanup.md)另行验证和启用。不要为了功能上线顺便打开删除任务。
 
+## 生产构建只接受 `main`（不要再 Promote 功能分支预览）
+
+`vercel.json` 的 `buildCommand` 先跑 `scripts/check-production-ref.mjs`：`VERCEL_ENV=production` 而来源分支（`VERCEL_GIT_COMMIT_REF`）不是 `main` 时构建失败，生产域名保持原版本。后台对预览点 Promote / Redeploy 到生产都会重新构建，因此会被挡下；预览和本地构建不受影响。
+
+原因是 2026-10-27 的事故：未合并的 PR #61 预览被 Promote 到生产，代码依赖的迁移没有在生产库应用，新代码 fail closed，全员无法登录约 7 天（见 [STATUS](../STATUS.md)）。此前生产发布大多就是这样 Promote 功能分支预览，那些分支当时恰好已经可以上线。
+
+现在唯一的发布方式：合并到 `main` → 确认所需迁移已在生产库应用 → 在干净、最新的 `main` 上 `npx vercel deploy --prod`。CLI 部署会带上本地分支名，在功能分支上执行同样会被拒。
+
+局限：检查写在提交里，只对包含它的提交生效；本检查合并之前的旧预览仍可被 Promote 上去。回滚（`vercel rollback` 或后台 Instant Rollback）不重新构建，不受影响；回滚后 Vercel 会暂停自动分配生产域名，下次用 `--prod` 发布即恢复。
+
 ## 旧部署 URL 会永远停在旧构建
 
 每个 `vercel deploy` 生成一个独立不变的 URL。改完环境变量必须**重新部署**，旧链接不会自动更新。排查时先确认自己打开的是最新那个部署。
