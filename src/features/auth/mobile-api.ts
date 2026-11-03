@@ -13,6 +13,8 @@ import type { createEmailOtpContextCodec } from "./email-otp-context";
 import { createEmailOtpService } from "./email-otp-service";
 import { createSignOutService } from "./sign-out-service";
 import { createSupabaseEmailOtpAuth, createSupabaseMemberSessionReader, createSupabaseSchoolDirectory } from "./supabase-email-otp-adapters";
+import { createPasswordSetupService, createPasswordSignInService } from "./password-service";
+import { createSupabasePasswordSetup, createSupabasePasswordSignIn, readOwnPasswordStatus, toMemberAccessStatus } from "./supabase-password-adapters";
 
 export const MOBILE_API_PREFIX = "/api/mobile/v1/";
 const MAX_BODY_BYTES = 16_384;
@@ -20,10 +22,13 @@ const methods: Record<string, string[]> = {
   schools: ["GET"],
   "auth/request-code": ["POST"],
   "auth/verify-code": ["POST"],
+  "auth/password-sign-in": ["POST"],
   "auth/refresh": ["POST"],
   "auth/sign-out": ["POST"],
   session: ["GET"],
   profile: ["GET", "PATCH"],
+  "account/password": ["GET", "PUT"],
+  "account/password/request-code": ["POST"],
 };
 
 type Dependencies = DeletionDependencies & {
@@ -82,8 +87,8 @@ function fields(body: Record<string, unknown>, names: string[]) {
 function resultHttpStatus(status: string) {
   if (status === "temporarily_unavailable" || status === "send_failed") return 503;
   if (status === "rate_limited") return 429;
-  if (["invalid_email", "invalid_or_expired_code", "invalid"].includes(status)) return 400;
-  if (status === "unauthenticated") return 401;
+  if (["invalid_email", "invalid_or_expired_code", "invalid", "invalid_credentials", "weak_password", "invalid_context"].includes(status)) return 400;
+  if (status === "unauthenticated" || status === "reverification_required") return 401;
   if (status === "onboarding_required") return 403;
   if (status === "invalid_request") return 400;
   if (status === "not_available") return 404;
@@ -110,7 +115,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
       const authorization = path === "auth/refresh" || deletionStatus ? null : request.headers.get("authorization");
       const accessToken = authorization?.match(/^Bearer ([^\s]{1,8192})$/i)?.[1];
       if (authorization && !accessToken) return json({ status: "access_token_invalid" }, 401);
-      const protectedPath = pushMethods !== undefined || (deletionMethods !== undefined && !deletionStatus) || courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out"].includes(path);
+      const protectedPath = pushMethods !== undefined || (deletionMethods !== undefined && !deletionStatus) || courseMethods !== undefined || friendMethods !== undefined || messageMethods !== undefined || reportMethods !== undefined || ["session", "profile", "auth/sign-out", "account/password", "account/password/request-code"].includes(path);
       if (protectedPath && !accessToken) return json({ status: "authentication_required" }, 401);
       const body = request.method === "GET" ? {} : await readBody(request);
       if (deletionMethods) {
@@ -118,17 +123,20 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         return json(result,deletionHttpStatus(result.status));
       }
       const codePath = path === "auth/request-code" || path === "auth/verify-code";
-      if (codePath && accessToken) {
+      const signInPath = codePath || path === "auth/password-sign-in";
+      if (signInPath && accessToken) {
         const current = await createSupabaseMemberSessionReader(dependencies.createClient(accessToken), accessToken).getMemberSession();
         if (current) return json({ status: "already_signed_in" });
       }
-      // 发码／验码用独立匿名实例，不能让旧 Bearer 覆盖新验证出的身份。
-      const supabase = dependencies.createClient(codePath ? undefined : accessToken);
-      const reader = createSupabaseMemberSessionReader(supabase, codePath ? undefined : accessToken, true);
+      // 发码／验码／密码登录用独立匿名实例，不能让旧 Bearer 覆盖新验证出的身份。
+      const supabase = dependencies.createClient(signInPath ? undefined : accessToken);
+      const reader = createSupabaseMemberSessionReader(supabase, signInPath ? undefined : accessToken, true);
       const readMember = async () => {
-        const member = await reader.getMemberContext();
-        if (!member) throw new RequestFailure("membership_denied", 403);
-        return member;
+        const access = await reader.getMemberAccess();
+        // 超过 30 天或密码失效：客户端应引导用验证码登录，而不是当作账号失效清缓存（ADR-0011）。
+        if (access?.status === "reverification_required") throw new RequestFailure("reverification_required", 401);
+        if (!access) throw new RequestFailure("membership_denied", 403);
+        return access.context;
       };
 
       if (path === "schools") {
@@ -193,6 +201,20 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         }
       }
 
+      if (path === "auth/password-sign-in") {
+        const input = fields(body, ["email", "password"]);
+        const result = await createPasswordSignInService({
+          auth: createSupabasePasswordSignIn(supabase),
+          readAccess: async () => toMemberAccessStatus(await reader.getMemberAccess()),
+        }).signIn(input.email, input.password);
+        if (result.status !== "signed_in") return json(result, resultHttpStatus(result.status));
+        try { return await sessionReply("signed_in", await readMember()); }
+        catch (error) {
+          await supabase.auth.signOut({ scope: "local" });
+          throw error;
+        }
+      }
+
       if (path === "auth/refresh") {
         const input = fields(body, ["refreshToken"]);
         if (!input.refreshToken) return json({ status: "invalid_request" }, 400);
@@ -227,6 +249,40 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         return json(result, mobilePushHttpStatus(result.status));
       }
       const member = await readMember();
+      if (path === "account/password" || path === "account/password/request-code") {
+        // 验码在独立客户端上得到新会话；Supabase 改密码会撤销其他会话（含 App 当前这个），
+        // 所以成功后交付新凭据，App 必须替换并重新登记推送设备（ADR-0011）。
+        const setupClient = dependencies.createClient();
+        const setup = createPasswordSetupService(createSupabasePasswordSetup(setupClient));
+        if (request.method === "GET") return json({ status: "ok", passwordSet: await readOwnPasswordStatus(supabase) });
+        if (path === "account/password/request-code") {
+          fields(body, []);
+          const result = await setup.requestCode(member);
+          if (result.status !== "code_sent") return json(result, resultHttpStatus(result.status));
+          const context = dependencies.getCodec().issue({ schoolId: member.homeSchoolId, email: member.email });
+          return json({ ...result, context, resendAfterSeconds: 60 });
+        }
+        const input = fields(body, ["context", "code", "password"]);
+        const context = dependencies.getCodec().read(input.context);
+        const result = context
+          ? await setup.setPassword(member, { contextEmail: context.email, code: input.code, password: input.password })
+          : { status: "invalid_context" as const };
+        if (result.status === "password_set") {
+          const { data, error } = await setupClient.auth.getSession();
+          if (!error && data.session?.expires_at) {
+            return json({ status: "password_set", session: {
+              accessToken: data.session.access_token,
+              refreshToken: data.session.refresh_token,
+              expiresAt: data.session.expires_at,
+              tokenType: data.session.token_type,
+            } });
+          }
+          return json({ status: "temporarily_unavailable" }, 503);
+        }
+        // 验码成功但后续失败时不留下这个多出来的会话。
+        await setupClient.auth.signOut({ scope: "local" }).catch(() => undefined);
+        return json(result, resultHttpStatus(result.status));
+      }
       if (reportMethods) {
         const result = await handleMobileReportRequest(request, body, supabase, member);
         return json(result, mobileReportHttpStatus(result.status));

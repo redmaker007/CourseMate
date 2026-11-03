@@ -32,6 +32,7 @@ const ROW = {
   enabled_school_id: "uw-madison",
   current_school_id: "uw-madison",
   onboarding_complete: true,
+  reverification_required: false,
 };
 
 describe("createSupabaseMemberSessionReader", () => {

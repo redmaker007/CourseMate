@@ -4,9 +4,13 @@ import {
   requestEmailCodeAction,
   verifyEmailCodeAction,
 } from "@/features/auth/actions";
-import { RequestEmailCodeForm } from "@/features/auth/components/request-email-code-form";
+import { LoginMethods } from "@/features/auth/components/login-methods";
+import { signInWithPasswordAction } from "@/features/auth/password-actions";
 import { getEnabledSchools, type EnabledSchool } from "@/features/auth/queries";
-import { getCurrentMember } from "@/features/auth/session";
+import {
+  currentSessionNeedsReverification,
+  getCurrentMember,
+} from "@/features/auth/session";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +36,7 @@ export default async function LoginPage({
     );
   }
 
+  const reverificationRequired = await currentSessionNeedsReverification();
   let schools: EnabledSchool[] = [];
   let schoolsUnavailable = false;
 
@@ -52,7 +57,7 @@ export default async function LoginPage({
             使用学校邮箱登录
           </h1>
           <p className="mt-2 text-sm text-muted">
-            选择学校并验证邮箱，快速进入属于你的校园社区。
+            用学校邮箱和密码登录；第一次使用请选验证码登录。
           </p>
         </div>
 
@@ -62,8 +67,10 @@ export default async function LoginPage({
           </p>
         ) : null}
 
-        <RequestEmailCodeForm
+        <LoginMethods
+          passwordAction={signInWithPasswordAction}
           requestAction={requestEmailCodeAction}
+          reverificationRequired={reverificationRequired}
           schools={schools}
           verifyAction={verifyEmailCodeAction}
         />

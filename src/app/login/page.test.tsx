@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({
   getCurrentMember: vi.fn(),
+  currentSessionNeedsReverification: vi.fn(async () => false),
 }));
 const navigation = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
@@ -17,6 +18,7 @@ vi.mock("@/features/auth/actions", () => ({
   requestEmailCodeAction: vi.fn(),
   verifyEmailCodeAction: vi.fn(),
 }));
+vi.mock("@/features/auth/password-actions", () => ({ signInWithPasswordAction: vi.fn() }));
 
 import LoginPage from "./page";
 

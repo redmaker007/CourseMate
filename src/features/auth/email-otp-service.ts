@@ -59,7 +59,7 @@ function isCommonEmailLocalPart(value: string) {
   );
 }
 
-function normalizeSchoolEmail(email: string) {
+export function normalizeSchoolEmail(email: string) {
   const trimmedEmail = email.trim();
   const at = trimmedEmail.lastIndexOf("@");
   const localPart = trimmedEmail.slice(0, at);

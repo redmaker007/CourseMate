@@ -27,6 +27,23 @@ const UNAVAILABLE_CODES = new Set([
   "unexpected_failure",
 ]);
 
+/** 验证码与密码共用的 Auth 错误分类；其他错误按调用方给的业务失败处理。 */
+export function classifyAuthError<Fallback extends string>(
+  error: { code?: string; status?: number },
+  fallback: Fallback,
+): { status: "rate_limited" | "unavailable" | Fallback } {
+  if (RATE_LIMIT_CODES.has(error.code ?? "") || error.status === 429) {
+    return { status: "rate_limited" };
+  }
+  if (
+    UNAVAILABLE_CODES.has(error.code ?? "") ||
+    (error.status !== undefined && error.status >= 500)
+  ) {
+    return { status: "unavailable" };
+  }
+  return { status: fallback };
+}
+
 export function createSupabaseEmailOtpAuth(
   supabase: CourseMateSupabaseClient,
 ): EmailOtpAuthPort {
@@ -59,17 +76,15 @@ export function createSupabaseEmailOtpAuth(
         type: "email",
       });
 
-      if (!error) return { status: "verified" };
-      if (RATE_LIMIT_CODES.has(error.code ?? "") || error.status === 429) {
-        return { status: "rate_limited" };
-      }
-      if (
-        UNAVAILABLE_CODES.has(error.code ?? "") ||
-        (error.status !== undefined && error.status >= 500)
-      ) {
+      if (!error) {
+        // 记下这次验证码验证，30 天重新验证按账号从这里算起（ADR-0011）。
+        // 记不下来就不留这个会话：否则密码会话可能拿到一个没登记的验证时间。
+        const { error: recordError } = await supabase.rpc("record_email_verification");
+        if (!recordError) return { status: "verified" };
+        await currentDeviceSession.signOut();
         return { status: "unavailable" };
       }
-      return { status: "invalid_or_expired" };
+      return classifyAuthError(error, "invalid_or_expired");
     },
 
     async discardSession() {
@@ -154,7 +169,8 @@ export function createSupabaseMemberSessionReader(
         typeof row.home_school_id !== "string" ||
         !(row.enabled_school_id === null || typeof row.enabled_school_id === "string") ||
         !(row.current_school_id === null || typeof row.current_school_id === "string") ||
-        typeof row.onboarding_complete !== "boolean"
+        typeof row.onboarding_complete !== "boolean" ||
+        typeof row.reverification_required !== "boolean"
       )) throw new Error("Invalid member context row");
       // 没有成员账号时函数返回零行。形状不对的行也按没有处理，不放行。
       if (
@@ -171,6 +187,8 @@ export function createSupabaseMemberSessionReader(
         enabledSchoolId: row.enabled_school_id ?? null,
         currentSchoolId: row.current_school_id ?? null,
         onboardingComplete: row.onboarding_complete === true,
+        // 字段缺失（比如迁移还没应用）时按需要重新验证处理，不放行。
+        reverificationRequired: row.reverification_required !== false,
       };
     },
   };

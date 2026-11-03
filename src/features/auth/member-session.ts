@@ -18,6 +18,8 @@ export type MemberFacts = {
   /** 业务上的当前学校；管理员跨校测试时与 homeSchoolId 不同。 */
   currentSchoolId: string | null;
   onboardingComplete: boolean;
+  /** 距上次验证码验证超过 30 天，或密码不是经本应用设置的（ADR-0011）。 */
+  reverificationRequired: boolean;
 };
 
 export type MemberContext = {
@@ -27,6 +29,11 @@ export type MemberContext = {
   currentSchoolId: string;
   onboardingComplete: boolean;
 };
+
+export type MemberAccess =
+  | { status: "member"; context: MemberContext }
+  | { status: "reverification_required" }
+  | null;
 
 export interface MemberSessionDataPort {
   getVerifiedUser(): Promise<VerifiedAuthUser | null>;
@@ -57,27 +64,39 @@ export function createMemberSessionReader(data: MemberSessionDataPort) {
     return { user, facts };
   }
 
+  /** 要求重新验证邮箱的会话不算有效会话，但调用方需要区分它，好提示用户用验证码登录。 */
+  async function readMemberAccess(): Promise<MemberAccess> {
+    const valid = await readValidFacts();
+    // 读不到当前学校与读不到 onboarding 状态一样，按未登录处理（fail closed）。
+    if (!valid || !valid.facts.currentSchoolId) return null;
+    if (valid.facts.reverificationRequired) return { status: "reverification_required" };
+
+    return {
+      status: "member",
+      context: {
+        userId: valid.user.id,
+        email: valid.user.email,
+        homeSchoolId: valid.facts.homeSchoolId,
+        currentSchoolId: valid.facts.currentSchoolId,
+        onboardingComplete: valid.facts.onboardingComplete,
+      },
+    };
+  }
+
   return {
     async getMemberSession(): Promise<MemberSession | null> {
       const valid = await readValidFacts();
-      if (!valid) return null;
+      if (!valid || valid.facts.reverificationRequired) return null;
 
       return { userId: valid.user.id, schoolId: valid.facts.homeSchoolId };
     },
 
     /** 给页面用：在有效会话之上，再带上邮箱、当前学校与 onboarding 状态。 */
     async getMemberContext(): Promise<MemberContext | null> {
-      const valid = await readValidFacts();
-      // 读不到当前学校与读不到 onboarding 状态一样，按未登录处理（fail closed）。
-      if (!valid || !valid.facts.currentSchoolId) return null;
-
-      return {
-        userId: valid.user.id,
-        email: valid.user.email,
-        homeSchoolId: valid.facts.homeSchoolId,
-        currentSchoolId: valid.facts.currentSchoolId,
-        onboardingComplete: valid.facts.onboardingComplete,
-      };
+      const access = await readMemberAccess();
+      return access?.status === "member" ? access.context : null;
     },
+
+    getMemberAccess: readMemberAccess,
   };
 }

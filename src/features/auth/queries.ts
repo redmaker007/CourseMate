@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
+import { readOwnPasswordStatus } from "./supabase-password-adapters";
+
 export type EnabledSchool = {
   id: string;
   nameEn: string;
@@ -27,4 +29,13 @@ export async function getEnabledSchools(): Promise<EnabledSchool[]> {
       .map((row) => row.domain)
       .sort((left, right) => left.length - right.length || left.localeCompare(right)),
   }));
+}
+
+/** 本人是否设过仍有效的密码；读不到时返回 null，页面按"状态未知"显示。 */
+export async function getOwnPasswordStatus(): Promise<boolean | null> {
+  try {
+    return await readOwnPasswordStatus(await createClient());
+  } catch {
+    return null;
+  }
 }

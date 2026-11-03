@@ -123,6 +123,8 @@ describe("get_member_context", () => {
         enabled_school_id: "uw-madison",
         current_school_id: "uw-madison",
         onboarding_complete: true,
+        // 这些成员在迁移后插入、也没有验证码会话，所以要求重新验证（规则见 password-sign-in.test.ts）。
+        reverification_required: true,
       },
     ]);
   });

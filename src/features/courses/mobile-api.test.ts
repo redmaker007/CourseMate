@@ -49,7 +49,7 @@ describe("移动课程 HTTP 契约（真实 SDK，模拟网络）", () => {
               calls.push({ path: url.pathname + url.search, method: request.method, body, authorization: request.headers.get("authorization") });
               const json = (data: unknown, status = 200) => Response.json(data, { status });
               if (name === "user") return json({ user: { id: userId, email, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } });
-              if (name === "get_member_context") return json([{ user_id: userId, home_school_id: "uw-madison", enabled_school_id: "uw-madison", current_school_id: currentSchool, onboarding_complete: onboarding }]);
+              if (name === "get_member_context") return json([{ user_id: userId, home_school_id: "uw-madison", enabled_school_id: "uw-madison", current_school_id: currentSchool, onboarding_complete: onboarding, reverification_required: false }]);
               if (failure === "network") return json({ message: "synthetic failure" }, 503);
               if (name === "school_term_settings") return json([{ current_term: "2026-fall" }]);
               if (name === "get_dashboard_courses") {

@@ -100,3 +100,19 @@ Ticket 7 接入补充（2026-10-26）：当前设备退出仍 POST 空对象，�
 - 真实环境联调仍需受控测试账号验证：真实 OTP、刷新轮换和响应丢失恢复、多设备独立退出、资料/RLS、900 秒 JWT 配置及无凭据泄漏。没有真实凭据时不以模拟测试代替这些验收。
 
 完整测试、构建、lint、类型检查和阶段 review 的本次证据在 `docs/STATUS.md` 与 Notion Ticket 1 记录；未完成检查保持未验收。
+
+## 2026-10-27 追加：密码登录与 30 天重新验证（ADR-0011）
+
+规则见 [ADR-0011](../adr/0011-password-sign-in-with-monthly-email-reverification.md)。需要迁移 `202610270001` 已应用（目前只在 CourseMate-test）。
+
+| 路径 | 方法 | 请求 | 成功 | 主要失败 |
+|---|---|---|---|---|
+| `auth/password-sign-in` | POST | `{ email, password }`，不带 Bearer | 同 `auth/verify-code`：`signed_in` + `member` + `session` | `400 invalid_credentials`（没设密码／密码错／账号不可用同一结果）、`401 reverification_required`、`429`、`503` |
+| `account/password` | GET | Bearer | `{ status: "ok", passwordSet }` | 同其他受保护接口 |
+| `account/password/request-code` | POST | Bearer，`{}` | `{ status: "code_sent", email, context, resendAfterSeconds: 60 }`，验证码只发到当前账号邮箱 | `429`、`503 send_failed` |
+| `account/password` | PUT | Bearer，`{ context, code, password }` | `{ status: "password_set", session }`（`session` 字段同登录响应） | `400 invalid_context`／`invalid_or_expired_code`／`weak_password`（8 字符起、最多 72 字节） |
+
+- **设置密码成功后必须替换凭据**：Supabase 改密码会撤销该账号所有其他会话，包括 App 发起请求时用的这个。用响应里的新 `session` 覆盖本地凭据，再重新 `PUT push/device`（推送绑定跟会话走）；同账号的其他设备会在令牌到期后收到 `session_invalid`，需要重新登录。失败时服务端会退出验码产生的会话，原凭据仍可用。
+- 任何受保护接口都可能返回 `401 reverification_required`：距上次验证码验证超过 30 天（按账号计），或密码已失效。App 应保留缓存、提示用验证码登录（`auth/request-code` → `auth/verify-code`），**不要当作成员失效清缓存**；`403 membership_denied` 的含义不变。
+- 验证码登录成功时服务端会登记验证时间；登记失败按 `503` 处理且不交付凭据。
+
