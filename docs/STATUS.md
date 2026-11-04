@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-11-03：密码登录上线（生产库迁移 + 前端发布）
+
+**合并**：PR #61 以合并提交并入 `main`（`7443521`）。
+
+**生产库**（`CourseMate-east`，`xpmkpkplftgtfzecdwpd`）：
+- 先用 `supabase db dump --linked` 导出结构与数据到仓库外 `D:\Projects\self_Project\coursemate-prod-schema-20261103.sql`（179 KB）、`coursemate-prod-data-20261103.sql`（3.3 MB），含用户数据，冒烟确认后自行处理。
+- `202609260001`（RLS 提速）当年手动执行未登记：只读确认其索引已在生产后，用 `migration repair --status applied` 补登记。
+- 预演时发现网页推送 `202610040001` 在生产**从未应用**（表与函数都不存在），与 STATUS 原记录一致但不在原上线清单里；经用户决定与另三条一起上。因其时间戳早于生产最新 `202610050002`，用 `db push --linked --include-all`，依次应用 `202610040001`、`202610260001`、`202610260002`、`202610270001`，全部成功。
+- 核对：`member_auth_state`、`push_subscriptions`、`push_dispatches`、`mobile_push_devices`、`mobile_push_jobs` 都在；密码登录 4 个函数、网页推送 5 个函数、`register_mobile_push_device` 各 1 个；`public` 下所有表 RLS 开启；`migration list` 无未登记项。
+- 从生产重新生成的 `database.ts` 与仓库 `public` 部分完全一致（只差 `PostgrestVersion` 与 CLI 默认带出的 `graphql_public`），未提交。
+
+**前端**：在干净的 `main` 上 `npx vercel deploy --prod` 得到 `course-mate-fznvi9hq1`（`dpl_3LVbweaN57TMdwzHARWeXSj1qarK`）；生产域名仍停在 `os0mp6m6t`，随后 `vercel promote`，`inspect course-mate-three.vercel.app` 确认已指向新部署。回滚目标：`course-mate-os0mp6m6t`（旧前端兼容新库，回滚不需动数据库）。
+
+**已验证**：线上登录页有「密码登录」标签、密码输入框与首次使用提示，控制台无错误（只看页面文本，未截图）。
+
+**未验证**：验证码登录、设置密码后保持登录、密码登录、输错密码保留邮箱——需真实验证码，由用户在线上走查。网页推送仍关闭（四个环境变量未配）。移动端需对接密码接口；上线后超过 30 天的会话会收到 `401 reverification_required`，需通知丹尼。
+
 ## 2026-11-03：生产登录事故（10-27 起约 7 天无法登录），已回滚
 
 **现象**：生产站验证码登录先显示"服务暂时不可用"，再用同一验证码显示"验证码错误或已过期"。
@@ -15,9 +32,9 @@
 **仍待处理**：
 - PR #61 分支的预览 `course-mate-git-feature-password-sign-in-…` 仍连生产库。
 - Vercel Preview 环境变量指向生产库，是否改指测试库需在后台决定。
-- 回滚后生产域名的自动分配已暂停，下次发布用 `--prod`。
+- 回滚后生产域名的自动分配已暂停；11-03 发布时 `--prod` 后仍需 `vercel promote` 才切换，promote 后是否恢复自动分配未核对。
 
-## 2026-10-27：密码登录与 30 天重新验证（分支 `feature/password-sign-in`，未合并）
+## 2026-10-27：密码登录与 30 天重新验证（PR #61，已于 11-03 合并并上线，见顶部条目）
 
 按主开发者要求：验证码登录后可在「我的」页设置密码（每次设置／修改都要当场输验证码），之后用学校邮箱 + 密码登录；每 30 天按账号强制用验证码登录一次。网页与移动接口一起做。规则与取舍见 [ADR-0011](adr/0011-password-sign-in-with-monthly-email-reverification.md)，移动端接口见[移动认证交接](handoffs/mobile-auth-api.md)末节。
 
@@ -163,7 +180,7 @@ Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接�
 | 延迟显示 | 个人资料页「显示偏好」开关（只存本机浏览器，不进数据库）；开启后页面左下角显示两个毫秒读数：**网络**（HEAD 静态图标，不经函数与数据库）与**服务**（GET `/api/ping`，含 proxy 的登录校验与 Supabase 往返）。每 15 秒测一次，标签页在后台时暂停，换页立即重测；未登录时只显示网络读数 |
 | 新界面 | Figma 原型的 6 页（登录、大厅、课程群聊、消息与好友两栏、我的）已移植，含导航外壳（桌面左栏、手机底栏）与深色模式（PR #44–#49，已上线） |
 | PWA | `manifest`、图标、`viewport-fit=cover` 与安全区、Service Worker（只提供可安装条件和断网离线页，不缓存页面与接口）、「我的」页的「安装到手机」卡片（PR #55、#56，已上线；真机验收进行中） |
-| 网页推送 | 私聊与好友申请通知：订阅表、只授权 `service_role` 的认领函数、发送器、开关（PR #57，已合并，**生产关闭**：迁移未应用、四个环境变量未配、前端未发布；见 [ADR-0010](adr/0010-web-push-via-restricted-rpc.md)、[启用手册](runbooks/web-push.md)） |
+| 网页推送 | 私聊与好友申请通知：订阅表、只授权 `service_role` 的认领函数、发送器、开关（PR #57，已合并，**生产关闭**：迁移 11-03 已应用、代码已随 11-03 前端发布，四个环境变量未配；见 [ADR-0010](adr/0010-web-push-via-restricted-rpc.md)、[启用手册](runbooks/web-push.md)） |
 
 学习搭子、笔记共享尚未开发；举报证据已实现不代表内容审核后台已交付。
 
@@ -216,10 +233,10 @@ Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接�
 
 1. **PWA 真机验收**：Android Chrome 与 iPhone Safari 各走一遍安装、独立窗口、断网离线页、刘海屏底栏、键盘弹出时聊天输入框、退出再登录；临时图标（靛蓝底白色 C）换成设计提供的正式图标。
 2. **Figma 界面登录后走查**：用真实验证码把各页点一遍（两栏「消息与好友」、深色模式、课程群聊回车发送）。「最后一条消息预览与时间」需要新增数据库函数，并遵守清除历史与拉黑规则，涉及权限，先出方案再做。
-3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——应用迁移 `202610040001`、补登记迁移历史、重新生成 `src/types/database.ts`；本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
-4. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并（见顶部 2026-10-27 条目，生产未迁移）；「HTTP API 还是直连 Supabase SDK」尚未定案。
+3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——迁移 `202610040001` 已于 11-03 应用并登记、类型无需改；剩下本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
+4. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并，迁移 11-03 已上生产；「HTTP API 还是直连 Supabase SDK」尚未定案。
 5. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
-6. **此前遗留**（仍然有效）：迁移 `202609260001` 登记到迁移历史表；测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份；本地 `supabase/.temp/project-ref` 仍指向旧项目；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
+6. **此前遗留**（仍然有效）：测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份（11-03 另有一份本地 dump，见顶部）；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
 7. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
 
 ## 日后再谈
