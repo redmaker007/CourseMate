@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-11-20：补物化 uw-madison 课表 1,064 门
+
+**问题**：只读核对生产库（`CourseMate-east`，`xpmkpkplftgtfzecdwpd`）时发现，`course_catalog` 里 uw-madison 有 4,988 行，`courses`（`2026-fall`）里只有 3,924 门。缺的 1,064 行全部是 09-15 那次物化（`courses` 最后建课时间 05:18 UTC）之后才写入目录的，`updated_at` 最晚到 09-15 20:59 UTC；课号和课名都在长度限制内，不是被规则跳过的。所以下面 09-15 条目说的"3,924 行都已能搜到"在当时成立，但之后补进目录的课一直没有物化，学生搜不到也加不了。这些行当时具体怎么写进去的没有查到。
+
+**处理**：经用户同意，通过 MCP `execute_sql` 调用 `materialize_catalog_courses('uw-madison')`，返回 `2026-fall` 新建 1,064 门、已存在 3,924 门、不合规 0 门。
+
+**已验证（数据库查询）**：`course_catalog` 与 `courses` 都是 4,988 门，没有遗漏；新建行的 `created_by` 全部为空（系统物化，不是学生建的）。按 [ADR-0007](adr/0007-lazy-course-conversation-creation.md)，课程会话等第一个学生加入时才创建，这次没有一起建。
+
+**未验证**：没有在线上网站搜索或加入这些课程。
+
+**其他数据现状（同日核对）**：`umich` 与 `msu` 的 `course_catalog` 和 `courses` 都是 0 行，`school_term_settings` 里没有 `msu` 的行。仓库根目录有一份未提交的 `umich-ann-arbor-courses.csv`（20,990 门，11-19 生成，只有课号和课名），尚未导入；其中 `wolverine_catalog` 来源（15,296 门）导入前要对照 [ADR-0002](adr/0002-do-not-reverse-engineer-university-course-search.md) 确认取得方式。
+
 ## 2026-11-03：密码登录上线（生产库迁移 + 前端发布）
 
 **合并**：PR #61 以合并提交并入 `main`（`7443521`）。
