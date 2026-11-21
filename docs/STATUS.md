@@ -1,5 +1,34 @@
 # 当前状态
 
+## 2026-11-21：导入 MSU 与 UMich 课表；搜索与登录改进已上线
+
+**课程数据决定**：用户决定导入两份队友整理的课表，即使它们不是 ADR-0002 指定的授权渠道。新写 [ADR-0012](adr/0012-course-catalog-from-public-pages.md) 取代 ADR-0002：允许使用无需登录的公开页面，绕过访问控制仍不允许。UMich 里 15,430 门来自 Wolverine Access，采集时是否公开可访问还没核实，见 ADR-0012。
+
+**生产导入**（`CourseMate-east`；`supabase db query --remote --file`，每校一个事务，用户已同意写入）：
+- MSU：先补 `school_term_settings`（`msu` → `2026-fall`），再写入目录 8,326 行；物化结果新建 8,326、已存在 0、不合规 0。
+- UMich 安娜堡：目录 21,196 行；物化结果新建 21,195、不合规 1（`PSYCH 476` 课名 128 字，超过 `courses` 的 120 字上限，只在目录里）。
+- 只有课号、学科、编号、课名和来源学期（`source_term` 存的是 CSV 的 `source_period`，其中 Wolverine 来源的是抓取日期，比如 `2026-11-19`）；学分、简介等列为空。
+- 数据库核对：msu 8,326 / 8,326、umich 21,196 / 21,195、uw-madison 4,988 / 4,988（目录 / `2026-fall` 课程）。没有在线上网站搜索验证。
+- 来源文件是用户通过微信发来的 `msu-courses(1).csv`、`umich-ann-arbor-courses(1).csv`（umich 这份比仓库根目录那份多 206 行），没有提交到仓库。
+
+**搜索与登录改进**（PR #65，已合并为 `main` `26a5134` 并发布生产）：常用缩写搜索（cs → COMP SCI / EECS / CSE 等）、搜索结果显示「2026 秋季 · X 位成员」、密码登录下的「创建账号」入口、按邮箱后缀识别学校、「同学」标签改「好友」、「返回课表」、按页标题。搜索不再每次读整份课表：UMich 2 万多门课，原写法一次搜索要连续发约 43 次请求。
+- **迁移**：`202611210001_course_search_member_counts.sql` 先经 `supabase db push --linked` 应用到生产（dry run 确认只有这一条待推）。核对：`get_course_member_counts` 是 security definer、`search_path` 为空、`anon` 不能执行、`authenticated` 可以执行；`umich` 显示名已改；迁移历史最新一条是 `202611210001`。
+- **前端**：在 `main` 的全新克隆里执行 `npx vercel deploy --prod`，得到 `course-mate-iukzzet7m`（`dpl_9AK6FaU5eVXU9LZFwFrARgCQbR2U`），生产域名已指向它，`x-vercel-id` 是 `cle1::cle1`。第一次在 git worktree 里发布时，Vercel CLI 读不到分支名，被 `check-production-ref` 拒绝（`course-mate-ll0cpn4t4`，Error）；生产没受影响。以后用普通克隆或主仓库发布，不要用 worktree。回滚目标：`course-mate-fznvi9hq1`。
+- **已验证**：合并前 `npm test` 116 个文件 / 871 项 → build → lint → typecheck 依次通过；用户在 PR 预览里看到了「创建账号」入口。上线后 `/login` 返回 200，有「创建账号」，标题是「学校邮箱登录 · CourseMate」；`/`、`/dashboard`、`/friends`、`/profile`、`/courses/*` 未登录时都是 307；部署后 5 分钟内日志没有错误。
+- **未验证**：登录后的页面（缩写搜索、成员人数、好友标签、返回课表、页面标题）没在生产走查。
+
+## 2026-11-20：补物化 uw-madison 课表 1,064 门
+
+**问题**：只读核对生产库（`CourseMate-east`，`xpmkpkplftgtfzecdwpd`）时发现，`course_catalog` 里 uw-madison 有 4,988 行，`courses`（`2026-fall`）里只有 3,924 门。缺的 1,064 行全部是 09-15 那次物化（`courses` 最后建课时间 05:18 UTC）之后才写入目录的，`updated_at` 最晚到 09-15 20:59 UTC；课号和课名都在长度限制内，不是被规则跳过的。所以下面 09-15 条目说的"3,924 行都已能搜到"在当时成立，但之后补进目录的课一直没有物化，学生搜不到也加不了。这些行当时具体怎么写进去的没有查到。
+
+**处理**：经用户同意，通过 MCP `execute_sql` 调用 `materialize_catalog_courses('uw-madison')`，返回 `2026-fall` 新建 1,064 门、已存在 3,924 门、不合规 0 门。
+
+**已验证（数据库查询）**：`course_catalog` 与 `courses` 都是 4,988 门，没有遗漏；新建行的 `created_by` 全部为空（系统物化，不是学生建的）。按 [ADR-0007](adr/0007-lazy-course-conversation-creation.md)，课程会话等第一个学生加入时才创建，这次没有一起建。
+
+**未验证**：没有在线上网站搜索或加入这些课程。
+
+**其他数据现状（同日核对）**：`umich` 与 `msu` 的 `course_catalog` 和 `courses` 都是 0 行，`school_term_settings` 里没有 `msu` 的行。仓库根目录有一份未提交的 `umich-ann-arbor-courses.csv`（20,990 门，11-19 生成，只有课号和课名），尚未导入；其中 `wolverine_catalog` 来源（15,296 门）导入前要对照 [ADR-0002](adr/0002-do-not-reverse-engineer-university-course-search.md) 确认取得方式。
+
 ## 2026-11-03：密码登录上线（生产库迁移 + 前端发布）
 
 **合并**：PR #61 以合并提交并入 `main`（`7443521`）。
