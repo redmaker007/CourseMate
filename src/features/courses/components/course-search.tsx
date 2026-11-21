@@ -3,10 +3,12 @@ import Link from "next/link";
 
 import { joinCourseAction } from "../actions";
 import type { CourseSearchItem } from "../queries";
+import { formatTerm } from "../term-label";
 
 const MATCH_LABELS = {
   exact_code: "课号精确匹配",
   code_prefix: "课号前缀",
+  subject_alias: "常用缩写",
   title_keyword: "名称关键词",
   title_similar: "相似名称",
 } as const;
@@ -37,7 +39,7 @@ export function CourseSearch({
             defaultValue={query}
             id="course-query"
             name="q"
-            placeholder="搜索课程号或名称，例如 CS 540"
+            placeholder="课号、缩写或名称，例如 CS 540、stats"
             type="search"
           />
         </div>
@@ -62,7 +64,11 @@ export function CourseSearch({
                   <span className="text-xs text-muted">{MATCH_LABELS[course.matchKind]}</span>
                 </div>
                 <p className="mt-0.5 line-clamp-2 text-sm text-ink">{course.title}</p>
-                <div className="mt-2 flex justify-end">
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted">
+                    {formatTerm(course.term)}
+                    {course.memberCount === null ? "" : ` · ${course.memberCount} 位成员`}
+                  </span>
                   {course.joined ? (
                     <Link
                       className="flex items-center gap-1 rounded-full bg-success-soft px-3 py-1 text-xs font-medium text-success"
@@ -92,7 +98,7 @@ export function CourseSearch({
         </ul>
       ) : (
         <p className="px-1 py-6 text-center text-xs text-muted">
-          输入课号或课程名称，找到课程后点「加入课程」进入班级群聊。
+          输入课号、常用缩写（如 CS、stats）或课程名称，找到课程后点「加入课程」进入班级群聊。
         </p>
       )}
     </section>

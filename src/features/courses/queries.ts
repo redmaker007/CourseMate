@@ -27,6 +27,8 @@ export type CourseListItem = CourseCatalogEntry & {
 
 export type CourseSearchItem = CourseSearchResult & {
   joined: boolean;
+  /** 加入前就能看到的人数；读不到时为 null，页面不显示人数但仍可加入。 */
+  memberCount: number | null;
 };
 
 export type CourseMemberView = {
@@ -77,19 +79,25 @@ export async function searchAvailableCourses(
   const matches = await service.searchCourses(member.schoolId, query);
   if (matches.length === 0) return [];
 
-  const { data: memberships, error } = await supabase
-    .from("course_members")
-    .select("course_id")
-    .eq("user_id", member.userId)
-    .in(
-      "course_id",
-      matches.map((course) => course.id),
-    );
-  if (error) throw error;
-  const joinedIds = new Set((memberships ?? []).map((row) => row.course_id));
+  const ids = matches.map((course) => course.id);
+  const [membershipResult, countResult] = await Promise.all([
+    supabase
+      .from("course_members")
+      .select("course_id")
+      .eq("user_id", member.userId)
+      .in("course_id", ids),
+    // 人数只是辅助信息（202611210001_course_search_member_counts.sql），失败时搜索照常可用。
+    supabase.rpc("get_course_member_counts", { target_courses: ids }),
+  ]);
+  if (membershipResult.error) throw membershipResult.error;
+  const joinedIds = new Set((membershipResult.data ?? []).map((row) => row.course_id));
+  const counts = countResult.error
+    ? null
+    : new Map((countResult.data ?? []).map((row) => [row.course_id, row.member_count]));
   return matches.map((course) => ({
     ...course,
     joined: joinedIds.has(course.id),
+    memberCount: counts ? (counts.get(course.id) ?? 0) : null,
   }));
 }
 

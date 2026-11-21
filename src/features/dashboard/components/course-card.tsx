@@ -2,6 +2,7 @@ import { MessageCircle, Users } from "lucide-react";
 import Link from "next/link";
 
 import type { CourseListItem } from "@/features/courses/queries";
+import { formatTerm } from "@/features/courses/term-label";
 import { courseColor } from "@/features/shell/navigation";
 
 type CourseCardProps = {
@@ -26,7 +27,7 @@ export function CourseCard({ course, colorIndex }: CourseCardProps) {
           <span className="truncate text-base font-bold" style={{ color }}>
             {course.code}
           </span>
-          <span className="shrink-0 text-xs text-muted">{course.term}</span>
+          <span className="shrink-0 text-xs text-muted">{formatTerm(course.term)}</span>
           {course.archived ? (
             <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">
               已归档
@@ -39,7 +40,7 @@ export function CourseCard({ course, colorIndex }: CourseCardProps) {
       <div className="mt-auto flex items-center justify-between gap-3">
         <span className="flex items-center gap-1 text-xs text-muted">
           <Users size={12} strokeWidth={1.75} />
-          {course.memberCount} 位同学
+          {course.memberCount} 位成员
         </span>
         <Link
           className="flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent transition hover:opacity-80"

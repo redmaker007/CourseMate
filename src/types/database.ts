@@ -1416,6 +1416,13 @@ export type Database = {
         Args: { receipt_digest: string }
         Returns: string
       }
+      get_course_member_counts: {
+        Args: { target_courses: string[] }
+        Returns: {
+          course_id: string
+          member_count: number
+        }[]
+      }
       get_course_room: {
         Args: {
           message_limit?: number

@@ -55,9 +55,6 @@ describe("RequestEmailCodeForm", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("学校"), {
-      target: { value: "uw-madison" },
-    });
     fireEvent.change(screen.getByLabelText("学校邮箱"), {
       target: { value: "student@wisc.edu" },
     });
@@ -105,9 +102,6 @@ describe("RequestEmailCodeForm", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("学校"), {
-      target: { value: "uw-madison" },
-    });
     fireEvent.change(screen.getByLabelText("学校邮箱"), {
       target: { value: "student@wisc.edu" },
     });
@@ -133,11 +127,16 @@ describe("RequestEmailCodeForm", () => {
     ).toBe(true);
     expect(requestCount).toBe(2);
   });
-  it("邮箱提示跟随所选学校变化，不会停留在上一所学校的域名", async () => {
-    const requestAction = async (): Promise<RequestEmailCodeActionState> => ({
-      status: "idle",
-      message: "",
-    });
+
+  it("按邮箱后缀识别学校，认不出时说明开放了哪些后缀且不能发送", async () => {
+    let submittedSchool: FormDataEntryValue | null = null;
+    const requestAction = async (
+      _state: RequestEmailCodeActionState,
+      formData: FormData,
+    ): Promise<RequestEmailCodeActionState> => {
+      submittedSchool = formData.get("schoolId");
+      return { status: "idle", message: "" };
+    };
     const verifyAction = async (): Promise<VerifyEmailCodeActionState> => ({
       status: "idle",
       message: "",
@@ -150,8 +149,8 @@ describe("RequestEmailCodeForm", () => {
           {
             emailDomains: ["umich.edu"],
             id: "umich",
-            nameEn: "University of Michigan",
-            nameZh: "密歇根大学",
+            nameEn: "University of Michigan–Ann Arbor",
+            nameZh: "密歇根大学安娜堡分校",
           },
           {
             emailDomains: ["wisc.edu"],
@@ -165,21 +164,25 @@ describe("RequestEmailCodeForm", () => {
     );
 
     const email = screen.getByLabelText("学校邮箱");
+    const submit = screen.getByRole<HTMLButtonElement>("button", { name: "发送验证码" });
 
-    // 还没选学校时不该编造一个域名当示例
-    expect(email.getAttribute("placeholder")).toBe("请先选择学校");
+    // 没输入时列出开放的学校，安娜堡校区写清楚
+    expect(screen.getByText(/密歇根大学安娜堡分校 · University of Michigan–Ann Arbor/)).toBeTruthy();
+    expect(submit.disabled).toBe(true);
 
-    fireEvent.change(screen.getByLabelText("学校"), {
-      target: { value: "uw-madison" },
+    fireEvent.change(email, { target: { value: "student@cs.wisc.edu" } });
+    expect(screen.getByText(/暂不支持 @cs\.wisc\.edu/)).toBeTruthy();
+    expect(submit.disabled).toBe(true);
+
+    fireEvent.change(email, { target: { value: "Student@UMich.edu" } });
+    expect(
+      screen.getByText("已识别：密歇根大学安娜堡分校 · University of Michigan–Ann Arbor"),
+    ).toBeTruthy();
+    expect(submit.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(submit);
     });
-    expect(email.getAttribute("placeholder")).toBe("name@wisc.edu");
-    expect(screen.getByText("只接受 @wisc.edu 结尾的完整邮箱地址。")).toBeTruthy();
-
-    // 换一所学校后必须跟着变——这里正是原来卡在 wisc.edu 不动的地方
-    fireEvent.change(screen.getByLabelText("学校"), {
-      target: { value: "umich" },
-    });
-    expect(email.getAttribute("placeholder")).toBe("name@umich.edu");
-    expect(screen.getByText("只接受 @umich.edu 结尾的完整邮箱地址。")).toBeTruthy();
+    expect(submittedSchool).toBe("umich");
   });
 });

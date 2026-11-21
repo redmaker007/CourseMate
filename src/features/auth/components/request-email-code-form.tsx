@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 
 import type { EnabledSchool } from "../queries";
+import { emailDomain, schoolForEmail } from "../school-email";
 import {
   EMAIL_RESEND_INTERVAL_SECONDS,
   getResendCountdown,
@@ -232,7 +233,7 @@ export function RequestEmailCodeForm({
     initialRequestEmailCodeState,
   );
   const [editingEmail, setEditingEmail] = useState(false);
-  const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [email, setEmail] = useState("");
 
   if (state.status === "code_sent" && !editingEmail) {
     return (
@@ -246,20 +247,12 @@ export function RequestEmailCodeForm({
     );
   }
 
-  const selectedSchool = schools.find(
-    (school) => school.id === selectedSchoolId,
-  );
-  const acceptedDomains = selectedSchool?.emailDomains ?? [];
-
-  // 选学校之前不能编造一个域名当示例——那会让人以为随便哪所学校都能用。
-  const emailPlaceholder =
-    acceptedDomains.length > 0 ? `name@${acceptedDomains[0]}` : "请先选择学校";
-
-  // 把接受的域名写出来，省得用户拿子域名邮箱反复试。系统是精确匹配的。
-  const emailHint =
-    acceptedDomains.length > 0
-      ? `只接受 ${acceptedDomains.map((domain) => `@${domain}`).join("、")} 结尾的完整邮箱地址。`
-      : "请输入完整邮箱地址，系统不会自动补全后缀。";
+  // 不再让用户先选学校：按邮箱后缀直接认出学校，认不出就说明支持哪些后缀。
+  const detectedSchool = schoolForEmail(schools, email);
+  const typedDomain = emailDomain(email);
+  const supportedDomains = schools
+    .flatMap((school) => school.emailDomains.map((domain) => `@${domain}`))
+    .join("、");
 
   return (
     <form
@@ -269,29 +262,7 @@ export function RequestEmailCodeForm({
       }}
       className="space-y-5"
     >
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-ink" htmlFor="schoolId">
-          学校
-        </label>
-        <select
-          className="w-full h-12 rounded-xl border border-line bg-canvas px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/30 disabled:opacity-50"
-          defaultValue=""
-          disabled={pending || schools.length === 0}
-          id="schoolId"
-          name="schoolId"
-          onChange={(event) => setSelectedSchoolId(event.target.value)}
-          required
-        >
-          <option disabled value="">
-            请选择学校
-          </option>
-          {schools.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.nameZh} · {school.nameEn}
-            </option>
-          ))}
-        </select>
-      </div>
+      <input name="schoolId" type="hidden" value={detectedSchool?.id ?? ""} />
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-ink" htmlFor="email">
@@ -304,16 +275,36 @@ export function RequestEmailCodeForm({
           id="email"
           inputMode="email"
           name="email"
-          placeholder={emailPlaceholder}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="输入完整的学校邮箱"
           required
           type="email"
+          value={email}
         />
-        <p className="text-xs text-muted">{emailHint}</p>
+        {detectedSchool ? (
+          <p className="text-xs text-success" role="status">
+            已识别：{detectedSchool.nameZh} · {detectedSchool.nameEn}
+          </p>
+        ) : typedDomain ? (
+          <p className="text-xs text-badge" role="status">
+            暂不支持 @{typedDomain}。目前开放：{supportedDomains}（需完全一致，子域名邮箱不可用）。
+          </p>
+        ) : (
+          <ul className="space-y-0.5 text-xs text-muted">
+            <li>根据邮箱后缀自动识别学校，目前开放：</li>
+            {schools.map((school) => (
+              <li key={school.id}>
+                {school.nameZh} · {school.nameEn}（
+                {school.emailDomains.map((domain) => `@${domain}`).join("、")}）
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <button
         className="w-full h-12 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={pending || schools.length === 0}
+        disabled={pending || !detectedSchool}
         type="submit"
       >
         {pending ? "正在发送…" : "发送验证码"}
