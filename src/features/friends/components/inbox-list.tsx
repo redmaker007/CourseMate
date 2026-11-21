@@ -12,7 +12,7 @@ import type { InboxData } from "../inbox";
 
 type Tab = "messages" | "classmates";
 
-/** 当前路径属于哪个标签：好友管理类页面默认停在「同学」。 */
+/** 当前路径属于哪个标签：好友管理类页面默认停在「好友」。 */
 export function defaultInboxTab(pathname: string): Tab {
   return pathname.startsWith("/messages/") || pathname === "/friends" ? "messages" : "classmates";
 }
@@ -30,7 +30,8 @@ function Badge({ count, className = "" }: { count: number; className?: string })
 
 /**
  * 「消息与好友」左栏（参照原型的 300px 会话列表）：
- * 「消息」列出私聊会话，「同学」放新的朋友、屏蔽与拉黑、我的好友。
+ * 「消息」列出私聊会话，「好友」放新的朋友、屏蔽与拉黑、我的好友。
+ * 课程群里的成员名单才叫「同学」——这里列的都是好友关系，不是同班的人。
  */
 export function InboxList({ conversations, friends, pendingIncoming, unavailable }: InboxData) {
   const pathname = usePathname();
@@ -45,7 +46,7 @@ export function InboxList({ conversations, friends, pendingIncoming, unavailable
         {(
           [
             ["messages", "消息"],
-            ["classmates", "同学"],
+            ["classmates", "好友"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -139,7 +140,7 @@ function ConversationRows({
           onClick={onShowClassmates}
           type="button"
         >
-          查看同学
+          查看好友
         </button>
       </div>
     );

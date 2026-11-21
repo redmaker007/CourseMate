@@ -15,6 +15,8 @@ import { safeRelativePath } from "@/lib/safe-relative-path";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "学校邮箱登录" };
+
 /**
  * 只接受站内相对路径，挡掉 //evil.com 和 https://evil.com 这类开放重定向。
  */

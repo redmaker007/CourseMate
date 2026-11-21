@@ -20,6 +20,7 @@ export function PasswordSignInForm({
   onUseCode,
 }: {
   action: SignInAction;
+  /** 切到验证码登录。新用户「创建账号」走的也是这条学校邮箱验证流程。 */
   onUseCode: () => void;
 }) {
   const [state, formAction, pending] = useActionState(action, initialPasswordSignInState);
@@ -58,7 +59,7 @@ export function PasswordSignInForm({
           type="password"
         />
         <p className="text-xs text-muted">
-          第一次使用请先用验证码登录，再到「我的」页设置密码。
+          设置过密码才能用密码登录，可在「我的」页设置。
         </p>
       </div>
 
@@ -69,6 +70,17 @@ export function PasswordSignInForm({
       >
         {pending ? "正在登录…" : "登录"}
       </button>
+
+      <p className="text-center text-sm text-muted">
+        还没有账号？
+        <button
+          className="ml-1 font-medium text-accent transition hover:opacity-80"
+          onClick={onUseCode}
+          type="button"
+        >
+          创建账号
+        </button>
+      </p>
 
       {state.status !== "idle" ? (
         <p

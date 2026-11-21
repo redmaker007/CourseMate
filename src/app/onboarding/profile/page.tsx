@@ -9,6 +9,8 @@ import { getOwnProfile } from "@/features/profile/queries";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "完善资料" };
+
 export default async function ProfileOnboardingPage({
   searchParams,
 }: {

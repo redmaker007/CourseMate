@@ -28,6 +28,8 @@ import { Section } from "@/features/dashboard/components/section";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "平台管理" };
+
 export default async function AdminPage() {
   // 页面层门禁：没有身份的人看到 404。真正的授权在数据库函数里，每次调用都重新校验。
   const { member, role } = await requireStaff();
@@ -68,7 +70,7 @@ export default async function AdminPage() {
             className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:border-line hover:bg-panel"
             href="/dashboard"
           >
-            返回大厅
+            返回课表
           </Link>
         </div>
       </header>

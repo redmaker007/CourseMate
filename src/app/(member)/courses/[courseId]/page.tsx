@@ -11,8 +11,11 @@ import {
   getCourseRoom,
   type CourseMemberView,
 } from "@/features/courses/queries";
+import { formatTerm } from "@/features/courses/term-label";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "课程群聊" };
 
 function MemberRelationshipAction({ member }: { member: CourseMemberView }) {
   if (member.relationshipStatus === "self") {
@@ -79,7 +82,7 @@ export default async function CoursePage({
       <SchoolTestBanner member={member} />
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-card px-3 md:px-4">
         <Link
-          aria-label="返回大厅"
+          aria-label="返回课表"
           className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-ink md:hidden"
           href="/dashboard"
         >
@@ -95,7 +98,7 @@ export default async function CoursePage({
           </span>
         ) : null}
         <span className="hidden shrink-0 text-xs text-muted sm:inline">
-          {room.course.term} · {room.course.memberCount} 位成员
+          {formatTerm(room.course.term)} · {room.course.memberCount} 位成员
         </span>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {/* 窄屏下成员列表默认收起，点这里展开；用纯 CSS 实现，成员列表只渲染一份 */}

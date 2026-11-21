@@ -14,8 +14,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "CourseMate 学校邮箱登录",
-  description: "使用学校邮箱验证码登录 CourseMate",
+  // 各页面只写自己的名字，标签页显示成「课表 · CourseMate」；登录后不再停留在「登录」标题。
+  title: { default: "CourseMate", template: "%s · CourseMate" },
+  description: "用学校邮箱加入同课程的同学群聊",
   icons: { apple: "/icons/apple-touch-icon.png" },
   // 加到 iPhone 主屏幕后以独立窗口打开；清单见 manifest.ts
   appleWebApp: { capable: true, title: "CourseMate", statusBarStyle: "default" },

@@ -16,6 +16,8 @@ import { Section } from "@/features/dashboard/components/section";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "课表" };
+
 // 学校名只是展示用，取不到就退回学校 ID，不该拦住整个页面。
 async function loadSchoolName(schoolId: string) {
   try {

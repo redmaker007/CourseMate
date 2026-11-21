@@ -54,9 +54,9 @@ describe("InboxList", () => {
     expect(screen.getByRole("link", { name: /Amy/ })).toBeTruthy();
   });
 
-  it("同学标签有新的朋友（带待处理数）、屏蔽与拉黑、我的好友", () => {
+  it("好友标签有新的朋友（带待处理数）、屏蔽与拉黑、我的好友", () => {
     render(<InboxList {...DATA} />);
-    fireEvent.click(screen.getByRole("tab", { name: /同学/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /好友/ }));
 
     expect(screen.getByRole("link", { name: /新的朋友/ }).getAttribute("href")).toBe(
       "/friends/requests",
@@ -67,13 +67,13 @@ describe("InboxList", () => {
     expect(screen.getByRole("link", { name: /Bob/ }).getAttribute("href")).toBe("/friends/m-bob");
   });
 
-  it("没有会话时引导去看同学", () => {
+  it("没有会话时引导去看好友", () => {
     render(<InboxList {...DATA} conversations={[]} />);
-    fireEvent.click(screen.getByRole("button", { name: "查看同学" }));
-    expect(screen.getByRole("tab", { name: /同学/ }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "查看好友" }));
+    expect(screen.getByRole("tab", { name: /好友/ }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("好友管理类页面默认停在同学标签", () => {
+  it("好友管理类页面默认停在好友标签", () => {
     expect(defaultInboxTab("/friends")).toBe("messages");
     expect(defaultInboxTab("/messages/c-bob")).toBe("messages");
     expect(defaultInboxTab("/friends/requests")).toBe("classmates");

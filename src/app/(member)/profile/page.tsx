@@ -19,6 +19,8 @@ import { serverEnv } from "@/lib/server-env";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "我的" };
+
 export default async function ProfilePage() {
   const member = await getCurrentMember();
   if (!member) redirect("/login");

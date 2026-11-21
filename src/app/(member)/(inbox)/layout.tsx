@@ -9,6 +9,8 @@ import { loadInboxData } from "@/features/friends/inbox";
  * 和 (member)/layout.tsx 一样只负责展示，访问控制仍由每个页面自己做。
  * 未登录或资料未补全时不取数据，交给页面去跳转。
  */
+export const metadata = { title: "消息与好友" };
+
 export default async function InboxLayout({ children }: { children: React.ReactNode }) {
   const member = await getCurrentMember();
   if (!member?.onboardingComplete) return children;
