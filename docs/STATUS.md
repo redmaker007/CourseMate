@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-11-21：导入 MSU 与 UMich 课表；搜索与登录改进待上线
+## 2026-11-21：导入 MSU 与 UMich 课表；搜索与登录改进已上线
 
 **课程数据决定**：用户决定导入两份队友整理的课表，即使它们不是 ADR-0002 指定的授权渠道。新写 [ADR-0012](adr/0012-course-catalog-from-public-pages.md) 取代 ADR-0002：允许使用无需登录的公开页面，绕过访问控制仍不允许。UMich 里 15,430 门来自 Wolverine Access，采集时是否公开可访问还没核实，见 ADR-0012。
 
@@ -11,9 +11,11 @@
 - 数据库核对：msu 8,326 / 8,326、umich 21,196 / 21,195、uw-madison 4,988 / 4,988（目录 / `2026-fall` 课程）。没有在线上网站搜索验证。
 - 来源文件是用户通过微信发来的 `msu-courses(1).csv`、`umich-ann-arbor-courses(1).csv`（umich 这份比仓库根目录那份多 206 行），没有提交到仓库。
 
-**搜索与登录改进**（PR #65，未合并）：常用缩写搜索（cs → COMP SCI / EECS / CSE 等）、搜索结果显示「2026 秋季 · X 位成员」、密码登录下的「创建账号」入口、按邮箱后缀识别学校、「同学」标签改「好友」、「返回课表」、按页标题。搜索不再每次读整份课表：UMich 2 万多门课，原写法一次搜索要连续发约 43 次请求。
-- **上线前必须先在生产应用迁移 `202611210001_course_search_member_counts.sql`**（新增 `get_course_member_counts`，`umich` 显示名改为安娜堡分校），再发前端。迁移未应用时，前端只是不显示人数。
-- 本次实际验证：`npm test` 116 个文件 / 871 项 → build → lint → typecheck 依次通过；本地预览只走查了未登录的 `/login`。登录后的页面未走查。
+**搜索与登录改进**（PR #65，已合并为 `main` `26a5134` 并发布生产）：常用缩写搜索（cs → COMP SCI / EECS / CSE 等）、搜索结果显示「2026 秋季 · X 位成员」、密码登录下的「创建账号」入口、按邮箱后缀识别学校、「同学」标签改「好友」、「返回课表」、按页标题。搜索不再每次读整份课表：UMich 2 万多门课，原写法一次搜索要连续发约 43 次请求。
+- **迁移**：`202611210001_course_search_member_counts.sql` 先经 `supabase db push --linked` 应用到生产（dry run 确认只有这一条待推）。核对：`get_course_member_counts` 是 security definer、`search_path` 为空、`anon` 不能执行、`authenticated` 可以执行；`umich` 显示名已改；迁移历史最新一条是 `202611210001`。
+- **前端**：在 `main` 的全新克隆里执行 `npx vercel deploy --prod`，得到 `course-mate-iukzzet7m`（`dpl_9AK6FaU5eVXU9LZFwFrARgCQbR2U`），生产域名已指向它，`x-vercel-id` 是 `cle1::cle1`。第一次在 git worktree 里发布时，Vercel CLI 读不到分支名，被 `check-production-ref` 拒绝（`course-mate-ll0cpn4t4`，Error）；生产没受影响。以后用普通克隆或主仓库发布，不要用 worktree。回滚目标：`course-mate-fznvi9hq1`。
+- **已验证**：合并前 `npm test` 116 个文件 / 871 项 → build → lint → typecheck 依次通过；用户在 PR 预览里看到了「创建账号」入口。上线后 `/login` 返回 200，有「创建账号」，标题是「学校邮箱登录 · CourseMate」；`/`、`/dashboard`、`/friends`、`/profile`、`/courses/*` 未登录时都是 307；部署后 5 分钟内日志没有错误。
+- **未验证**：登录后的页面（缩写搜索、成员人数、好友标签、返回课表、页面标题）没在生产走查。
 
 ## 2026-11-20：补物化 uw-madison 课表 1,064 门
 
