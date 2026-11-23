@@ -54,6 +54,17 @@ export const getCurrentMember = cache(async function getCurrentMember(): Promise
   }
 });
 
+/** 当前浏览器里的登录账号已被停用。页面据此跳到 /suspended；放行仍以 getCurrentMember 为准。 */
+export async function currentSessionSuspended(): Promise<boolean> {
+  const supabase = await createClient();
+  try {
+    const access = await createSupabaseMemberSessionReader(supabase).getMemberAccess();
+    return access?.status === "suspended";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 当前浏览器里有登录会话，但按 ADR-0011 需要重新输验证码（超过 30 天或密码已失效）。
  * 只给登录页显示提示用；判断是否放行仍以 getCurrentMember 为准。
