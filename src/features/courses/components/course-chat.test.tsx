@@ -325,4 +325,46 @@ describe("CourseChat", () => {
     expect(screen.getByText("课程已归档，聊天记录仅供查看。")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "发送" })).toBeNull();
   });
+  it("shows a message report entry only for other members' messages and submits the message id", async () => {
+    const reportAction = vi.fn(async () => ({ status: "created", message: "举报已提交。" }));
+    render(
+      <CourseChat
+        archived
+        conversationId="conversation-1"
+        courseId="course-1"
+        currentUserId="member-1"
+        hasOlderMessages={false}
+        initialMessages={[
+          ...INITIAL,
+          { id: "2", senderId: "member-1", senderName: "Me", body: "mine", createdAt: "2026-09-10T00:01:00Z" },
+          { id: "3", senderId: null, senderName: "已注销用户", body: "deleted sender", createdAt: "2026-09-10T00:02:00Z" },
+        ]}
+        reportAction={reportAction}
+      />,
+    );
+
+    const entries = screen.getAllByRole("button", { name: "举报消息" });
+    expect(entries).toHaveLength(1);
+    fireEvent.click(entries[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Submit report" }));
+    await waitFor(() => expect(reportAction).toHaveBeenCalledTimes(1));
+    const form = (reportAction.mock.calls[0] as unknown as [unknown, FormData])[1];
+    expect(form.get("targetType")).toBe("message");
+    expect(form.get("targetId")).toBe("1");
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("举报已提交"));
+  });
+
+  it("does not render report entries when no report action is provided", () => {
+    render(
+      <CourseChat
+        archived
+        conversationId="conversation-1"
+        courseId="course-1"
+        currentUserId="member-1"
+        hasOlderMessages={false}
+        initialMessages={INITIAL}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "举报消息" })).toBeNull();
+  });
 });

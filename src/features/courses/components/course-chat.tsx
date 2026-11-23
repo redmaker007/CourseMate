@@ -10,6 +10,10 @@ import {
   TimeDivider,
 } from "@/components/ui/chat";
 import { useMessageSend } from "@/features/messages/use-message-send";
+import {
+  type ReportAction,
+  ReportForm,
+} from "@/features/reporting/components/report-form";
 
 import { sendCourseMessageAction } from "../actions";
 import { initialCourseMessageActionState } from "../course-action-state";
@@ -23,6 +27,8 @@ type CourseChatProps = {
   archived: boolean;
   hasOlderMessages: boolean;
   initialMessages: SyncedCourseMessage[];
+  /** 举报他人课程消息；未提供时不显示举报入口。 */
+  reportAction?: ReportAction;
 };
 
 export function CourseChat({
@@ -32,6 +38,7 @@ export function CourseChat({
   archived,
   hasOlderMessages: initialHasOlderMessages,
   initialMessages,
+  reportAction,
 }: CourseChatProps) {
   const {
     connected,
@@ -132,6 +139,7 @@ export function CourseChat({
                 message={message}
                 own={message.senderId === currentUserId}
                 previousAt={messages[index - 1]?.createdAt}
+                reportAction={reportAction}
               />
             ))}
             {visibleAttempts.map((attempt) => (
@@ -218,10 +226,12 @@ function MessageWithDivider({
   message,
   own,
   previousAt,
+  reportAction,
 }: {
   message: SyncedCourseMessage;
   own: boolean;
   previousAt?: string;
+  reportAction?: ReportAction;
 }) {
   return (
     <>
@@ -230,6 +240,18 @@ function MessageWithDivider({
       ) : null}
       <ChatMessageRow
         body={message.body}
+        footer={
+          reportAction && !own && message.senderId ? (
+            <div className="mt-0.5 text-xs text-chat-meta">
+              <ReportForm
+                action={reportAction}
+                label="举报消息"
+                targetId={message.id}
+                targetType="message"
+              />
+            </div>
+          ) : null
+        }
         own={own}
         senderId={message.senderId}
         senderName={message.senderName}

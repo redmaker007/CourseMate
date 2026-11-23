@@ -794,7 +794,7 @@ describe("phase-one full-chain integration", () => {
     }
   });
 
-  it("移动举报沿用完整迁移链的真实目标、本人身份、私有证据和留存，课程举报缺口不假报成功", async () => {
+  it("移动举报沿用完整迁移链的真实目标、本人身份、私有证据和留存，课程消息举报由课程成员受理", async () => {
     await database.exec("begin;");
     try {
       const direct = await database.query<{ conversation_id: string }>(`select conversation_id from public.direct_conversations
@@ -841,8 +841,11 @@ describe("phase-one full-chain integration", () => {
       const sent = await asUser(BOB, `select message_id::text from public.send_conversation_message('${course.rows[0].conversation_id}', 'course evidence', gen_random_uuid())`);
       const courseMessageId = sent.ok ? String(sent.rows[0].message_id) : "";
       expect(await asUser(ALICE, `select id::text from public.messages where id = ${courseMessageId}`)).toEqual({ ok: true, rows: [{ id: courseMessageId }] });
-      expect(await asUser(ALICE, `select * from public.create_behavior_report('message', '${courseMessageId}', 'spam', null)`))
+      // 202611220001 起课程成员可举报课程消息；外校成员仍不可见。
+      expect(await asUser(CAROL, `select * from public.create_behavior_report('message', '${courseMessageId}', 'spam', null)`))
         .toEqual({ ok: true, rows: [{ result_status: "not_available", report_id: null }] });
+      const courseReport = await asUser(ALICE, `select result_status from public.create_behavior_report('message', '${courseMessageId}', 'spam', null)`);
+      expect(courseReport).toEqual({ ok: true, rows: [{ result_status: "created" }] });
     } finally {
       await database.exec("rollback;");
     }
