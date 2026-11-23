@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-11-22：放弃 PWA，手机端只做原生 App
+
+团队试用后对 PWA 效果不满意，决定不再把它当作手机端渠道，见 [ADR-0013](adr/0013-drop-pwa-mobile-channel.md)。下方「下一步」里的 PWA 真机验收作废。iPhone 只有添加到主屏幕的网页才能收网页推送，所以网页推送对手机用户也基本失去意义，手机通知改由原生 App 的 APNs 负责。PWA 相关代码（manifest、Service Worker、离线页、「安装到手机」卡片）仍在生产上，没有删除；要不要移除另行决定。
+
 ## 2026-11-21：导入 MSU 与 UMich 课表；搜索与登录改进已上线
 
 **课程数据决定**：用户决定导入两份队友整理的课表，即使它们不是 ADR-0002 指定的授权渠道。新写 [ADR-0012](adr/0012-course-catalog-from-public-pages.md) 取代 ADR-0002：允许使用无需登录的公开页面，绕过访问控制仍不允许。UMich 里 15,430 门来自 Wolverine Access，采集时是否公开可访问还没核实，见 ADR-0012。
@@ -208,7 +212,7 @@ Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接�
 | 平台管理 | `/admin`、所有者与管理员、学校域名、课表导入、学期切换与审计；管理员跨校测试（课程、好友与私聊按当前学校判断，见 [ADR-0006](adr/0006-admin-cross-school-testing.md)） |
 | 延迟显示 | 个人资料页「显示偏好」开关（只存本机浏览器，不进数据库）；开启后页面左下角显示两个毫秒读数：**网络**（HEAD 静态图标，不经函数与数据库）与**服务**（GET `/api/ping`，含 proxy 的登录校验与 Supabase 往返）。每 15 秒测一次，标签页在后台时暂停，换页立即重测；未登录时只显示网络读数 |
 | 新界面 | Figma 原型的 6 页（登录、大厅、课程群聊、消息与好友两栏、我的）已移植，含导航外壳（桌面左栏、手机底栏）与深色模式（PR #44–#49，已上线） |
-| PWA | `manifest`、图标、`viewport-fit=cover` 与安全区、Service Worker（只提供可安装条件和断网离线页，不缓存页面与接口）、「我的」页的「安装到手机」卡片（PR #55、#56，已上线；真机验收进行中） |
+| PWA | `manifest`、图标、`viewport-fit=cover` 与安全区、Service Worker（只提供可安装条件和断网离线页，不缓存页面与接口）、「我的」页的「安装到手机」卡片（PR #55、#56，已上线；**2026-11-22 放弃这条渠道**，真机验收不再进行，代码暂留，见 [ADR-0013](adr/0013-drop-pwa-mobile-channel.md)） |
 | 网页推送 | 私聊与好友申请通知：订阅表、只授权 `service_role` 的认领函数、发送器、开关（PR #57，已合并，**生产关闭**：迁移 11-03 已应用、代码已随 11-03 前端发布，四个环境变量未配；见 [ADR-0010](adr/0010-web-push-via-restricted-rpc.md)、[启用手册](runbooks/web-push.md)） |
 
 学习搭子、笔记共享尚未开发；举报证据已实现不代表内容审核后台已交付。
@@ -260,10 +264,10 @@ Ticket 6 永久注销和 Ticket 7 iOS APNs 推送已完成本地实现、交接�
 
 ## 下一步（2026-10-04 列出，按建议顺序）
 
-1. **PWA 真机验收**：Android Chrome 与 iPhone Safari 各走一遍安装、独立窗口、断网离线页、刘海屏底栏、键盘弹出时聊天输入框、退出再登录；临时图标（靛蓝底白色 C）换成设计提供的正式图标。
+1. ~~**PWA 真机验收**~~：2026-11-22 作废，PWA 不再作为手机端渠道（[ADR-0013](adr/0013-drop-pwa-mobile-channel.md)）。
 2. **Figma 界面登录后走查**：用真实验证码把各页点一遍（两栏「消息与好友」、深色模式、课程群聊回车发送）。「最后一条消息预览与时间」需要新增数据库函数，并遵守清除历史与拉黑规则，涉及权限，先出方案再做。
-3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——迁移 `202610040001` 已于 11-03 应用并登记、类型无需改；剩下本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。
-4. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；PWA 保留为网页与 Android 的渠道。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并，迁移 11-03 已上生产；「HTTP API 还是直连 Supabase SDK」尚未定案。
+3. **启用网页推送**：按[启用手册](runbooks/web-push.md)——迁移 `202610040001` 已于 11-03 应用并登记、类型无需改；剩下本机生成 VAPID 密钥；在 Vercel 配 `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`SUPABASE_SERVICE_ROLE_KEY`；`npx vercel deploy --prod`；用已添加到主屏幕的 iPhone 与 Android 验收。课程群聊推送、静音与「提到我」另行设计。**2026-11-22 起优先级降低**：放弃 PWA 后，这项只对电脑浏览器有用，手机通知走原生 App 的 APNs；要不要还启用，另行决定。
+4. **原生 App 走 React Native + Expo（优先 iOS，丹尼的[适配约定](handoffs/app-adaptation-review.md)）**：界面用原生组件重写，后端（Supabase 账号、RPC、RLS）复用，**不是套壳**，之前的 Capacitor 套壳计划作废；~~PWA 保留为网页与 Android 的渠道~~（2026-11-22 放弃 PWA，手机端只做原生 App，见 [ADR-0013](adr/0013-drop-pwa-mobile-channel.md)）。网页端要做的是把认证服务的复用口子补齐（见评审文档的差距清单，改认证公共服务前先和丹尼对齐范围）。iOS 构建需要 Mac 与 Apple 开发者账号（99 美元/年）；**账号永久注销是 App Store 的硬要求**，后端已随 PR #58 合并，迁移 11-03 已上生产；「HTTP API 还是直连 Supabase SDK」尚未定案。
 5. **加 GitHub CI**：目前 PR 只有 Vercel 预览检查，`npm test`、`lint`、`typecheck` 全靠本地跑；建议加一个工作流，并按需开启分支保护与 Code Owners 强制审核。
 6. **此前遗留**（仍然有效）：测试组冒烟；重置搬迁时暴露的两个数据库密码；旧 Supabase 项目的保留与删除时点；`member_accounts` 等三张表的表级授权收紧；生产平台备份（11-03 另有一份本地 dump，见顶部）；`get_member_context` 检查 `session_id`（加封号或强制下线时）。
 7. **清理**：已合并的本地与远程旧分支；`git stash list` 里残留的一条暂存。
