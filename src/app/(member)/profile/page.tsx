@@ -1,22 +1,13 @@
-import { LogOut } from "lucide-react";
+import { Settings } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/ui/chat";
 import { SchoolTestBanner } from "@/features/admin/components/school-test-banner";
-import { PasswordCard } from "@/features/auth/components/password-card";
-import { requestPasswordCodeAction, setPasswordAction } from "@/features/auth/password-actions";
-import { getOwnPasswordStatus } from "@/features/auth/queries";
 import { getCurrentMember } from "@/features/auth/session";
-import { signOutAndReturnToLoginAction } from "@/features/dashboard/actions";
-import { LatencyToggle } from "@/features/latency/components/latency-toggle";
 import { updateProfileAction } from "@/features/profile/actions";
 import { ProfileForm } from "@/features/profile/components/profile-form";
 import { getOwnProfile } from "@/features/profile/queries";
-import { PushCard } from "@/features/push/components/push-card";
-import { InstallCard } from "@/features/pwa/components/install-card";
-import { ThemeSelector } from "@/features/theme/components/theme-toggle";
-import { serverEnv } from "@/lib/server-env";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +18,7 @@ export default async function ProfilePage() {
   if (!member) redirect("/login");
   if (!member.onboardingComplete) redirect("/onboarding/profile");
 
-  const [profile, passwordSet] = await Promise.all([
-    getOwnProfile(member.userId),
-    getOwnPasswordStatus(),
-  ]);
+  const profile = await getOwnProfile(member.userId);
   if (!profile) redirect("/onboarding/profile");
 
   return (
@@ -78,42 +66,16 @@ export default async function ProfilePage() {
           />
         </section>
 
-        <PasswordCard
-          email={member.email}
-          passwordSet={passwordSet}
-          requestAction={requestPasswordCodeAction}
-          setAction={setPasswordAction}
-        />
-
-        <section
-          aria-labelledby="display-preferences"
-          className="space-y-5 rounded-xl border border-line bg-card p-4"
+        <Link
+          className="flex items-center justify-between rounded-xl border border-line bg-card px-4 py-3 text-sm font-medium text-ink hover:bg-panel"
+          href="/settings"
         >
-          <h2 className="text-sm font-semibold text-ink" id="display-preferences">
-            显示偏好
-          </h2>
-          <ThemeSelector />
-          <LatencyToggle />
-        </section>
-
-        <InstallCard />
-        {serverEnv.push ? <PushCard publicKey={serverEnv.push.publicKey} /> : null}
-
-        <form action={signOutAndReturnToLoginAction}>
-          <button
-            className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-sm font-medium text-badge transition hover:bg-badge/10"
-            type="submit"
-          >
-            <LogOut size={15} strokeWidth={1.75} />
-            退出登录
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-muted">
-          <Link className="underline-offset-2 hover:text-ink hover:underline" href="/privacy">
-            隐私政策
-          </Link>
-        </p>
+          <span className="flex items-center gap-2">
+            <Settings size={16} strokeWidth={1.75} />
+            设置
+          </span>
+          <span className="text-xs text-muted">密码、通知、隐私、退出与注销 ›</span>
+        </Link>
       </div>
     </main>
   );

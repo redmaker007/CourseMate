@@ -36,9 +36,12 @@
 |---|---|
 | 注销删除账号、资料、关系、推送登记；本人消息换成“[消息已删除]”；删除相关好友申请 | `permanently_delete_member`，`202610260001_permanent_account_deletion.sql` |
 | 举报匿名保留（去掉 ID 和资料快照，保留原因、说明和正文） | 同上；决定记录见 `docs/handoffs/account-deletion-design.md` |
-| 注销要邮箱验证码，只在 App 内 | `docs/handoffs/mobile-account-deletion-api.md`；网页没有注销入口 |
+| 注销要邮箱验证码，App 内或网页“我的 → 设置” | `docs/handoffs/mobile-account-deletion-api.md`；网页复用同一流程：`src/features/auth/web-account-deletion.ts`、`/settings` |
 | 退出课程后消息保留 | 退出只删除 `course_members` 和 `conversation_members`，不删 `messages` |
 | 私聊不会自动清理 | 720 小时清理能力存在但没有定时任务（`docs/handoffs/direct-message-cleanup.md`） |
+| 举报证据正文处理完一年后删除 | `202611220003_report_evidence_retention.sql`（PR #67）：`resolved_at` + `redact_expired_report_evidence()`，每月手动执行，见 `docs/runbooks/report-handling.md` |
+| 被拦截内容不保存 | `202611220002_content_filter.sql`（PR #69） |
+| 24–48 小时内查看举报、可删除内容或停用账号 | 用户 2026-11-23 决定；停用账号功能待实现 |
 
 ---
 
@@ -54,7 +57,7 @@
 | User Content → Other User Content | 是 | App Functionality | 好友申请附言、举报说明、好友备注 |
 | User Content → Customer Support | 待定 | App Functionality | 联系邮箱开通后，用户来信算客服数据 |
 | Identifiers → User ID | 是 | App Functionality | 账号 UUID |
-| Identifiers → Device ID | 建议申报（待你决定） | App Functionality | APNs 设备令牌和安装编号会保存并关联账号。Apple 没点名推送令牌，申报更稳妥 |
+| Identifiers → Device ID | 是（2026-11-23 按建议申报） | App Functionality | APNs 设备令牌和安装编号会保存并关联账号。Apple 没点名推送令牌，申报更稳妥 |
 | Other Data → Other Data Types | 是 | App Functionality | 学校、专业、毕业年份、课程、好友和拉黑关系 |
 | Usage Data／Diagnostics | 否（待丹尼确认） | — | 后端没有统计或崩溃 SDK；App 端如接入就要改成“是” |
 | Location、Contacts、Photos、Health、Financial、Browsing／Search History、Purchases、Sensitive Info | 否 | — | 没有收集 |
@@ -63,4 +66,4 @@
 
 - 举报和防滥用记录：Apple 的用途选项里没有单独的“安全”，一般并入 App Functionality；如果想说明得更细，可以加选 Other Purposes。
 - 服务器访问日志里的 IP：不用于定位，也不由我们另外保存，按 Apple 说明可以不申报；如果以后用 IP 做限流或风控并保存，要申报。
-- 隐私政策 URL 填 `https://<生产域名>/privacy`。生产域名在页面上线后再填。
+- 隐私政策 URL 填 `https://<生产域名>/privacy`，Support URL 填 `https://<生产域名>/support`。生产域名在页面上线后再填。

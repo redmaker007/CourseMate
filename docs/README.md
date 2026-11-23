@@ -24,7 +24,8 @@
 | 原生 App 课程／私聊消息、幂等、清除与缓存恢复 | [移动聊天交接](handoffs/mobile-messages-api.md)；沿用 ADR-0006／0008 | `src/features/messages/mobile-api.ts`；`mobile-message-data.ts`；既有发送／私聊 service 与 RPC |
 | 原生 App 举报、受控证据与安全／发布缺口 | [移动举报交接](handoffs/mobile-reporting-api.md)；沿用既有举报／清理规则 | `src/features/reporting/mobile-api.ts`；`reporting-service.ts`；`supabase-reporting-backend.ts` |
 | 原生 App 永久注销、本人核验、回执与删除同步 | [注销交接](handoffs/mobile-account-deletion-api.md)、[数据清单](handoffs/account-deletion-design.md)；涉及举报／清理及会话 ADR | `src/features/auth/account-deletion-api.ts`；`account-deletion-context.ts`；注销迁移及集成测试 |
-| 隐私政策页、App 隐私标签、上架前内容治理（过滤／举报处理／联系渠道） | [待决定事项](policies/privacy-and-safety-open-questions.md)、[政策事实来源与隐私标签草稿](policies/privacy-policy-sources.md) | `src/app/privacy/page.tsx`；`src/features/legal/public-contact.ts`；`src/proxy.ts`（matcher 排除 `/privacy`） |
+| 隐私政策／用户协议／帮助页、App 隐私标签、举报处理 | [待决定事项与答复](policies/privacy-and-safety-open-questions.md)、[政策事实来源与隐私标签草稿](policies/privacy-policy-sources.md)、[举报处理手册](runbooks/report-handling.md) | `src/app/privacy/`、`src/app/terms/`、`src/app/support/`；`src/features/legal/`；`src/proxy.ts`（matcher 排除这三个路径） |
+| 设置页、网页永久注销 | [注销交接](handoffs/mobile-account-deletion-api.md)（网页复用同一流程） | `src/app/(member)/settings/`；`src/features/auth/web-account-deletion*.ts`；`account-deletion-card.tsx` |
 | iOS 私信推送、设备绑定／解绑和恢复调度 | [原生推送交接](handoffs/mobile-push-api.md)；沿用认证／消息与注销边界 | `src/features/push/mobile-api.ts`；`apns.ts`；`mobile-dispatch.ts`；`202610260002_mobile_push.sql` |
 | 资料保存、首次登录卡住 | [ADR-0004](adr/0004-require-profile-onboarding-for-app-access.md)；权限事故见[课程整合交接](handoffs/course-catalog-integration.md)“新成员卡在 onboarding” | `src/features/profile/`；`src/app/onboarding/profile/` |
 | 搜课、加退课、课程消息 | [ADR-0007](adr/0007-lazy-course-conversation-creation.md)、[统一会话交接](handoffs/unified-conversation-core.md)；课程来源见[录入课程](runbooks/seed-courses.md) | `src/features/courses/`；`src/app/(member)/dashboard/`；`src/app/(member)/courses/`；`src/app/api/courses/` |

@@ -26,7 +26,7 @@ describe("resolveProtectedAccess", () => {
     });
   });
 
-  it.each(["/", "/login", "/privacy"])(
+  it.each(["/", "/login", "/privacy", "/privacy/en", "/terms", "/support"])(
     "没有成员会话也可以访问公开路径 %s",
     (pathname) => {
       expect(resolveProtectedAccess(pathname, null)).toEqual({

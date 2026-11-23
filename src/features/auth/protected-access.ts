@@ -1,7 +1,7 @@
 import type { MemberSession } from "./member-session";
 
-// /privacy 同时在 proxy matcher 中排除；这里再列一次，避免以后改 matcher 时误把它锁在登录后。
-const PUBLIC_PATHS = ["/", "/login", "/privacy"];
+// 公开政策页同时在 proxy matcher 中排除；这里再列一次，避免以后改 matcher 时误把它们锁在登录后。
+const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms", "/support"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(

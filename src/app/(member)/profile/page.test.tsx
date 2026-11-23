@@ -65,7 +65,7 @@ describe("Profile page flow", () => {
     expect(screen.getByTestId("profile-form").textContent).toBe("小明");
   });
 
-  it("资料页提供显示网络延迟的开关", async () => {
+  it("资料页只保留个人信息，并链接到设置页", async () => {
     auth.getCurrentMember.mockResolvedValue({
       userId: "member-1",
       onboardingComplete: true,
@@ -79,6 +79,8 @@ describe("Profile page flow", () => {
 
     render(await ProfilePage());
 
-    expect(screen.getByRole("checkbox", { name: /显示网络延迟/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /设置/ }).getAttribute("href")).toBe("/settings");
+    expect(screen.queryByRole("checkbox", { name: /显示网络延迟/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /退出登录/ })).toBeNull();
   });
 });
