@@ -48,7 +48,8 @@ export const config = {
     /*
      * 跳过静态资源和图片优化请求，避免每个 asset 都打一次 Supabase auth。
      * manifest.webmanifest、sw.js、offline.html 要让未登录的浏览器也能取到，否则会被重定向到登录页。
+     * privacy 是公开的隐私政策页（App Store 要求可公开访问），只排除 /privacy 本身及其子路径。
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|privacy(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

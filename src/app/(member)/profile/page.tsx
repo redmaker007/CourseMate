@@ -1,4 +1,5 @@
 import { LogOut } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/ui/chat";
@@ -107,6 +108,12 @@ export default async function ProfilePage() {
             退出登录
           </button>
         </form>
+
+        <p className="text-center text-xs text-muted">
+          <Link className="underline-offset-2 hover:text-ink hover:underline" href="/privacy">
+            隐私政策
+          </Link>
+        </p>
       </div>
     </main>
   );

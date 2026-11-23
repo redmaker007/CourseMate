@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
@@ -76,6 +77,12 @@ export default async function LoginPage({
           schools={schools}
           verifyAction={verifyEmailCodeAction}
         />
+
+        <p className="mt-6 text-center text-xs text-muted">
+          <Link className="underline-offset-2 hover:text-ink hover:underline" href="/privacy">
+            隐私政策
+          </Link>
+        </p>
       </section>
     </main>
   );

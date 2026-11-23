@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-11-22：App Store 上架前的内容治理缺口与隐私政策页（进行中）
+
+对照 Apple 审核指南 1.2（2026-11-22 核对原文：过滤、举报和及时回应、拉黑、公开联系方式；原文没有固定 24 小时时限）补缺口。
+
+- **课程群消息举报**：PR #67（`feature/course-message-reporting`）。新迁移 `202611220001_course_message_reporting.sql` 让课程成员可以举报课程消息，网页课程群聊加了“举报消息”。移动接口契约不变。**迁移未应用到生产，未发生产**，等用户同意。
+- **隐私政策页 `/privacy`**：本 PR（`feature/privacy-and-governance`）。公开页面，未登录可访问（proxy matcher 排除，`PUBLIC_PATHS` 也列出）；登录页和“我的”页底部有链接。内容按代码和迁移写成，出处见[事实来源](policies/privacy-policy-sources.md)；页面里“可以举报课程群消息”一句要等 PR #67 的迁移上线后才成立。公开联系邮箱还没决定，页面明确写着“尚未公布”，没有用占位地址。**未发生产**。
+- **App 隐私标签草稿**：见[事实来源](policies/privacy-policy-sources.md)末节。
+- **待用户决定**（见[待决定事项](policies/privacy-and-safety-open-questions.md)）：内容过滤方案（推荐：发送时拦截 + 数据库词表），谁处理举报、多久回应、联系邮箱、Support URL，举报证据保留期，以及隐私政策里 11 项拿不准的事实。内容过滤和举报处理 runbook 等答复后再做。
+- **本次验证**：两个分支各自 `npm test` → build → lint → typecheck 通过，详见各 PR。没有连接生产库或测试库。
+
 ## 2026-11-22：放弃 PWA，手机端只做原生 App
 
 团队试用后对 PWA 效果不满意，决定不再把它当作手机端渠道，见 [ADR-0013](adr/0013-drop-pwa-mobile-channel.md)。下方「下一步」里的 PWA 真机验收作废。iPhone 只有添加到主屏幕的网页才能收网页推送，所以网页推送对手机用户也基本失去意义，手机通知改由原生 App 的 APNs 负责。PWA 相关代码（manifest、Service Worker、离线页、「安装到手机」卡片）仍在生产上，没有删除；要不要移除另行决定。
