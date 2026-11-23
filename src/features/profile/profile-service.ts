@@ -1,3 +1,5 @@
+import { CONTENT_REJECTED_MESSAGE, contentRejectedField } from "@/features/moderation/content-filter";
+
 export type ProfileMember = {
   userId: string;
 };
@@ -74,7 +76,16 @@ export function createProfileService(dependencies: ProfileServiceDependencies) {
           major: major || null,
           gradYear,
         });
-      } catch {
+      } catch (error) {
+        const rejected = contentRejectedField(error);
+        if (rejected) {
+          return {
+            status: "invalid",
+            fieldErrors: rejected === "major"
+              ? { major: CONTENT_REJECTED_MESSAGE }
+              : { displayName: CONTENT_REJECTED_MESSAGE },
+          } as const;
+        }
         return { status: "temporarily_unavailable" } as const;
       }
 

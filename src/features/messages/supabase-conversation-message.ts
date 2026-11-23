@@ -1,3 +1,5 @@
+import { contentRejectedField } from "@/features/moderation/content-filter";
+
 export type ConversationMessage = {
   id: string;
   clientMessageId: string;
@@ -17,7 +19,8 @@ export type ConversationMessageSendResult =
         | "invalid_body"
         | "not_available"
         | "not_allowed"
-        | "idempotency_conflict";
+        | "idempotency_conflict"
+        | "content_rejected";
     };
 
 type RpcResult = { data: unknown; error: unknown };
@@ -44,7 +47,11 @@ export async function sendSupabaseConversationMessage(
     client_message_id: clientMessageId,
     message_body: body,
   });
-  if (error) throw error;
+  if (error) {
+    // 数据库内容过滤拒绝：消息没有写入，交给调用方提示用户修改。
+    if (contentRejectedField(error)) return { status: "content_rejected" };
+    throw error;
+  }
 
   const row = Array.isArray(data) && data[0] && typeof data[0] === "object"
     ? (data[0] as Record<string, unknown>)

@@ -117,6 +117,9 @@ export function createCourseOperations(
         if (result.status === "not_available") {
           return { status: "not_available" } as const;
         }
+        if (result.status === "content_rejected") {
+          return { status: "content_rejected" } as const;
+        }
         return { status: "temporarily_unavailable" } as const;
       } catch {
         return { status: "temporarily_unavailable" } as const;

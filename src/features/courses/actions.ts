@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import type { CourseMessageActionState } from "./course-action-state";
 import { isUuid } from "./course-identifiers";
 import { createProductionCourseOperations } from "./production-course-operations";
+import { CONTENT_REJECTED_MESSAGE } from "@/features/moderation/content-filter";
 
 export async function joinCourseAction(courseId: string) {
   if (!isUuid(courseId)) redirect("/dashboard?courseAction=invalid");
@@ -91,6 +92,12 @@ export async function sendCourseMessageAction(
       return {
         status: "invalid",
         message: "请输入 1–4000 个字符。",
+        ...attempt,
+      };
+    case "content_rejected":
+      return {
+        status: "invalid",
+        message: CONTENT_REJECTED_MESSAGE,
         ...attempt,
       };
     case "unauthenticated":
