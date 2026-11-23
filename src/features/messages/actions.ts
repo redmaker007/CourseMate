@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentMember } from "@/features/auth/session";
+import { CONTENT_REJECTED_MESSAGE } from "@/features/moderation/content-filter";
 import { scheduleDirectMessagePush } from "@/features/push/schedule";
 
 import type { DirectMessageActionState } from "./message-action-state";
@@ -19,6 +20,7 @@ function feedback(
     invalid_conversation: "会话参数无效。",
     invalid_request: "发送请求无效，请重新发送。",
     idempotency_conflict: "发送内容已改变，请作为新消息发送。",
+    content_rejected: CONTENT_REJECTED_MESSAGE,
     invalid_cursor: "消息位置无效。",
     not_allowed: "当前关系状态不允许发送消息。",
     not_available: "无法访问该会话。",

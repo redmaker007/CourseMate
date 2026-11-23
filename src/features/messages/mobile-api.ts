@@ -23,6 +23,8 @@ export function mobileMessageHttpStatus(status: string) {
   if (["onboarding_required", "not_allowed"].includes(status)) return 403;
   if (status === "not_available") return 404;
   if (status === "idempotency_conflict") return 409;
+  // 内容过滤拒绝：请求格式正确但内容不被接受，App 提示用户修改后重发。
+  if (status === "content_rejected") return 422;
   return 503;
 }
 

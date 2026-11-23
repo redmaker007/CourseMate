@@ -20,6 +20,7 @@
 | 数据库迁移、Auth Hook、SMTP 和 OTP 配置 | [新建 Supabase 项目](docs/runbooks/new-supabase-project.md) |
 | 把已有数据整体搬到另一个 Supabase 项目（换区域等） | [迁移 Supabase 项目](docs/runbooks/migrate-supabase-project.md) |
 | 所有者与管理员、管理页日常操作 | [管理页与平台角色](docs/runbooks/platform-admin.md) |
+| 内容过滤词表的增删、自查与误伤处理 | [维护内容过滤词表](docs/runbooks/content-filter.md) |
 | 课表预演、导入与当前学期课程生成 | [录入课程](docs/runbooks/seed-courses.md) |
 | 向学校申请课程数据 | [申请课程数据授权](docs/runbooks/request-course-data.md) |
 

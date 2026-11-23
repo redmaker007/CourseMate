@@ -1,3 +1,5 @@
+import { CONTENT_REJECTED_MESSAGE, contentRejectedField } from "@/features/moderation/content-filter";
+
 export type SharedCourseView = {
   id: string;
   code: string;
@@ -132,7 +134,13 @@ export function createFriendshipService(backend: FriendBackend) {
       }
       try {
         return await backend.sendFriendRequest(targetMemberId, message);
-      } catch {
+      } catch (error) {
+        if (contentRejectedField(error)) {
+          return {
+            status: "invalid",
+            fieldErrors: { message: CONTENT_REJECTED_MESSAGE },
+          } as const;
+        }
         return { status: "temporarily_unavailable" } as const;
       }
     },

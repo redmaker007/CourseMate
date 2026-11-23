@@ -141,6 +141,7 @@ reconcile 示例：
 | 403 | onboarding_required／membership_denied 按认证契约处理；not_allowed 只限制目标操作，不锁整个账号 |
 | 404 | not_available 表示该目标当前不可访问；未知路径 not_found；不能显示其他账号会话内容 |
 | 409 | idempotency_conflict；保留草稿，用户确认为新意图时才换 UUID |
+| 422 | content_rejected（2026-11-22 起，迁移 `202611220002`）：内容命中过滤词表，消息没有保存。保留草稿，提示“内容包含不允许的词语，请修改后再发送”，不自动重试；修改后可用新 UUID 重发 |
 | 503 | temporarily_unavailable；保留缓存和失败项，不返回删除列表或误判账号失效 |
 
 JSON 405／413／415 沿用统一入口。只有查询成功的 reconcile 才可应用移除集合；读取失败不能当“全部消息已删除”。
