@@ -110,6 +110,7 @@ where r.id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid;
 - reporter_id／reported_user_id 不依靠账号外键级联删除。源内容或 auth 用户消失，不会自动删除原快照、UUID 和说明；源资料变化也不会覆盖快照。
 - report_evidence 与 report_source_retention 有 UPDATE／DELETE 拒绝触发器；消息留存的生成列 message_id 对 messages.id 有 ON DELETE RESTRICT 外键。仅删账号／消息、置空 sender_id 或调用普通私聊清理不能完成注销。
 - dismissed／actioned 状态不会自动释放留存。当前没有到期清理策略或已验证的依法保留期限；普通私聊“双方清除满 720 小时”不能套用为举报证据留存期限。
+- 2026-11-23 补充：用户决定**处理完一年后删除证据正文**。迁移 `202611220003_report_evidence_retention.sql`（尚未应用到生产）新增 `behavior_reports.resolved_at`（状态离开 pending 时自动记录）和 `redact_expired_report_evidence()`（仅 service_role 可执行，每月手动跑一次）：处理满一年的证据快照只留类别、ID 和时间，补充说明换成“[已清理]”，删除留存行，原因和处理结果保留。迁移前已处理的举报从应用迁移时开始计时。这不是法定期限，只是项目决定。
 - Ticket 6 必须先核实可保留的范围、依据与期限，给出受控最小保留／脱敏／释放方案及失败恢复，再处理正文、快照、身份引用、说明、源内容外键与本机副本；不能绕过不可变触发器直接手工删，也不能以“证据不可变”永久保留所有内容。涉及既有举报／清理规则须先界定影响并讨论。
 - 同时检查 App 内草稿／回执、运营导出与可控制副本；不能从举报快照重新恢复已注销用户正文。受控审核证据和普通聊天缓存分开授权。注销最终行为不在本票实现或验收。
 
