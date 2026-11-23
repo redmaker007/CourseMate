@@ -12,6 +12,7 @@ import {
   type CourseMemberView,
 } from "@/features/courses/queries";
 import { formatTerm } from "@/features/courses/term-label";
+import { submitBehaviorReportAction } from "@/features/reporting/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,7 @@ export default async function CoursePage({
           currentUserId={member.userId}
           hasOlderMessages={room.hasOlderMessages}
           initialMessages={room.messages}
+          reportAction={submitBehaviorReportAction}
         />
 
         <input className="peer sr-only" id="course-members-toggle" type="checkbox" />
