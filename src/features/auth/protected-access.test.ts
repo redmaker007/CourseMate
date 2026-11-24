@@ -26,7 +26,7 @@ describe("resolveProtectedAccess", () => {
     });
   });
 
-  it.each(["/", "/login"])(
+  it.each(["/", "/login", "/privacy", "/privacy/en", "/terms", "/support"])(
     "没有成员会话也可以访问公开路径 %s",
     (pathname) => {
       expect(resolveProtectedAccess(pathname, null)).toEqual({
@@ -34,4 +34,10 @@ describe("resolveProtectedAccess", () => {
       });
     },
   );
+  it("相似前缀的路径不属于隐私政策白名单", () => {
+    expect(resolveProtectedAccess("/privacyx", null)).toEqual({
+      status: "redirect_to_login",
+      nextPath: "/privacyx",
+    });
+  });
 });

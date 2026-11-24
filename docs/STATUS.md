@@ -1,5 +1,26 @@
 # 当前状态
 
+## 2026-11-23：用户答复上架前问题；设置页与网页注销、公开政策页
+
+用户答复见[待决定事项](policies/privacy-and-safety-open-questions.md)开头的表格。本分支（`feature/privacy-and-governance`，PR #68）新增：
+
+- **`/settings` 设置页**：从“我的”页拆出密码、显示偏好、通知、帮助与政策链接、退出登录；新增**网页永久注销**，复用移动端同一套服务端流程（Auth 重新确认 → 邮箱验证码 → 签名确认和回执 → service_role RPC 一次事务删除）。注销成功后清掉浏览器会话 Cookie，回到登录页并提示“账号已永久注销”。App 的设置页由丹尼按同样结构做。
+- **公开页**：`/privacy`（更新内容）、`/privacy/en`（英文版）、`/terms`（用户协议与社区规范，零容忍条款）、`/support`（Support URL）。这三个路径都不经过 proxy；登录页写明“登录即表示同意”。
+- **[举报处理手册](runbooks/report-handling.md)**：全体平台管理员处理，24–48 小时内查看，每天查一次数据库。注意 `/admin` 看不到举报，要进 SQL Editor。
+- 页面里有三处要等其他 PR 上线才成立：课程消息举报、举报证据一年后删除（PR #67）；内容拦截（PR #69）；“停用违规账号”（功能还没做）。
+- **仍待用户**：封禁账号的设计、词表负责人和初始词表、联系邮箱、App 是否接入崩溃统计 SDK、哪些管理员能进 SQL Editor。
+- **未发生产**；没有在真实账号上走过网页注销（会真的删除账号）。
+
+## 2026-11-22：App Store 上架前的内容治理缺口与隐私政策页（进行中）
+
+对照 Apple 审核指南 1.2（2026-11-22 核对原文：过滤、举报和及时回应、拉黑、公开联系方式；原文没有固定 24 小时时限）补缺口。
+
+- **课程群消息举报**：PR #67（`feature/course-message-reporting`）。新迁移 `202611220001_course_message_reporting.sql` 让课程成员可以举报课程消息，网页课程群聊加了“举报消息”。移动接口契约不变。**迁移未应用到生产，未发生产**，等用户同意。
+- **隐私政策页 `/privacy`**：本 PR（`feature/privacy-and-governance`）。公开页面，未登录可访问（proxy matcher 排除，`PUBLIC_PATHS` 也列出）；登录页和“我的”页底部有链接。内容按代码和迁移写成，出处见[事实来源](policies/privacy-policy-sources.md)；页面里“可以举报课程群消息”一句要等 PR #67 的迁移上线后才成立。公开联系邮箱还没决定，页面明确写着“尚未公布”，没有用占位地址。**未发生产**。
+- **App 隐私标签草稿**：见[事实来源](policies/privacy-policy-sources.md)末节。
+- **待用户决定**（见[待决定事项](policies/privacy-and-safety-open-questions.md)）：内容过滤方案（推荐：发送时拦截 + 数据库词表），谁处理举报、多久回应、联系邮箱、Support URL，举报证据保留期，以及隐私政策里 11 项拿不准的事实。内容过滤和举报处理 runbook 等答复后再做。
+- **本次验证**：两个分支各自 `npm test` → build → lint → typecheck 通过，详见各 PR。没有连接生产库或测试库。
+
 ## 2026-11-22：放弃 PWA，手机端只做原生 App
 
 团队试用后对 PWA 效果不满意，决定不再把它当作手机端渠道，见 [ADR-0013](adr/0013-drop-pwa-mobile-channel.md)。下方「下一步」里的 PWA 真机验收作废。iPhone 只有添加到主屏幕的网页才能收网页推送，所以网页推送对手机用户也基本失去意义，手机通知改由原生 App 的 APNs 负责。PWA 相关代码（manifest、Service Worker、离线页、「安装到手机」卡片）仍在生产上，没有删除；要不要移除另行决定。

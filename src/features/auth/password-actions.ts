@@ -133,6 +133,6 @@ export async function setPasswordAction(
   }
 
   console.info(JSON.stringify({ operation: "set_password", outcome: status, requestId: crypto.randomUUID() }));
-  if (status === "password_set") revalidatePath("/profile");
+  if (status === "password_set") revalidatePath("/settings");
   return { status, message: SET_MESSAGES[status] };
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
@@ -25,7 +26,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { next } = await searchParams;
+  const { next, deleted } = await searchParams;
   const destination = safeRelativePath(next);
 
   // 验证码校验成功后，Server Action 会让这个页面重新渲染，那时会话已经建立，
@@ -63,6 +64,12 @@ export default async function LoginPage({
           </p>
         </div>
 
+        {deleted === "1" ? (
+          <p className="mb-5 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm text-success" role="status">
+            账号已永久注销。
+          </p>
+        ) : null}
+
         {schoolsUnavailable || schools.length === 0 ? (
           <p className="mb-5 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm text-warn">
             学校列表暂时不可用，请稍后刷新重试。
@@ -76,6 +83,15 @@ export default async function LoginPage({
           schools={schools}
           verifyAction={verifyEmailCodeAction}
         />
+
+        <p className="mt-6 text-center text-xs leading-5 text-muted">
+          登录即表示你同意
+          <Link className="underline-offset-2 hover:text-ink hover:underline" href="/terms">《用户协议与社区规范》</Link>
+          和
+          <Link className="underline-offset-2 hover:text-ink hover:underline" href="/privacy">《隐私政策》</Link>
+          ·
+          <Link className="ml-1 underline-offset-2 hover:text-ink hover:underline" href="/support">帮助与联系</Link>
+        </p>
       </section>
     </main>
   );

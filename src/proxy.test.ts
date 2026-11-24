@@ -84,7 +84,7 @@ vi.mock("@supabase/ssr", () => ({
   },
 }));
 
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 describe("proxy member session", () => {
   beforeEach(() => {
@@ -175,4 +175,13 @@ describe("proxy member session", () => {
     );
   });
 
+  it("matcher 放行公开静态资源与隐私政策页，但相似路径仍受保护", () => {
+    const matcher = new RegExp(`^${config.matcher[0]}$`);
+    for (const path of ["/privacy", "/privacy/en", "/terms", "/support", "/manifest.webmanifest", "/offline.html"]) {
+      expect(matcher.test(path), path).toBe(false);
+    }
+    for (const path of ["/privacyx", "/termsx", "/supporting", "/dashboard", "/settings", "/login", "/courses/privacy"]) {
+      expect(matcher.test(path), path).toBe(true);
+    }
+  });
 });

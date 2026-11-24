@@ -25,7 +25,7 @@ export function navSectionFor(pathname: string): NavSection {
   if (pathname.startsWith("/friends") || pathname.startsWith("/messages/")) {
     return "messages";
   }
-  if (pathname.startsWith("/profile")) return "profile";
+  if (pathname.startsWith("/profile") || pathname.startsWith("/settings")) return "profile";
   return "other";
 }
 
