@@ -20,6 +20,8 @@ export type MemberFacts = {
   onboardingComplete: boolean;
   /** 距上次验证码验证超过 30 天，或密码不是经本应用设置的（ADR-0011）。 */
   reverificationRequired: boolean;
+  /** 账号被平台管理员停用（202611230001）。会话仍然有效，但不能使用主应用。 */
+  suspended: boolean;
 };
 
 export type MemberContext = {
@@ -33,6 +35,7 @@ export type MemberContext = {
 export type MemberAccess =
   | { status: "member"; context: MemberContext }
   | { status: "reverification_required" }
+  | { status: "suspended" }
   | null;
 
 export interface MemberSessionDataPort {
@@ -67,8 +70,12 @@ export function createMemberSessionReader(data: MemberSessionDataPort) {
   /** 要求重新验证邮箱的会话不算有效会话，但调用方需要区分它，好提示用户用验证码登录。 */
   async function readMemberAccess(): Promise<MemberAccess> {
     const valid = await readValidFacts();
+    if (!valid) return null;
+    // 停用成员没有当前学校；先区分出来，页面和 App 才能显示“账号已停用”而不是当成未登录。
+    // 停用的会话本身仍然有效（getMemberSession 不变），这样用户还能退出登录或永久注销。
+    if (valid.facts.suspended) return { status: "suspended" };
     // 读不到当前学校与读不到 onboarding 状态一样，按未登录处理（fail closed）。
-    if (!valid || !valid.facts.currentSchoolId) return null;
+    if (!valid.facts.currentSchoolId) return null;
     if (valid.facts.reverificationRequired) return { status: "reverification_required" };
 
     return {

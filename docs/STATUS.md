@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-11-23：停用（封禁）违规账号
+
+用户按推荐方案确认。分支 `feature/member-suspension`（基于 PR #68 的分支），迁移 `202611230001_member_suspension.sql`：
+
+- **效果**：停用后什么都不能看、不能发。数据库层面让两个既有关口 `has_completed_onboarding()` 和 `current_school_id()` 对停用成员关闭，依赖它们的 RLS、RPC 和 Realtime 都随之关闭；另外单独拦住停用成员修改自己的资料。`get_member_context` 新增 `suspended`。
+- **已发内容**保留，管理员按举报逐条删除。
+- **注销**：停用期间仍可永久注销。停用记录存邮箱的 SHA-256 哈希，注销后仍在；Before User Created Hook 据此拒绝同一邮箱重新注册，直到解除停用。
+- **操作**：`admin_suspend_member`／`admin_unsuspend_member`／`admin_unsuspend_email`，限平台管理员；不能停用自己和所有者，管理员之间只有所有者能停用；每次写审计日志，停用时撤销对方的全部会话。暂时没有 `/admin` 按钮，按[举报处理手册](runbooks/report-handling.md)用 SQL 操作。
+- **网页**：停用账号的会话仍算有效（这样才能退出或注销），但读不到成员上下文；登录页会把它带到 `/suspended`，那里有申诉邮箱、退出登录和永久注销。
+- **移动端**：受保护接口返回 `403 account_suspended`；登录时返回 403，同时带会话，只用于退出或注销。契约见[移动认证交接](handoffs/mobile-auth-api.md)末节，需要通知丹尼。
+- **未应用迁移，未发生产**。迁移会重建注册 Hook 函数（函数名不变，后台配置不用改）。
+
 ## 2026-11-23：用户答复上架前问题；设置页与网页注销、公开政策页
 
 用户答复见[待决定事项](policies/privacy-and-safety-open-questions.md)开头的表格。本分支（`feature/privacy-and-governance`，PR #68）新增：

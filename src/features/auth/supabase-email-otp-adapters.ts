@@ -170,7 +170,9 @@ export function createSupabaseMemberSessionReader(
         !(row.enabled_school_id === null || typeof row.enabled_school_id === "string") ||
         !(row.current_school_id === null || typeof row.current_school_id === "string") ||
         typeof row.onboarding_complete !== "boolean" ||
-        typeof row.reverification_required !== "boolean"
+        typeof row.reverification_required !== "boolean" ||
+        // 迁移 202611230001 应用前没有这一列；有就必须是布尔值。
+        !(row.suspended === undefined || typeof row.suspended === "boolean")
       )) throw new Error("Invalid member context row");
       // 没有成员账号时函数返回零行。形状不对的行也按没有处理，不放行。
       if (
@@ -189,6 +191,7 @@ export function createSupabaseMemberSessionReader(
         onboardingComplete: row.onboarding_complete === true,
         // 字段缺失（比如迁移还没应用）时按需要重新验证处理，不放行。
         reverificationRequired: row.reverification_required !== false,
+        suspended: (row as { suspended?: unknown }).suspended === true,
       };
     },
   };

@@ -310,6 +310,23 @@ describe("移动认证 HTTP 契约（真实 Supabase SDK，模拟网络）", () 
       expect(calls.some((call) => call.path === "/auth/v1/logout?scope=local")).toBe(true);
     });
 
+    it("停用账号登录时返回 403 account_suspended 并交付会话（只用于退出或注销），不撤销会话", async () => {
+      memberRows = [{ ...(memberRows[0] as object), current_school_id: null, onboarding_complete: false, suspended: true }];
+      const response = await api()(request("auth/password-sign-in", { email, password: "secret-123" }));
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body).toMatchObject({ status: "account_suspended", session: { refreshToken: "synthetic-refresh" } });
+      expect(body).not.toHaveProperty("member");
+      expect(calls.some((call) => call.path === "/auth/v1/logout?scope=local")).toBe(false);
+    });
+
+    it("停用账号访问受保护接口返回 403 account_suspended", async () => {
+      memberRows = [{ ...(memberRows[0] as object), current_school_id: null, onboarding_complete: false, suspended: true }];
+      const response = await api()(request("session", undefined, token));
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ status: "account_suspended" });
+    });
+
     it("已登录的会话超过 30 天时受保护接口返回 401 reverification_required，而不是成员失效", async () => {
       memberRows = [{ ...(memberRows[0] as object), reverification_required: true }];
       const response = await api()(request("session", undefined, token));

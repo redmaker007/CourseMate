@@ -10,6 +10,7 @@ import { signInWithPasswordAction } from "@/features/auth/password-actions";
 import { getEnabledSchools, type EnabledSchool } from "@/features/auth/queries";
 import {
   currentSessionNeedsReverification,
+  currentSessionSuspended,
   getCurrentMember,
 } from "@/features/auth/session";
 import { safeRelativePath } from "@/lib/safe-relative-path";
@@ -38,6 +39,8 @@ export default async function LoginPage({
       `/onboarding/profile?next=${encodeURIComponent(destination)}`,
     );
   }
+  // 停用账号的会话仍有效，但不能进主应用；带去说明页，那里可以退出或永久注销。
+  if (await currentSessionSuspended()) redirect("/suspended");
 
   const reverificationRequired = await currentSessionNeedsReverification();
   let schools: EnabledSchool[] = [];

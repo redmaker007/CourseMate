@@ -135,6 +135,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         const access = await reader.getMemberAccess();
         // 超过 30 天或密码失效：客户端应引导用验证码登录，而不是当作账号失效清缓存（ADR-0011）。
         if (access?.status === "reverification_required") throw new RequestFailure("reverification_required", 401);
+        if (access?.status === "suspended") throw new RequestFailure("account_suspended", 403);
         if (!access) throw new RequestFailure("membership_denied", 403);
         return access.context;
       };
@@ -148,7 +149,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         })) });
       }
 
-      const sessionReply = async (status: "signed_in" | "refreshed", member?: Awaited<ReturnType<typeof readMember>>) => {
+      const sessionReply = async (status: "signed_in" | "refreshed" | "account_suspended", member?: Awaited<ReturnType<typeof readMember>>, httpStatus = 200) => {
         const { data, error } = await supabase.auth.getSession();
         if (error || !data.session?.expires_at) throw error ?? new Error("Missing session");
         const session = data.session;
@@ -157,7 +158,7 @@ export function createMobileAuthApi(dependencies: Dependencies) {
           refreshToken: session.refresh_token,
           expiresAt: session.expires_at,
           tokenType: session.token_type,
-        } });
+        } }, httpStatus);
       };
 
       if (path === "auth/request-code" || path === "auth/verify-code") {
@@ -196,6 +197,8 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         if (result.status !== "signed_in") return json(result, resultHttpStatus(result.status));
         try { return await sessionReply("signed_in", await readMember()); }
         catch (error) {
+          // 停用账号：仍交付会话，App 只能用它退出登录或永久注销，其他接口都会返回 403 account_suspended。
+          if (error instanceof RequestFailure && error.status === "account_suspended") return await sessionReply("account_suspended", undefined, 403);
           await supabase.auth.signOut({ scope: "local" });
           throw error;
         }
@@ -210,6 +213,8 @@ export function createMobileAuthApi(dependencies: Dependencies) {
         if (result.status !== "signed_in") return json(result, resultHttpStatus(result.status));
         try { return await sessionReply("signed_in", await readMember()); }
         catch (error) {
+          // 停用账号：仍交付会话，App 只能用它退出登录或永久注销，其他接口都会返回 403 account_suspended。
+          if (error instanceof RequestFailure && error.status === "account_suspended") return await sessionReply("account_suspended", undefined, 403);
           await supabase.auth.signOut({ scope: "local" });
           throw error;
         }

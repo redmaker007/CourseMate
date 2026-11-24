@@ -13,6 +13,7 @@ const FACTS: MemberFacts = {
   currentSchoolId: "uw-madison",
   onboardingComplete: true,
   reverificationRequired: false,
+  suspended: false,
 };
 
 function reader(overrides: Partial<MemberSessionDataPort> = {}) {
@@ -214,6 +215,24 @@ describe("需要重新验证邮箱（ADR-0011）", () => {
   it("学校绑定不一致时优先当作未登录，不提示重新验证", async () => {
     const { reader: mismatched } = reader({
       getMemberFacts: async () => ({ ...FACTS, enabledSchoolId: null, reverificationRequired: true }),
+    });
+    await expect(mismatched.getMemberAccess()).resolves.toBeNull();
+  });
+});
+
+describe("停用账号（202611230001）", () => {
+  const suspended = () =>
+    reader({ getMemberFacts: async () => ({ ...FACTS, currentSchoolId: null, onboardingComplete: false, suspended: true }) }).reader;
+
+  it("会话仍有效（可退出、可注销），但页面上下文为空，getMemberAccess 标明 suspended", async () => {
+    await expect(suspended().getMemberSession()).resolves.toEqual({ userId: "user-1", schoolId: "uw-madison" });
+    await expect(suspended().getMemberContext()).resolves.toBeNull();
+    await expect(suspended().getMemberAccess()).resolves.toEqual({ status: "suspended" });
+  });
+
+  it("学校绑定不一致时仍按未登录处理", async () => {
+    const { reader: mismatched } = reader({
+      getMemberFacts: async () => ({ ...FACTS, enabledSchoolId: null, suspended: true }),
     });
     await expect(mismatched.getMemberAccess()).resolves.toBeNull();
   });

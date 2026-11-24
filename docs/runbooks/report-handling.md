@@ -50,7 +50,18 @@ order by r.created_at;
    where id = <message_id> and deleted_at is null;
    ```
 
-3. **情节严重时停用账号**：停用功能还在开发，上线后在这里补操作步骤。停用之前，只能删除内容。
+3. **情节严重时停用账号**（迁移 `202611230001` 上线后可用；暂时没有 `/admin` 按钮）。停用函数会检查调用者是不是平台管理员，所以在 SQL Editor 里要先声明“我是哪个管理员”，再调用：
+
+   ```sql
+   select set_config('request.jwt.claim.sub', '<你的管理员 user_id>', true);
+   select public.admin_suspend_member('<被停用者 user_id>', '多次骚扰（举报 <report_id>）');
+   -- 解除：select public.admin_unsuspend_member('<user_id>');
+   -- 对方已注销、只想允许该邮箱重新注册：select public.admin_unsuspend_email('<邮箱>');
+   ```
+
+   三条语句要放在同一次执行里（`set_config` 第三个参数 `true` 只在本事务有效）。返回值：`suspended`／`unsuspended` 成功；`invalid_target` 不能停用自己；`not_allowed` 不能停用所有者，管理员之间只有所有者能停用；`not_found` 账号不存在。每次操作都会写进管理审计日志。
+
+   停用的效果：对方立即退出所有设备，再登录只能看到“账号已停用”页（可以申诉、退出或永久注销）；已发的内容保留，违规的那几条按上一步逐条删除；在解除停用前，同一邮箱注销后也不能重新注册。
 4. **更新举报状态**：违规写 `actioned`，不违规写 `dismissed`。数据库会自动记下处理时间，到期清理靠这个时间计算。
 
    ```sql

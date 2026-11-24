@@ -53,6 +53,12 @@ describe("密码登录", () => {
     expect(discardSession).toHaveBeenCalledOnce();
   });
 
+  it("停用账号保留会话，由页面带到“账号已停用”（可退出或注销）", async () => {
+    const { service, discardSession } = signIn({ access: ["none", "suspended"] });
+    await expect(service.signIn(MEMBER.email, "secret-123")).resolves.toEqual({ status: "signed_in" });
+    expect(discardSession).not.toHaveBeenCalled();
+  });
+
   it("密码对了但不是可用成员时丢掉会话，结果与密码错误相同", async () => {
     const { service, discardSession } = signIn({ access: ["none", "none"] });
     await expect(service.signIn(MEMBER.email, "secret-123")).resolves.toEqual({ status: "invalid_credentials" });

@@ -19,7 +19,7 @@ export function isAcceptablePassword(password: string) {
   );
 }
 
-export type MemberAccessStatus = "member" | "reverification_required" | "none";
+export type MemberAccessStatus = "member" | "reverification_required" | "suspended" | "none";
 
 export interface PasswordSignInPort {
   signIn(
@@ -65,7 +65,8 @@ export function createPasswordSignInService(dependencies: {
           await dependencies.auth.discardSession();
           return { status: "temporarily_unavailable" };
         }
-        if (access === "member") return { status: "signed_in" };
+        // 停用账号也保留会话：页面会把它带到“账号已停用”，用户仍可退出或永久注销。
+        if (access === "member" || access === "suspended") return { status: "signed_in" };
         // 不留下这次的密码会话：要么该用验证码重新验证，要么已不是可用成员。
         await dependencies.auth.discardSession();
         return access === "reverification_required"
